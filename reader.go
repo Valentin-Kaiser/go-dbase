@@ -76,8 +76,9 @@ type FieldHeader struct {
 
 // contains the raw record data and a deleted flag
 type Record struct {
+	DBF     *DBF
 	Deleted bool
-	data    []interface{}
+	Data    []interface{}
 }
 
 /**
@@ -437,43 +438,35 @@ func (dbf *DBF) Skip(offset int64) error {
 	return nil
 }
 
-// returns a complete record as a map.
-// If recNumber > 0 it returns the record at recNumber, if recNumber <= 0 it returns the record at dbf.recordPointer
-func (dbf *DBF) RecordToMap(recNumber uint32) (map[string]interface{}, error) {
-	if recNumber <= 0 {
-		recNumber = dbf.recordPointer
-	} else if recNumber != dbf.recordPointer {
-		if err := dbf.GoTo(recNumber); err != nil {
+// returns all records
+func (dbf *DBF) Records() ([]*Record, error) {
+	records := make([]*Record, 1)
+	for i := 0; i < int(dbf.RecordsCount()); i++ {
+		record, err := dbf.GetRecord(uint32(i))
+		if err != nil {
 			return nil, err
 		}
+		records = append(records, record)
 	}
-	out := make(map[string]interface{})
-	for i, fn := range dbf.FieldNames() {
-		val, err := dbf.Field(i)
-		if err != nil {
-			return out, fmt.Errorf("error on field %s (column %d): %s", fn, i, err)
-		}
-		out[fn] = val
-	}
-	return out, nil
+
+	return records, nil
 }
 
-// returns a complete record as a JSON object.
-// if recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recpointer.
-// if trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the record map are re-assigned)
-func (dbf *DBF) RecordToJSON(recordNumber uint32, trimspaces bool) ([]byte, error) {
-	m, err := dbf.RecordToMap(recordNumber)
+// returns the requested record.
+// if recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recordPointer
+func (dbf *DBF) GetRecord(recordNumber uint32) (*Record, error) {
+	if recordNumber <= 0 {
+		recordNumber = dbf.recordPointer
+	}
+
+	// Set dbf pointer to record number
+	err := dbf.GoTo(recordNumber)
 	if err != nil {
 		return nil, err
 	}
-	if trimspaces {
-		for k, v := range m {
-			if str, ok := v.(string); ok {
-				m[k] = strings.TrimSpace(str)
-			}
-		}
-	}
-	return json.Marshal(m)
+
+	data, err := dbf.readRecord(recordNumber)
+	return dbf.bytesToRecord(data)
 }
 
 // reads field number fieldpos at the record number the internal pointer is pointing to and returns its Go value
@@ -671,7 +664,8 @@ func (dbf *DBF) Deleted() (bool, error) {
 // converts raw record data to a Record struct
 // if the data points to a memo (FPT) file this file is also read
 func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
-	rec := new(Record)
+	rec := &Record{}
+	rec.DBF = dbf
 
 	// a record should start with te delete flag, a space (0x20) or * (0x2A)
 	rec.Deleted = data[0] == 0x2A
@@ -679,16 +673,16 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 		return nil, errors.New("invalid record data, no delete flag found at beginning of record")
 	}
 
-	rec.data = make([]interface{}, dbf.FieldsCount())
+	rec.Data = make([]interface{}, dbf.FieldsCount())
 
 	offset := uint16(1) // deleted flag already read
-	for i := 0; i < len(rec.data); i++ {
+	for i := 0; i < len(rec.Data); i++ {
 		fieldinfo := dbf.fields[i]
 		val, err := dbf.FieldToValue(data[offset:offset+uint16(fieldinfo.Length)], i)
 		if err != nil {
 			return rec, err
 		}
-		rec.data[i] = val
+		rec.Data[i] = val
 
 		offset += uint16(fieldinfo.Length)
 	}
@@ -718,17 +712,49 @@ func (f *FieldHeader) FieldType() string {
  *	################################################################
  */
 
+// returns a complete record as a map.
+// if recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recordPointer
+func (rec *Record) ToMap() (map[string]interface{}, error) {
+	out := make(map[string]interface{})
+	for i, fn := range rec.DBF.FieldNames() {
+		val, err := rec.Field(i)
+		if err != nil {
+			return out, fmt.Errorf("error on field %s (column %d): %s", fn, i, err)
+		}
+		out[fn] = val
+	}
+	return out, nil
+}
+
+// returns a complete record as a JSON object.
+// if recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recpointer.
+// if trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the record map are re-assigned)
+func (rec *Record) ToJSON(trimspaces bool) ([]byte, error) {
+	m, err := rec.ToMap()
+	if err != nil {
+		return nil, err
+	}
+	if trimspaces {
+		for k, v := range m {
+			if str, ok := v.(string); ok {
+				m[k] = strings.TrimSpace(str)
+			}
+		}
+	}
+	return json.Marshal(m)
+}
+
 // Field gets a fields value by field pos (index)
 func (r *Record) Field(pos int) (interface{}, error) {
-	if pos < 0 || len(r.data) < pos {
+	if pos < 0 || len(r.Data) < pos {
 		return 0, ERROR_INVALID.AsError()
 	}
-	return r.data[pos], nil
+	return r.Data[pos], nil
 }
 
 // FieldSlice gets all fields as a slice
 func (r *Record) FieldSlice() []interface{} {
-	return r.data
+	return r.Data
 }
 
 /**
