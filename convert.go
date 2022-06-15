@@ -10,8 +10,8 @@ import (
 
 // convert year, month and day to a julian day number
 // julian day number -> days since 01-01-4712 BC
-func YMD2J(y, m, d int) int {
-	return y - 32075 +
+func YMD2JD(y, m, d int) int {
+	return d - 32075 +
 		1461*(y+4800+(m-14)/12)/4 +
 		367*(m-2-(m-14)/12*12)/12 -
 		3*((y+4900+(m-14)/12)/100)/4
@@ -19,7 +19,7 @@ func YMD2J(y, m, d int) int {
 
 // convert julian day number to year, month and day
 // julian day number -> days since 01-01-4712 BC
-func J2YMD(date int) (int, int, int) {
+func JD2YMD(date int) (int, int, int) {
 	l := date + 68569
 	n := 4 * l / 146097
 	l = l - (146097*n+3)/4
@@ -35,7 +35,7 @@ func J2YMD(date int) (int, int, int) {
 
 // convert year, month and day delimited by hyphen to a julian day number
 // julian day number -> days since 01-01-4712 BC
-func ToNumber(date string) (int, error) {
+func JDToNumber(date string) (int, error) {
 	dateString := strings.FieldsFunc(date, unicode.IsPunct)
 	if len(dateString) != 3 {
 		return 0, errors.New("expected 3 punctuation delimited fields.")
@@ -46,13 +46,13 @@ func ToNumber(date string) (int, error) {
 	if ei != nil || ej != nil || ek != nil {
 		return 0, errors.New("expected 3 integers")
 	}
-	return YMD2J(y, m, d), nil
+	return YMD2JD(y, m, d), nil
 }
 
 // convert julian day number to golang time.Time
 // julian day number -> days since 01-01-4712 BC
-func ToDate(number int) (time.Time, error) {
-	y, m, d := J2YMD(number)
+func JDToDate(number int) (time.Time, error) {
+	y, m, d := JD2YMD(number)
 	ys := strconv.Itoa(y)
 	ms := strconv.Itoa(m)
 	ds := strconv.Itoa(d)
@@ -65,7 +65,7 @@ func ToDate(number int) (time.Time, error) {
 		ds = "0" + ds
 	}
 
-	return time.Parse("2000-01-01", ys+"-"+ms+"-"+ds)
+	return time.Parse("2006-01-02", ys+"-"+ms+"-"+ds)
 }
 
 /**
