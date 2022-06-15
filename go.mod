@@ -1,4 +1,4 @@
-module dBase
+module github.com/Avanis-GmbH/dBase
 
 go 1.17
 
