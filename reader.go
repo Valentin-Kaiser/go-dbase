@@ -15,32 +15,32 @@ import (
 	"time"
 )
 
-// used to open files from memory
+// Used to open files from memory
 type MemoryReader interface {
 	io.ReadSeeker
 	io.ReaderAt
 }
 
 type DBF struct {
-	dbaseHeader *DBaseFileHeader
-	memoHeader  *MemoFileHeader
-
-	// used with memory files
+	// Used with files loaded into memory
 	dbaseReader MemoryReader
 	memoReader  MemoryReader
 
-	// used with disk files
+	// Used with disk files
 	dbaseFile *os.File
 	memoFile  *os.File
 
 	decoder Decoder
 
+	dbaseHeader *DBaseFileHeader
+	memoHeader  *MemoFileHeader
+
 	fields []FieldHeader
 
-	recordPointer uint32 // internal record pointer, can be moved
+	recordPointer uint32 // Internal record pointer, can be moved
 }
 
-// containing all raw DBF header fields.
+// Containing all raw DBF header fields.
 type DBaseFileHeader struct {
 	FileVersion  byte     // File type flag
 	Year         uint8    // Last update year (0-99)
@@ -54,14 +54,14 @@ type DBaseFileHeader struct {
 	CodePage     byte     // Code page mark
 }
 
-// the raw header of the Memo file.
+// The raw header of the Memo file.
 type MemoFileHeader struct {
 	NextFree  uint32  // Location of next free block
 	Unused    [2]byte // Unused
 	BlockSize uint16  // Block size (bytes per block)
 }
 
-// contains the raw field info structure from the DBF header.
+// Contains the raw field info structure from the DBF header.
 type FieldHeader struct {
 	Name     [11]byte // Field name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
 	Type     byte     // Field type
@@ -74,7 +74,7 @@ type FieldHeader struct {
 	Reserved [8]byte  // Reserved
 }
 
-// contains the raw record data and a deleted flag
+// Contains the raw record data and a deleted flag
 type Record struct {
 	DBF     *DBF
 	Deleted bool
@@ -87,8 +87,8 @@ type Record struct {
  *	################################################################
  */
 
-// openFile opens a dBase database file (and the memo file if needed) from disk.
-// to close the embedded file handle(s) call DBF.Close().
+// OpenFile opens a dBase database file (and the memo file if needed) from disk.
+// To close the embedded file handle(s) call DBF.Close().
 func OpenFile(filename string, dec Decoder) (*DBF, error) {
 	filename = filepath.Clean(filename)
 
@@ -104,9 +104,9 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 
 	dbf.dbaseFile = file
 
-	// check if there is an FPT according to the header
-	// if there is we will try to open it in the same dir (using the same filename and case)
-	// if the FPT file does not exist an error is returned
+	// Check if there is an FPT according to the header.
+	// If there is we will try to open it in the same dir (using the same filename and case).
+	// If the FPT file does not exist an error is returned.
 	if (dbf.dbaseHeader.TableFlags & 0x02) != 0 {
 		ext := filepath.Ext(filename)
 		fptExt := ".fpt"
@@ -129,10 +129,9 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 	return dbf, nil
 }
 
-// creates a new DBF struct from a bytes stream, for example a bytes.Reader
-// the memoFile parameter is optional, but if the DBF header has the FPT flag set, the memoFile must be provided.
+// Creates a new DBF struct from a bytes stream.
+// The memoFile parameter is optional, but if the DBF header has the FPT flag set, the memoFile must be provided.
 func OpenStream(dbffile, memoFile MemoryReader, dec Decoder) (*DBF, error) {
-
 	dbf, err := prepareDBF(dbffile, dec)
 	if err != nil {
 		return nil, err
@@ -151,7 +150,7 @@ func OpenStream(dbffile, memoFile MemoryReader, dec Decoder) (*DBF, error) {
 	return dbf, nil
 }
 
-// closes the file handlers
+// Closes the file handlers.
 func (dbf *DBF) Close() error {
 	if dbf.dbaseFile != nil {
 		err := dbf.dbaseFile.Close()
@@ -176,8 +175,9 @@ func (dbf *DBF) Close() error {
  *	################################################################
  */
 
+// Returns a DBF object pointer
+// Reads the DBF Header, the field infos and validates file version.
 func prepareDBF(dbfReader MemoryReader, dec Decoder) (*DBF, error) {
-
 	header, err := readDBFHeader(dbfReader)
 	if err != nil {
 		return nil, err
@@ -217,7 +217,7 @@ func readDBFHeader(r io.ReadSeeker) (*DBaseFileHeader, error) {
 	return h, nil
 }
 
-// reads field infos from DBF header, starting at pos 32, until it finds the Header record terminator (0x0D).
+// Reads field infos from DBF header, starting at pos 32, until it finds the Header record terminator (0x0D).
 func readFieldInfos(r io.ReadSeeker) ([]FieldHeader, error) {
 	fields := make([]FieldHeader, 0)
 
@@ -250,8 +250,8 @@ func readFieldInfos(r io.ReadSeeker) ([]FieldHeader, error) {
 	return fields, nil
 }
 
-// reads field infos from DBF header, starting at pos 32.
-// reads fields until it finds the Header record terminator (0x0D).
+// Reads field infos from DBF header, starting at pos 32.
+// Reads fields until it finds the Header record terminator (0x0D).
 func ReadHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 	fields := make([]FieldHeader, 0)
 
@@ -299,20 +299,20 @@ func validateFileVersion(version byte) error {
  *	################################################################
  */
 
-// parses the year, month and day to time.Time.
-// note: the year is stored in 2 digits, 15 is 2015
+// Parses the year, month and day to time.Time.
+// Note: the year is stored in 2 digits, 15 is 2015
 func (h *DBaseFileHeader) Modified() time.Time {
 	return time.Date(2000+int(h.Year), time.Month(h.Month), int(h.Day), 0, 0, 0, 0, time.Local)
 }
 
-// returns the calculated number of fields from the header info alone (without the need to read the fieldinfo from the header).
+// Returns the calculated number of fields from the header info alone (without the need to read the fieldinfo from the header).
 // This is the fastest way to determine the number of records in the file.
-// note: when OpenFile is used the fields have already been parsed so it is better to call DBF.FieldsCount in that case.
+// Note: when OpenFile is used the fields have already been parsed so it is better to call DBF.FieldsCount in that case.
 func (h *DBaseFileHeader) FieldsCount() uint16 {
 	return uint16((h.FirstRecord - 296) / 32)
 }
 
-// returns the calculated file size based on the header info
+// Returns the calculated file size based on the header info
 func (h *DBaseFileHeader) FileSize() int64 {
 	return 296 + int64(h.FieldsCount()*32) + int64(h.RecordsCount*uint32(h.RecordLength))
 }
@@ -324,7 +324,6 @@ func (h *DBaseFileHeader) FileSize() int64 {
  */
 
 func (dbf *DBF) prepareMemo(memoFileReader MemoryReader) error {
-
 	memoHeader, err := readMemoHeader(memoFileReader)
 	if err != nil {
 		return err
@@ -353,12 +352,12 @@ func readMemoHeader(r io.ReadSeeker) (*MemoFileHeader, error) {
  *	################################################################
  */
 
-// returns the dBase database file header struct for inspecting
+// Returns the dBase database file header struct for inspecting
 func (dbf *DBF) Header() *DBaseFileHeader {
 	return dbf.dbaseHeader
 }
 
-// returns the os.FileInfo for the DBF file
+// Returns the os.FileInfo for the DBF file
 func (dbf *DBF) DBaseFileStats() (os.FileInfo, error) {
 	if dbf.dbaseFile == nil {
 		return nil, ERROR_NO_DBF_FILE.AsError()
@@ -366,7 +365,7 @@ func (dbf *DBF) DBaseFileStats() (os.FileInfo, error) {
 	return dbf.dbaseFile.Stat()
 }
 
-// returns the os.FileInfo for the FPT file
+// Returns the os.FileInfo for the FPT file
 func (dbf *DBF) MemoFileStats() (os.FileInfo, error) {
 	if dbf.memoFile == nil {
 		return nil, ERROR_NO_FPT_FILE.AsError()
@@ -379,17 +378,17 @@ func (dbf *DBF) RecordsCount() uint32 {
 	return dbf.dbaseHeader.RecordsCount
 }
 
-// returns all the FieldHeaders
+// Returns all the FieldHeaders
 func (dbf *DBF) Fields() []FieldHeader {
 	return dbf.fields
 }
 
-// returns the number of fields
+// Returns the number of fields
 func (dbf *DBF) FieldsCount() uint16 {
 	return uint16(len(dbf.fields))
 }
 
-// returns a slice of all the field names
+// Returns a slice of all the field names
 func (dbf *DBF) FieldNames() []string {
 	num := len(dbf.fields)
 	names := make([]string, num)
@@ -399,7 +398,7 @@ func (dbf *DBF) FieldNames() []string {
 	return names
 }
 
-// returns the field position of a fieldname or -1 if not found.
+// Returns the field position of a fieldname or -1 if not found.
 func (dbf *DBF) FieldPos(fieldname string) int {
 	for i := 0; i < len(dbf.fields); i++ {
 		if dbf.fields[i].FieldName() == fieldname {
@@ -420,10 +419,10 @@ func (dbf *DBF) GoTo(recNumber uint32) error {
 	return nil
 }
 
-// skip adds offset to the internal record pointer
-// returns EOF error if at end of file and positions the pointer at lastRecord+1
+// Skip adds offset to the internal record pointer
+// Returns EOF error if at end of file and positions the pointer at lastRecord+1
 // Returns BOF error is the record pointer would be become negative and positions the pointer at 0
-// does not skip deleted records
+// Does not skip deleted records
 func (dbf *DBF) Skip(offset int64) error {
 	newval := int64(dbf.recordPointer) + offset
 	if newval >= int64(dbf.dbaseHeader.RecordsCount) {
@@ -438,9 +437,9 @@ func (dbf *DBF) Skip(offset int64) error {
 	return nil
 }
 
-// returns all records
+// Returns all records
 func (dbf *DBF) Records() ([]*Record, error) {
-	records := make([]*Record, 1)
+	records := make([]*Record, 0)
 	for i := 0; i < int(dbf.RecordsCount()); i++ {
 		record, err := dbf.GetRecord(uint32(i))
 		if err != nil {
@@ -452,8 +451,8 @@ func (dbf *DBF) Records() ([]*Record, error) {
 	return records, nil
 }
 
-// returns the requested record.
-// if recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recordPointer
+// Returns the requested record.
+// If recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recordPointer
 func (dbf *DBF) GetRecord(recordNumber uint32) (*Record, error) {
 	if recordNumber <= 0 {
 		recordNumber = dbf.recordPointer
@@ -469,7 +468,7 @@ func (dbf *DBF) GetRecord(recordNumber uint32) (*Record, error) {
 	return dbf.bytesToRecord(data)
 }
 
-// reads field number fieldpos at the record number the internal pointer is pointing to and returns its Go value
+// Reads field number fieldpos at the record number the internal pointer is pointing to and returns its Go value
 func (dbf *DBF) Field(fieldPosition int) (interface{}, error) {
 	data, err := dbf.readField(dbf.recordPointer, fieldPosition)
 	if err != nil {
@@ -479,17 +478,17 @@ func (dbf *DBF) Field(fieldPosition int) (interface{}, error) {
 	return dbf.FieldToValue(data, fieldPosition)
 }
 
-// returns if the internal recordpointer is at end of file
+// Returns if the internal recordpointer is at end of file
 func (dbf *DBF) EOF() bool {
 	return dbf.recordPointer >= dbf.dbaseHeader.RecordsCount
 }
 
-// returns if the internal recordpointer is before first record
+// Returns if the internal recordpointer is before first record
 func (dbf *DBF) BOF() bool {
 	return dbf.recordPointer == 0
 }
 
-// reads raw field data of one field at fieldPosition at recordPosition
+// Reads raw field data of one field at fieldPosition at recordPosition
 func (dbf *DBF) readField(recordPosition uint32, fieldPosition int) ([]byte, error) {
 	if recordPosition >= dbf.dbaseHeader.RecordsCount {
 		return nil, ERROR_EOF.AsError()
@@ -509,7 +508,7 @@ func (dbf *DBF) readField(recordPosition uint32, fieldPosition int) ([]byte, err
 	return buf, nil
 }
 
-// reads raw record data of one record at recordPosition
+// Reads raw record data of one record at recordPosition
 func (dbf *DBF) readRecord(recordPosition uint32) ([]byte, error) {
 	if recordPosition >= dbf.dbaseHeader.RecordsCount {
 		return nil, ERROR_EOF.AsError()
@@ -525,9 +524,9 @@ func (dbf *DBF) readRecord(recordPosition uint32) ([]byte, error) {
 	return buf, nil
 }
 
-// converts raw field data to the correct type for the given field
-// for C and M fields a charset conversion is done
-// for M fields the data is read from the memo file
+// Converts raw field data to the correct type for the given field
+// For C and M fields a charset conversion is done
+// For M fields the data is read from the memo file
 func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error) {
 	// Not all field types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed
@@ -536,8 +535,6 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 	}
 
 	switch dbf.fields[fieldPosition].FieldType() {
-	default:
-		return nil, fmt.Errorf("unsupported fieldtype: %s", dbf.fields[fieldPosition].FieldType())
 	case "M":
 		// M values contain the address in the FPT file from where to read data
 		memo, isText, err := dbf.parseMemo(raw)
@@ -581,6 +578,8 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 	case "F":
 		// F values are stored as string values
 		return dbf.parseFloat(raw)
+	default:
+		return nil, fmt.Errorf("unsupported fieldtype: %s", dbf.fields[fieldPosition].FieldType())
 	}
 }
 
@@ -598,7 +597,7 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	return memo, isText, nil
 }
 
-// reads one or more blocks from the FPT file, called for each memo field.
+// Reads one or more blocks from the FPT file, called for each memo field.
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 
@@ -606,14 +605,14 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 		return nil, false, ERROR_NO_FPT_FILE.AsError()
 	}
 
-	// determine the block number
+	// Determine the block number
 	block := binary.LittleEndian.Uint32(blockdata)
-	// the position in the file is blocknumber*blocksize
+	// The position in the file is blocknumber*blocksize
 	if _, err := dbf.memoReader.Seek(int64(dbf.memoHeader.BlockSize)*int64(block), 0); err != nil {
 		return nil, false, err
 	}
 
-	// read the memo block header, instead of reading into a struct using binary.Read we just read the two
+	// Read the memo block header, instead of reading into a struct using binary.Read we just read the two
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo fields
 	// as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
@@ -640,7 +639,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
-// returns if the record at recordPosition is deleted
+// Returns if the record at recordPosition is deleted
 func (dbf *DBF) DeletedAt(recordPosition uint32) (bool, error) {
 	if recordPosition >= dbf.dbaseHeader.RecordsCount {
 		return false, ERROR_EOF.AsError()
@@ -656,13 +655,13 @@ func (dbf *DBF) DeletedAt(recordPosition uint32) (bool, error) {
 	return buf[0] == 0x2A, nil
 }
 
-// returns if the record at the internal record pos is deleted
+// Returns if the record at the internal record pos is deleted
 func (dbf *DBF) Deleted() (bool, error) {
 	return dbf.DeletedAt(dbf.recordPointer)
 }
 
-// converts raw record data to a Record struct
-// if the data points to a memo (FPT) file this file is also read
+// Converts raw record data to a Record struct
+// If the data points to a memo (FPT) file this file is also read
 func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 	rec := &Record{}
 	rec.DBF = dbf
@@ -696,12 +695,12 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
  *	################################################################
  */
 
-// returns the name of the field as a trimmed string (max length 10)
+// Returns the name of the field as a trimmed string (max length 10)
 func (f *FieldHeader) FieldName() string {
 	return string(bytes.TrimRight(f.Name[:], "\x00"))
 }
 
-// returns the type of the field as string (length 1)
+// Returns the type of the field as string (length 1)
 func (f *FieldHeader) FieldType() string {
 	return string(f.Type)
 }
@@ -712,8 +711,8 @@ func (f *FieldHeader) FieldType() string {
  *	################################################################
  */
 
-// returns a complete record as a map.
-// if recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recordPointer
+// Returns a complete record as a map.
+// If recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recordPointer
 func (rec *Record) ToMap() (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 	for i, fn := range rec.DBF.FieldNames() {
@@ -726,9 +725,9 @@ func (rec *Record) ToMap() (map[string]interface{}, error) {
 	return out, nil
 }
 
-// returns a complete record as a JSON object.
-// if recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recpointer.
-// if trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the record map are re-assigned)
+// Returns a complete record as a JSON object.
+// If recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recpointer.
+// If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the record map are re-assigned)
 func (rec *Record) ToJSON(trimspaces bool) ([]byte, error) {
 	m, err := rec.ToMap()
 	if err != nil {
@@ -742,6 +741,24 @@ func (rec *Record) ToJSON(trimspaces bool) ([]byte, error) {
 		}
 	}
 	return json.Marshal(m)
+}
+
+// Parses the record from map to JSON-encoded data and stores the result in the value pointed to by v.
+// If v is nil or not a pointer, an InvalidUnmarshalError will be returned.
+// To convert the record into a struct, json.Unmarshal matches incoming object keys to either the struct field name or its tag,
+// preferring an exact match but also accepting a case-insensitive match.
+func (rec *Record) ToStruct(v interface{}) error {
+	jsonRecord, err := rec.ToJSON(true)
+	if err != nil {
+		return nil
+	}
+
+	err = json.Unmarshal(jsonRecord, v)
+	if err != nil {
+		return nil
+	}
+
+	return nil
 }
 
 // Field gets a fields value by field pos (index)
@@ -777,17 +794,17 @@ func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
 	julDat := int(binary.LittleEndian.Uint32(raw[:4]))
 	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
 
-	// determine year, month, day
-	y, m, d := J2YMD(julDat)
+	// Determine year, month, day
+	y, m, d := JD2YMD(julDat)
 	if y < 0 || y > 9999 {
-		// TODO some dbf files seem to contain invalid dates, not sure if we want treat this an error until I know what is going on
 		return time.Time{}, nil
 	}
 
-	// calculate whole seconds and use the remainder as nanosecond resolution
+	// Calculate whole seconds and use the remainder as nanosecond resolution
 	nSec := mSec / 1000
 	mSec = mSec - (nSec * 1000)
-	// create time using ymd and nanosecond timestamp
+
+	// Create time using ymd and nanosecond timestamp
 	return time.Date(y, time.Month(m), d, 0, 0, nSec, mSec*int(time.Millisecond), time.UTC), nil
 }
 
