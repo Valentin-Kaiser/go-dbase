@@ -6,7 +6,7 @@ This package provides a reader for reading FoxPro database files.
 Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
 # Features 
 
-This project is a extended clone of the [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) package from [Sebastiaan Klippert](https://github.com/SebastiaanKlippert).
+This project is an extended clone of the [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) package from [Sebastiaan Klippert](https://github.com/SebastiaanKlippert).
 
 There are several similar packages like the go-foxpro-dbf package but they are not suited for our use case, this package implemented:
 
@@ -19,6 +19,7 @@ There are several similar packages like the go-foxpro-dbf package but they are n
 We also aim to support the following features:
 
 * Non blocking IO operation
+* Writing to dBase database files
 
 The focus is on performance while also trying to keep the code readable and easy to use.
 
