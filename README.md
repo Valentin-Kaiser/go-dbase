@@ -76,8 +76,13 @@ func main() {
 		fmt.Println(field.FieldName(), field.FieldType(), field.Decimals /*etc*/)
 	}
 
+	err = dbf.GoTo(1)
+	if err != nil {
+		panic(err)
+	}
+
 	// Read the complete second record
-	record, err := dbf.RecordAt(1)
+	record, err := dbf.GetRecord()
 	if err != nil {
 		panic(err)
 	}
@@ -85,11 +90,17 @@ func main() {
 	// Print all the fields in their Go values
 	fmt.Println(record.FieldSlice())
 
+	// Go back to start
+	err = dbf.GoTo(0)
+	if err != nil {
+		panic(err)
+	}
+
 	// Loop through all records using recordpointer in DBF struct
 	// Reads the complete record
 	for !dbf.EOF() {
 		// This reads the complete record
-		record, err := dbf.Record()
+		record, err := dbf.GetRecord()
 		if err != nil {
 			panic(err)
 		}

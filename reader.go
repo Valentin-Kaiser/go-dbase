@@ -451,15 +451,9 @@ func (dbf *DBF) Records() ([]*Record, error) {
 	return records, nil
 }
 
-// Returns the requested record.
-// If recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recordPointer
+// Returns the requested record at dbf.recordPointer.
 func (dbf *DBF) GetRecord(recordNumber uint32) (*Record, error) {
-	if recordNumber <= 0 {
-		recordNumber = dbf.recordPointer
-	}
-
-	// Set dbf pointer to record number
-	err := dbf.GoTo(recordNumber)
+	err := dbf.GoTo(dbf.recordPointer)
 	if err != nil {
 		return nil, err
 	}
