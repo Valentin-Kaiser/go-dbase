@@ -444,12 +444,12 @@ func (dbf *DBF) Skip(offset int64) error {
 }
 
 // Returns all records
-func (dbf *DBF) Records() ([]*Record, error) {
+func (dbf *DBF) Records(skipInvalid bool) ([]*Record, error) {
 	records := make([]*Record, 0)
 	for !dbf.EOF() {
 		// This reads the complete record
 		record, err := dbf.GetRecord()
-		if err != nil {
+		if err != nil && !skipInvalid {
 			return nil, err
 		}
 
