@@ -46,6 +46,10 @@ The supported field types with their return Go types are:
 | T | DateTime | time.Time |
 | Y | Currency | float64 |
 
+# Installation
+``` 
+go get github.com/Valentin-Kaiser/go-dbase@latest
+```
 
 # Example
 
