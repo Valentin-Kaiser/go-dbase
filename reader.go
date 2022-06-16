@@ -245,6 +245,7 @@ func readFieldInfos(r io.ReadSeeker) ([]FieldHeader, error) {
 		}
 
 		if field.FieldName() == "_NullFlags" {
+			offset += 32
 			continue
 		}
 
