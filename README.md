@@ -58,9 +58,26 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase"
 )
+
+type Test struct {
+	ID          int32     `json:"ID"`
+	Niveau      int32     `json:"NIVEAU"`
+	Date        time.Time `json:"DATUM"`
+	TIJD        string    `json:"TIJD"`
+	SOORT       float64   `json:"SOORT"`
+	ID_NR       int32     `json:"ID_NR"`
+	UserNR      int32     `json:"USERNR"`
+	CompanyName string    `json:"COMP_NAME"`
+	CompanyOS   string    `json:"COMP_OS"`
+	Melding     string    `json:"MELDING"`
+	Number      int64     `json:"NUMBER"`
+	Float       float64   `json:"FLOAT"`
+	Bool        bool      `json:"BOOL"`
+}
 
 func main() {
 	// Open file
@@ -75,9 +92,11 @@ func main() {
 		fmt.Println(name)
 	}
 
+	fmt.Println("--- database file fields --- \n")
+
 	// Get fieldinfo for all fields
 	for _, field := range dbf.Fields() {
-		fmt.Println(field.FieldName(), field.FieldType(), field.Decimals /*etc*/)
+		fmt.Println(field.FieldName(), field.FieldType(), field.Decimals)
 	}
 
 	err = dbf.GoTo(1)
@@ -91,6 +110,8 @@ func main() {
 		panic(err)
 	}
 
+	fmt.Println("--- database row as slice --- \n")
+
 	// Print all the fields in their Go values
 	fmt.Println(record.FieldSlice())
 
@@ -100,7 +121,7 @@ func main() {
 		panic(err)
 	}
 
-	// Loop through all records using recordpointer in DBF struct
+	// Loop through all records using recordPointer in DBF struct
 	// Reads the complete record
 	for !dbf.EOF() {
 		// This reads the complete record
@@ -116,18 +137,26 @@ func main() {
 		}
 
 		// get field by position
-		field1, err := record.Field(0)
+		_, err = record.Field(0)
 		if err != nil {
 			panic(err)
 		}
 
 		// get field by name
-		field2, err := record.Field(dbf.FieldPos("NAAM"))
+		_, err = record.Field(dbf.FieldPos("COMP_NAME"))
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println(field1, field2)
+		fmt.Println("\n --- converted to struct --- \n")
+
+		// convert record into struct
+		t := &Test{}
+		err = record.ToStruct(t)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("TESTDATA Company: %+v \n", t.CompanyName)
 	}
 
 	// Read only the third field of records 1, 2 and 3
@@ -152,6 +181,7 @@ func main() {
 		}
 	}
 }
+
 ```
 
 # Thanks
