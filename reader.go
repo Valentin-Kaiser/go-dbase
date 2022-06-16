@@ -440,11 +440,19 @@ func (dbf *DBF) Skip(offset int64) error {
 // Returns all records
 func (dbf *DBF) Records() ([]*Record, error) {
 	records := make([]*Record, 0)
-	for i := 0; i < int(dbf.RecordsCount()); i++ {
-		record, err := dbf.GetRecord(uint32(i))
+	for !dbf.EOF() {
+		// This reads the complete record
+		record, err := dbf.GetRecord()
 		if err != nil {
 			return nil, err
 		}
+
+		dbf.Skip(1)
+		// skip deleted records
+		if record.Deleted {
+			continue
+		}
+
 		records = append(records, record)
 	}
 
@@ -452,13 +460,12 @@ func (dbf *DBF) Records() ([]*Record, error) {
 }
 
 // Returns the requested record at dbf.recordPointer.
-func (dbf *DBF) GetRecord(recordNumber uint32) (*Record, error) {
-	err := dbf.GoTo(dbf.recordPointer)
+func (dbf *DBF) GetRecord() (*Record, error) {
+	data, err := dbf.readRecord(dbf.recordPointer)
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := dbf.readRecord(recordNumber)
 	return dbf.bytesToRecord(data)
 }
 
