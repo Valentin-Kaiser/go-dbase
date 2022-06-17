@@ -158,6 +158,7 @@ func main() {
 		fmt.Printf("TESTDATA Company: %+v \n", t.CompanyName)
 	}
 
+	fmt.Println("\n --- record specific field --- \n")
 	// Read only the third field of records 1, 2 and 3
 	recnumbers := []uint32{1, 2, 3}
 	for _, rec := range recnumbers {
@@ -171,13 +172,17 @@ func main() {
 			panic(err)
 		}
 
-		if !deleted {
-			field3, err := dbf.Field(3)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Println(field3)
+		if deleted {
+			fmt.Printf("Record %v deleted \n", rec)
+			continue
 		}
+
+		field3, err := dbf.Field(3)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Record %v field 3: %v \n", rec, field3)
+
 	}
 }
 
