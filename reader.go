@@ -741,12 +741,82 @@ func (f *FieldHeader) FieldType() string {
 
 /**
  *	################################################################
- *	#						Record helper
+ *	#						Conversion helper
  *	################################################################
  */
 
+// Returns all records as a slice of maps.
+func (dbf *DBF) RecordsToMap(skipInvalid bool) ([]map[string]interface{}, error) {
+	out := make([]map[string]interface{}, 0)
+
+	records, err := dbf.Records(skipInvalid)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range records {
+		rmap, err := record.ToMap()
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, rmap)
+	}
+
+	return out, nil
+}
+
+// Returns all records as json
+// If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the record map are re-assigned)
+func (dbf *DBF) RecordsToJSON(skipInvalid bool, trimspaces bool) ([]byte, error) {
+	records, err := dbf.RecordsToMap(skipInvalid)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-reader-to-json-1:FAILED:%v", err)
+	}
+
+	mapRecords := make([]map[string]interface{}, 0)
+	for _, record := range records {
+		if trimspaces {
+			for k, v := range record {
+				if str, ok := v.(string); ok {
+					record[k] = strings.TrimSpace(str)
+				}
+			}
+		}
+		mapRecords = append(mapRecords, record)
+	}
+
+	return json.Marshal(mapRecords)
+}
+
+// Returns all records as a slice of struct.
+// Parses the record from map to JSON-encoded data and stores the result in the value pointed to by v.
+// If v is nil or not a pointer, an InvalidUnmarshalError will be returned.
+// To convert the record into a struct, json.Unmarshal matches incoming object keys to either the struct field name or its tag,
+// preferring an exact match but also accepting a case-insensitive match.
+// v keeps the last converted struct.
+// If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the record map are re-assigned)
+func (dbf *DBF) RecordsToStruct(v interface{}, skipInvalid bool, trimspaces bool) ([]interface{}, error) {
+	out := make([]interface{}, 0)
+
+	records, err := dbf.Records(skipInvalid)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range records {
+		err := record.ToStruct(v, trimspaces)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, v)
+	}
+
+	return out, nil
+}
+
 // Returns a complete record as a map.
-// If recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recordPointer
 func (rec *Record) ToMap() (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 	for i, fn := range rec.DBF.FieldNames() {
@@ -760,7 +830,6 @@ func (rec *Record) ToMap() (map[string]interface{}, error) {
 }
 
 // Returns a complete record as a JSON object.
-// If recordNumber > 0 it returns the record at recordNumber, if recordNumber <= 0 it returns the record at dbf.recpointer.
 // If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the record map are re-assigned)
 func (rec *Record) ToJSON(trimspaces bool) ([]byte, error) {
 	m, err := rec.ToMap()
@@ -781,8 +850,8 @@ func (rec *Record) ToJSON(trimspaces bool) ([]byte, error) {
 // If v is nil or not a pointer, an InvalidUnmarshalError will be returned.
 // To convert the record into a struct, json.Unmarshal matches incoming object keys to either the struct field name or its tag,
 // preferring an exact match but also accepting a case-insensitive match.
-func (rec *Record) ToStruct(v interface{}) error {
-	jsonRecord, err := rec.ToJSON(true)
+func (rec *Record) ToStruct(v interface{}, trimspaces bool) error {
+	jsonRecord, err := rec.ToJSON(trimspaces)
 	if err != nil {
 		return fmt.Errorf("dbase-reader-to-struct-1:FAILED:%v", err)
 	}
