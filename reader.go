@@ -244,40 +244,6 @@ func readFieldInfos(fd syscall.Handle) ([]FieldHeader, error) {
 	return fields, nil
 }
 
-// Reads field infos from DBF header, starting at pos 32.
-// Reads fields until it finds the Header record terminator (0x0D).
-func ReadHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
-	fields := make([]FieldHeader, 0)
-
-	offset := int64(32)
-	b := make([]byte, 1)
-	for {
-		// Check if we are at 0x0D by reading one byte ahead
-		if _, err := r.Seek(offset, 0); err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-header-fields-1:FAILED:%v", err)
-		}
-		if _, err := r.Read(b); err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-header-fields-2:FAILED:%v", err)
-		}
-		if b[0] == 0x0D {
-			break
-		}
-		// Position back one byte and read the field
-		if _, err := r.Seek(-1, 1); err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-header-fields-3:FAILED:%v", err)
-		}
-		field := FieldHeader{}
-		err := binary.Read(r, binary.LittleEndian, &field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-header-fields-4:FAILED:%v", err)
-		}
-		fields = append(fields, field)
-
-		offset += 32
-	}
-	return fields, nil
-}
-
 func validateFileVersion(version byte) error {
 	switch version {
 	default:
