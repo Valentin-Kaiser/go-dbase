@@ -1,10 +1,9 @@
 package dbase
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -20,71 +19,11 @@ func TestOpenFile(t *testing.T) {
 	}
 }
 
-func TestOpenStream(t *testing.T) {
-	dbfbytes, err := ioutil.ReadFile(testFilePath + ".DBF")
-	if err != nil {
-		t.Fatalf("[TEST] OpenStream failed #1 - Error: %v", err)
-	}
-	dbfreader := bytes.NewReader(dbfbytes)
-
-	fptbytes, err := ioutil.ReadFile(filepath.Join("test_data", "TEST.FPT"))
-	if err != nil {
-		t.Fatalf("[TEST] OpenStream failed #2 - Error: %v", err)
-	}
-	fptreader := bytes.NewReader(fptbytes)
-
-	dBaseStream, err = OpenStream(dbfreader, fptreader, new(Win1250Decoder))
-	if err != nil {
-		t.Fatalf("[TEST] OpenStream failed #3 - Error: %v", err)
-	}
-}
-
 func TestFieldHeader(t *testing.T) {
 	want := "{Name:[73 68 0 0 0 0 0 0 0 0 0] Type:73 Position:1 Length:4 Decimals:0 Flags:0 Next:5 Step:1 Reserved:[0 0 0 0 0 0 0 78]}"
 	have := fmt.Sprintf("%+v", dBaseFile.fields[0])
 	if have != want {
 		t.Errorf("[TEST] OpenStream failed #1 - Error: First field from header does not match signature >> Want %s, have %s", want, have)
-	}
-}
-
-// Test if file stat size matches header file size, only run when using file mode
-func TestStatsAndSize(t *testing.T) {
-	stats, err := dBaseFile.DBaseFileStats()
-	if err != nil {
-		t.Errorf("[TEST] Stats failed #1 - DBaseFileStats - Error: %v", err)
-	}
-
-	statSize := stats.Size()
-	hdrSize := dBaseFile.dbaseHeader.FileSize()
-	if statSize != hdrSize {
-		t.Errorf("[TEST] Stats failed #2 - Error: Calculated header size >> %d, stat size >> %d", hdrSize, statSize)
-	}
-
-	stats, err = dBaseFile.MemoFileStats()
-	if err != nil {
-		t.Errorf("[TEST] Stats failed #3 - MemoFileStats - Error: %v", err)
-	}
-
-	fptbytes, err := ioutil.ReadFile(testFilePath + ".FPT")
-	if err != nil {
-		t.Errorf("[TEST] Stats failed #4 - ReadFile - Error: %v", err)
-	}
-
-	if stats.Size() != int64(len(fptbytes)) {
-		t.Errorf("[TEST] Stats failed #5 - Error: Real FPT size >> %d, stat size >> %d", int64(len(fptbytes)), stats.Size())
-	}
-
-	if dBaseFile.RecordsCount() != uint32(4) {
-		t.Errorf("[TEST] Stats failed #6 - Error: Want 4 records, have %d", dBaseFile.RecordsCount())
-	}
-
-	if len(dBaseFile.Fields()) != 13 {
-		t.Errorf("[TEST] Stats failed #7 - Error: Want 10 fields, have %d", len(dBaseFile.Fields()))
-	}
-	// Test modified date, because we use time.Local to represent the modified date it can change depending on the system we run
-	modified := dBaseFile.Header().Modified().UTC()
-	if modified.Format("2006-01-02") != "2022-06-14" {
-		t.Errorf("[TEST] Stats failed #8 - Error: Want modified date 2022-06-14, have %s", modified.Format("2006-01-02"))
 	}
 }
 
@@ -143,7 +82,7 @@ func TestSkip(t *testing.T) {
 	}
 	err = dBaseFile.Skip(3)
 	if err != nil {
-		if DBaseError(err.Error()) != ERROR_EOF {
+		if DBaseError(strings.Split(err.Error(), ":")[len(strings.Split(err.Error(), ":"))-1]) != ERROR_EOF {
 			t.Errorf("[TEST] Skip failed #3- Error: %v", err)
 		}
 	}
@@ -152,7 +91,7 @@ func TestSkip(t *testing.T) {
 	}
 	err = dBaseFile.Skip(-20)
 	if err != nil {
-		if DBaseError(err.Error()) != ERROR_BOF {
+		if DBaseError(strings.Split(err.Error(), ":")[len(strings.Split(err.Error(), ":"))-1]) != ERROR_BOF {
 			t.Errorf("[TEST] Skip failed #5 - Error: %v", err)
 		}
 	}

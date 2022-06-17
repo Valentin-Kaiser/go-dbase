@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -22,13 +21,8 @@ type MemoryReader interface {
 }
 
 type DBF struct {
-	// Used with files loaded into memory
-	dbaseReader MemoryReader
-	memoReader  MemoryReader
-
-	// Used with disk files
-	dbaseFile *os.File
-	memoFile  *os.File
+	dbaseFileHandle *syscall.Handle
+	memoFileHandle  *syscall.Handle
 
 	decoder Decoder
 
@@ -92,17 +86,17 @@ type Record struct {
 func OpenFile(filename string, dec Decoder) (*DBF, error) {
 	filename = filepath.Clean(filename)
 
-	file, err := os.Open(filename)
+	fd, err := syscall.Open(filename, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0644)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-open-file-1:FAILED:%v", err)
 	}
 
-	dbf, err := prepareDBF(file, dec)
+	dbf, err := prepareDBF(fd, dec)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-open-file-2:FAILED:%v", err)
 	}
 
-	dbf.dbaseFile = file
+	dbf.dbaseFileHandle = &fd
 
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
@@ -113,38 +107,17 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 		if strings.ToUpper(ext) == ext {
 			fptExt = ".FPT"
 		}
-		memoFile, err := os.Open(strings.TrimSuffix(filename, ext) + fptExt)
+		fd, err := syscall.Open(strings.TrimSuffix(filename, ext)+fptExt, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0644)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbase-reader-open-file-3:FAILED:%v", err)
 		}
 
-		err = dbf.prepareMemo(memoFile)
+		err = dbf.prepareMemo(fd)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbase-reader-open-file-4:FAILED:%v", err)
 		}
 
-		dbf.memoFile = memoFile
-	}
-
-	return dbf, nil
-}
-
-// Creates a new DBF struct from a bytes stream.
-// The memoFile parameter is optional, but if the DBF header has the FPT flag set, the memoFile must be provided.
-func OpenStream(dbffile, memoFile MemoryReader, dec Decoder) (*DBF, error) {
-	dbf, err := prepareDBF(dbffile, dec)
-	if err != nil {
-		return nil, err
-	}
-
-	if (dbf.dbaseHeader.TableFlags & 0x02) != 0 {
-		if memoFile == nil {
-			return nil, ERROR_NO_FPT_FILE.AsError()
-		}
-		err = dbf.prepareMemo(memoFile)
-		if err != nil {
-			return nil, err
-		}
+		dbf.memoFileHandle = &fd
 	}
 
 	return dbf, nil
@@ -152,17 +125,17 @@ func OpenStream(dbffile, memoFile MemoryReader, dec Decoder) (*DBF, error) {
 
 // Closes the file handlers.
 func (dbf *DBF) Close() error {
-	if dbf.dbaseFile != nil {
-		err := dbf.dbaseFile.Close()
+	if dbf.dbaseFileHandle != nil {
+		err := syscall.Close(*dbf.dbaseFileHandle)
 		if err != nil {
-			return fmt.Errorf("closing DBF failed: %s", err)
+			return fmt.Errorf("dbase-reader-close-1:FAILED:Closing DBF failed with error: %v", err)
 		}
 	}
 
-	if dbf.memoFile != nil {
-		err := dbf.memoFile.Close()
+	if dbf.memoFileHandle != nil {
+		err := syscall.Close(*dbf.memoFileHandle)
 		if err != nil {
-			return fmt.Errorf("closing FPT failed: %s", err)
+			return fmt.Errorf("dbase-reader-close-2:FAILED:Closing FPT failed with error: %v", err)
 		}
 	}
 
@@ -177,71 +150,86 @@ func (dbf *DBF) Close() error {
 
 // Returns a DBF object pointer
 // Reads the DBF Header, the field infos and validates file version.
-func prepareDBF(dbfReader MemoryReader, dec Decoder) (*DBF, error) {
-	header, err := readDBFHeader(dbfReader)
+func prepareDBF(fd syscall.Handle, dec Decoder) (*DBF, error) {
+	header, err := readDBFHeader(fd)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-prepare-dbf-1:FAILED:%v", err)
 	}
 
 	// check if the fileversion flag is expected, expand validFileVersion if needed
 	if err := validateFileVersion(header.FileVersion); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-prepare-dbf-2:FAILED:%v", err)
 	}
 
 	// read fieldinfo
-	fields, err := readFieldInfos(dbfReader)
+	fields, err := readFieldInfos(fd)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-prepare-dbf-3:FAILED:%v", err)
 	}
 
 	dbf := &DBF{
-		dbaseHeader: header,
-		dbaseReader: dbfReader,
-		fields:      fields,
-		decoder:     dec,
+		dbaseHeader:     header,
+		dbaseFileHandle: &fd,
+		fields:          fields,
+		decoder:         dec,
 	}
 
 	return dbf, nil
 }
 
-func readDBFHeader(r io.ReadSeeker) (*DBaseFileHeader, error) {
+func readDBFHeader(fd syscall.Handle) (*DBaseFileHeader, error) {
 	h := &DBaseFileHeader{}
-	if _, err := r.Seek(0, 0); err != nil {
-		return nil, err
+	if _, err := syscall.Seek(syscall.Handle(fd), 0, 0); err != nil {
+		return nil, fmt.Errorf("dbase-reader-read-dbf-header-1:FAILED:%v", err)
 	}
-	// integers in table files are stored with the least significant byte first.
-	err := binary.Read(r, binary.LittleEndian, h)
+
+	b := make([]byte, 1024)
+	n, err := syscall.Read(syscall.Handle(fd), b)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-read-dbf-header-2:FAILED:%v", err)
+	}
+
+	// integers in table files are stored with the least significant byte first.
+	err = binary.Read(bytes.NewReader(b[:n]), binary.LittleEndian, h)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-reader-read-dbf-header-3:FAILED:%v", err)
 	}
 	return h, nil
 }
 
 // Reads field infos from DBF header, starting at pos 32, until it finds the Header record terminator (0x0D).
-func readFieldInfos(r io.ReadSeeker) ([]FieldHeader, error) {
+func readFieldInfos(fd syscall.Handle) ([]FieldHeader, error) {
 	fields := make([]FieldHeader, 0)
 
 	offset := int64(32)
 	b := make([]byte, 1)
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
-		if _, err := r.Seek(offset, 0); err != nil {
-			return nil, err
+		if _, err := syscall.Seek(syscall.Handle(fd), offset, 0); err != nil {
+			return nil, fmt.Errorf("dbase-reader-read-field-infos-1:FAILED:%v", err)
 		}
-		if _, err := r.Read(b); err != nil {
-			return nil, err
+		if _, err := syscall.Read(syscall.Handle(fd), b); err != nil {
+			return nil, fmt.Errorf("dbase-reader-read-field-infos-2:FAILED:%v", err)
 		}
 		if b[0] == 0x0D {
 			break
 		}
+
 		// Position back one byte and read the field
-		if _, err := r.Seek(-1, 1); err != nil {
-			return nil, err
+		if _, err := syscall.Seek(syscall.Handle(fd), -1, 1); err != nil {
+			return nil, fmt.Errorf("dbase-reader-read-field-infos-3:FAILED:%v", err)
 		}
-		field := FieldHeader{}
-		err := binary.Read(r, binary.LittleEndian, &field)
+
+		buf := make([]byte, 2048)
+		n, err := syscall.Read(syscall.Handle(fd), buf)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbase-reader-read-field-infos-4:FAILED:%v", err)
+		}
+
+		field := FieldHeader{}
+		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, &field)
+		if err != nil {
+			return nil, fmt.Errorf("dbase-reader-read-field-infos-5:FAILED:%v", err)
 		}
 
 		if field.FieldName() == "_NullFlags" {
@@ -266,22 +254,22 @@ func ReadHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
 		if _, err := r.Seek(offset, 0); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbase-reader-read-header-fields-1:FAILED:%v", err)
 		}
 		if _, err := r.Read(b); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbase-reader-read-header-fields-2:FAILED:%v", err)
 		}
 		if b[0] == 0x0D {
 			break
 		}
 		// Position back one byte and read the field
 		if _, err := r.Seek(-1, 1); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbase-reader-read-header-fields-3:FAILED:%v", err)
 		}
 		field := FieldHeader{}
 		err := binary.Read(r, binary.LittleEndian, &field)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbase-reader-read-header-fields-4:FAILED:%v", err)
 		}
 		fields = append(fields, field)
 
@@ -293,7 +281,7 @@ func ReadHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 func validateFileVersion(version byte) error {
 	switch version {
 	default:
-		return fmt.Errorf("untested DBF file version: %d (%x hex), try overriding ValidFileVersionFunc to open this file anyway", version, version)
+		return fmt.Errorf("dbase-reader-validate-file-version-1:FAILED:untested DBF file version: %d (%x hex)", version, version)
 	case 0x30, 0x31:
 		return nil
 	}
@@ -329,25 +317,33 @@ func (h *DBaseFileHeader) FileSize() int64 {
  *	################################################################
  */
 
-func (dbf *DBF) prepareMemo(memoFileReader MemoryReader) error {
-	memoHeader, err := readMemoHeader(memoFileReader)
+func (dbf *DBF) prepareMemo(fd syscall.Handle) error {
+	memoHeader, err := readMemoHeader(fd)
 	if err != nil {
-		return err
+		return fmt.Errorf("dbase-reader-prepare-memo-1:FAILED:%v", err)
+
 	}
 
-	dbf.memoReader = memoFileReader
+	dbf.memoFileHandle = &fd
 	dbf.memoHeader = memoHeader
 	return nil
 }
 
-func readMemoHeader(r io.ReadSeeker) (*MemoFileHeader, error) {
+func readMemoHeader(fd syscall.Handle) (*MemoFileHeader, error) {
 	h := &MemoFileHeader{}
-	if _, err := r.Seek(0, 0); err != nil {
-		return nil, err
+	if _, err := syscall.Seek(syscall.Handle(fd), 0, 0); err != nil {
+		return nil, fmt.Errorf("dbase-reader-read-memo-header-1:FAILED:%v", err)
 	}
-	err := binary.Read(r, binary.BigEndian, h)
+
+	b := make([]byte, 1024)
+	n, err := syscall.Read(syscall.Handle(fd), b)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-read-memo-header-2:FAILED:%v", err)
+	}
+
+	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-reader-read-memo-header-3:FAILED:%v", err)
 	}
 	return h, nil
 }
@@ -361,22 +357,6 @@ func readMemoHeader(r io.ReadSeeker) (*MemoFileHeader, error) {
 // Returns the dBase database file header struct for inspecting
 func (dbf *DBF) Header() *DBaseFileHeader {
 	return dbf.dbaseHeader
-}
-
-// Returns the os.FileInfo for the DBF file
-func (dbf *DBF) DBaseFileStats() (os.FileInfo, error) {
-	if dbf.dbaseFile == nil {
-		return nil, ERROR_NO_DBF_FILE.AsError()
-	}
-	return dbf.dbaseFile.Stat()
-}
-
-// Returns the os.FileInfo for the FPT file
-func (dbf *DBF) MemoFileStats() (os.FileInfo, error) {
-	if dbf.memoFile == nil {
-		return nil, ERROR_NO_FPT_FILE.AsError()
-	}
-	return dbf.memoFile.Stat()
 }
 
 // returns the number of records
@@ -417,9 +397,9 @@ func (dbf *DBF) FieldPos(fieldname string) int {
 // GoTo sets the internal record pointer to record recNumber
 // Returns and EOF error if at EOF and positions the pointer at lastRecord+1
 func (dbf *DBF) GoTo(recNumber uint32) error {
-	if recNumber >= dbf.dbaseHeader.RecordsCount {
+	if recNumber > dbf.dbaseHeader.RecordsCount {
 		dbf.recordPointer = dbf.dbaseHeader.RecordsCount
-		return ERROR_EOF.AsError()
+		return fmt.Errorf("dbase-reader-go-to-1:FAILED:go to %v > %v:%v", recNumber, dbf.dbaseHeader.RecordsCount, ERROR_EOF.AsError())
 	}
 	dbf.recordPointer = recNumber
 	return nil
@@ -433,11 +413,11 @@ func (dbf *DBF) Skip(offset int64) error {
 	newval := int64(dbf.recordPointer) + offset
 	if newval >= int64(dbf.dbaseHeader.RecordsCount) {
 		dbf.recordPointer = dbf.dbaseHeader.RecordsCount
-		return ERROR_EOF.AsError()
+		return fmt.Errorf("dbase-reader-skip-1:FAILED:%v", ERROR_EOF.AsError())
 	}
 	if newval < 0 {
 		dbf.recordPointer = 0
-		return ERROR_BOF.AsError()
+		return fmt.Errorf("dbase-reader-skip-2:FAILED:%v", ERROR_BOF.AsError())
 	}
 	dbf.recordPointer = uint32(newval)
 	return nil
@@ -450,7 +430,7 @@ func (dbf *DBF) Records(skipInvalid bool) ([]*Record, error) {
 		// This reads the complete record
 		record, err := dbf.GetRecord()
 		if err != nil && !skipInvalid {
-			return nil, err
+			return nil, fmt.Errorf("dbase-reader-records-1:FAILED:%v", err)
 		}
 
 		dbf.Skip(1)
@@ -469,7 +449,7 @@ func (dbf *DBF) Records(skipInvalid bool) ([]*Record, error) {
 func (dbf *DBF) GetRecord() (*Record, error) {
 	data, err := dbf.readRecord(dbf.recordPointer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-get-record-1:FAILED:%v", err)
 	}
 
 	return dbf.bytesToRecord(data)
@@ -479,7 +459,7 @@ func (dbf *DBF) GetRecord() (*Record, error) {
 func (dbf *DBF) Field(fieldPosition int) (interface{}, error) {
 	data, err := dbf.readField(dbf.recordPointer, fieldPosition)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-field-1:FAILED:%v", err)
 	}
 	// fieldPosition is valid or readField would have returned an error
 	return dbf.FieldToValue(data, fieldPosition)
@@ -498,19 +478,28 @@ func (dbf *DBF) BOF() bool {
 // Reads raw field data of one field at fieldPosition at recordPosition
 func (dbf *DBF) readField(recordPosition uint32, fieldPosition int) ([]byte, error) {
 	if recordPosition >= dbf.dbaseHeader.RecordsCount {
-		return nil, ERROR_EOF.AsError()
+		return nil, fmt.Errorf("dbase-reader-read-field-1:FAILED:%v", ERROR_EOF.AsError())
 	}
+
 	if fieldPosition < 0 || fieldPosition > int(dbf.FieldsCount()) {
-		return nil, ERROR_INVALID.AsError()
+		return nil, fmt.Errorf("dbase-reader-read-field-2:FAILED:%v", ERROR_INVALID.AsError())
 	}
+
 	buf := make([]byte, dbf.fields[fieldPosition].Length)
 	pos := int64(dbf.dbaseHeader.FirstRecord) + (int64(recordPosition) * int64(dbf.dbaseHeader.RecordLength)) + int64(dbf.fields[fieldPosition].Position)
-	read, err := dbf.dbaseReader.ReadAt(buf, pos)
+
+	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), pos, 0)
 	if err != nil {
-		return buf, err
+		return buf, fmt.Errorf("dbase-reader-read-field-3:FAILED:%v", err)
 	}
+
+	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-reader-read-field-4:FAILED:%v", err)
+	}
+
 	if read != int(dbf.fields[fieldPosition].Length) {
-		return buf, ERROR_INCOMPLETE.AsError()
+		return buf, fmt.Errorf("dbase-reader-read-field-5:FAILED:%v", ERROR_INCOMPLETE.AsError())
 	}
 	return buf, nil
 }
@@ -518,15 +507,22 @@ func (dbf *DBF) readField(recordPosition uint32, fieldPosition int) ([]byte, err
 // Reads raw record data of one record at recordPosition
 func (dbf *DBF) readRecord(recordPosition uint32) ([]byte, error) {
 	if recordPosition >= dbf.dbaseHeader.RecordsCount {
-		return nil, ERROR_EOF.AsError()
+		return nil, fmt.Errorf("dbase-reader-read-record-1:FAILED:%v", ERROR_EOF.AsError())
 	}
 	buf := make([]byte, dbf.dbaseHeader.RecordLength)
-	read, err := dbf.dbaseReader.ReadAt(buf, int64(dbf.dbaseHeader.FirstRecord)+(int64(recordPosition)*int64(dbf.dbaseHeader.RecordLength)))
+
+	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), int64(dbf.dbaseHeader.FirstRecord)+(int64(recordPosition)*int64(dbf.dbaseHeader.RecordLength)), 0)
 	if err != nil {
-		return buf, err
+		return buf, fmt.Errorf("dbase-reader-read-record-2:FAILED:%v", err)
 	}
+
+	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-reader-read-record-3:FAILED:%v", err)
+	}
+
 	if read != int(dbf.dbaseHeader.RecordLength) {
-		return buf, ERROR_INCOMPLETE.AsError()
+		return buf, fmt.Errorf("dbase-reader-read-record-1:FAILED:%v", ERROR_INCOMPLETE.AsError())
 	}
 	return buf, nil
 }
@@ -538,7 +534,7 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 	// Not all field types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed
 	if fieldPosition < 0 || len(dbf.fields) < fieldPosition {
-		return nil, ERROR_INVALID.AsError()
+		return nil, fmt.Errorf("dbase-reader-field-to-value-1:FAILED:%v", ERROR_INVALID.AsError())
 	}
 
 	switch dbf.fields[fieldPosition].FieldType() {
@@ -546,12 +542,19 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 		// M values contain the address in the FPT file from where to read data
 		memo, isText, err := dbf.parseMemo(raw)
 		if isText {
-			return string(memo), err
+			if err != nil {
+				return string(memo), fmt.Errorf("dbase-reader-field-to-value-2:FAILED:%v", err)
+			}
+			return string(memo), nil
 		}
-		return memo, err
+		return memo, nil
 	case "C":
 		// C values are stored as strings, the returned string is not trimmed
-		return dbf.toUTF8String(raw)
+		str, err := dbf.toUTF8String(raw)
+		if err != nil {
+			return str, fmt.Errorf("dbase-reader-field-to-value-4:FAILED:%v", err)
+		}
+		return str, nil
 	case "I":
 		// I values are stored as numeric values
 		return int32(binary.LittleEndian.Uint32(raw)), nil
@@ -560,13 +563,21 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 		return math.Float64frombits(binary.LittleEndian.Uint64(raw)), nil
 	case "D":
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
-		return dbf.parseDate(raw)
+		date, err := dbf.parseDate(raw)
+		if err != nil {
+			return date, fmt.Errorf("dbase-reader-field-to-value-5:FAILED:%v", err)
+		}
+		return date, nil
 	case "T":
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
-		return dbf.parseDateTime(raw)
+		dateTime, err := dbf.parseDateTime(raw)
+		if err != nil {
+			return dateTime, fmt.Errorf("dbase-reader-field-to-value-6:FAILED:%v", err)
+		}
+		return dateTime, nil
 	case "L":
 		// L values are stored as strings T or F, we only check for T, the rest is false...
 		return string(raw) == "T", nil
@@ -579,26 +590,34 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 	case "N":
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
 		if dbf.fields[fieldPosition].Decimals == 0 {
-			return dbf.parseNumericInt(raw)
+			i, err := dbf.parseNumericInt(raw)
+			if err != nil {
+				return i, fmt.Errorf("dbase-reader-field-to-value-7:FAILED:%v", err)
+			}
+			return i, nil
 		}
 		fallthrough // same as "F"
 	case "F":
 		// F values are stored as string values
-		return dbf.parseFloat(raw)
+		f, err := dbf.parseFloat(raw)
+		if err != nil {
+			return f, fmt.Errorf("dbase-reader-field-to-value-8:FAILED:%v", err)
+		}
+		return f, nil
 	default:
-		return nil, fmt.Errorf("unsupported fieldtype: %s", dbf.fields[fieldPosition].FieldType())
+		return nil, fmt.Errorf("dbase-reader-field-to-value-9:FAILED:Unsupported fieldtype: %s", dbf.fields[fieldPosition].FieldType())
 	}
 }
 
 func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	memo, isText, err := dbf.readMemo(raw)
 	if err != nil {
-		return []byte{}, false, err
+		return []byte{}, false, fmt.Errorf("dbase-reader-parse-memo-1:FAILED:%v", err)
 	}
 	if isText {
 		memo, err = dbf.decoder.Decode(memo)
 		if err != nil {
-			return []byte{}, false, err
+			return []byte{}, false, fmt.Errorf("dbase-reader-parse-memo-2:FAILED:%v", err)
 		}
 	}
 	return memo, isText, nil
@@ -608,40 +627,42 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 
-	if dbf.memoReader == nil {
-		return nil, false, ERROR_NO_FPT_FILE.AsError()
+	if dbf.memoFileHandle == nil {
+		return nil, false, fmt.Errorf("dbase-reader-read-memo-1:FAILED:%v", ERROR_NO_FPT_FILE.AsError())
 	}
 
 	// Determine the block number
 	block := binary.LittleEndian.Uint32(blockdata)
 	// The position in the file is blocknumber*blocksize
-	if _, err := dbf.memoReader.Seek(int64(dbf.memoHeader.BlockSize)*int64(block), 0); err != nil {
-		return nil, false, err
+	_, err := syscall.Seek(syscall.Handle(*dbf.memoFileHandle), int64(dbf.memoHeader.BlockSize)*int64(block), 0)
+	if err != nil {
+		return nil, false, fmt.Errorf("dbase-reader-read-memo-2:FAILED:%v", err)
 	}
 
 	// Read the memo block header, instead of reading into a struct using binary.Read we just read the two
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo fields
 	// as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
-	_, err := dbf.memoReader.Read(hbuf)
+	read, err := syscall.Read(syscall.Handle(*dbf.memoFileHandle), hbuf)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("dbase-reader-read-memo-3:FAILED:%v", err)
 	}
+
 	sign := binary.BigEndian.Uint32(hbuf[:4])
 	leng := binary.BigEndian.Uint32(hbuf[4:])
-
 	if leng == 0 {
 		// No data according to block header? Not sure if this should be an error instead
 		return []byte{}, sign == 1, nil
 	}
+
 	// Now read the actual data
 	buf := make([]byte, leng)
-	read, err := dbf.memoReader.Read(buf)
+	read, err = syscall.Read(syscall.Handle(*dbf.memoFileHandle), buf)
 	if err != nil {
-		return buf, false, err
+		return buf, false, fmt.Errorf("dbase-reader-read-memo-4:FAILED:%v", err)
 	}
 	if read != int(leng) {
-		return buf, sign == 1, ERROR_INCOMPLETE.AsError()
+		return buf, sign == 1, fmt.Errorf("dbase-reader-read-memo-5:FAILED:%v", ERROR_INCOMPLETE.AsError())
 	}
 	return buf, sign == 1, nil
 }
@@ -649,15 +670,21 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 // Returns if the record at recordPosition is deleted
 func (dbf *DBF) DeletedAt(recordPosition uint32) (bool, error) {
 	if recordPosition >= dbf.dbaseHeader.RecordsCount {
-		return false, ERROR_EOF.AsError()
+		return false, fmt.Errorf("dbase-reader-deleted-at-1:FAILED:%v", ERROR_EOF.AsError())
 	}
-	buf := make([]byte, 1)
-	read, err := dbf.dbaseReader.ReadAt(buf, int64(dbf.dbaseHeader.FirstRecord)+(int64(recordPosition)*int64(dbf.dbaseHeader.RecordLength)))
+
+	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), int64(dbf.dbaseHeader.FirstRecord)+(int64(recordPosition)*int64(dbf.dbaseHeader.RecordLength)), 0)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("dbase-reader-deleted-at-2:FAILED:%v", err)
+	}
+
+	buf := make([]byte, 1)
+	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
+	if err != nil {
+		return false, fmt.Errorf("dbase-reader-deleted-at-3:FAILED:%v", err)
 	}
 	if read != 1 {
-		return false, ERROR_INCOMPLETE.AsError()
+		return false, fmt.Errorf("dbase-reader-deleted-at-4:FAILED:%v", ERROR_INCOMPLETE.AsError())
 	}
 	return buf[0] == 0x2A, nil
 }
@@ -676,7 +703,7 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 	// a record should start with te delete flag, a space (0x20) or * (0x2A)
 	rec.Deleted = data[0] == 0x2A
 	if !rec.Deleted && data[0] != 0x20 {
-		return nil, errors.New("invalid record data, no delete flag found at beginning of record")
+		return nil, fmt.Errorf("dbase-reader-bytes-to-record-1:FAILED:invalid record data, no delete flag found at beginning of record")
 	}
 
 	rec.Data = make([]interface{}, dbf.FieldsCount())
@@ -686,7 +713,7 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 		fieldinfo := dbf.fields[i]
 		val, err := dbf.FieldToValue(data[offset:offset+uint16(fieldinfo.Length)], i)
 		if err != nil {
-			return rec, err
+			return rec, fmt.Errorf("dbase-reader-bytes-to-record-2:FAILED:%v", err)
 		}
 		rec.Data[i] = val
 
@@ -725,7 +752,7 @@ func (rec *Record) ToMap() (map[string]interface{}, error) {
 	for i, fn := range rec.DBF.FieldNames() {
 		val, err := rec.Field(i)
 		if err != nil {
-			return out, fmt.Errorf("error on field %s (column %d): %s", fn, i, err)
+			return out, fmt.Errorf("dbase-reader-to-map-1:FAILED:error on field %s (column %d): %s", fn, i, err)
 		}
 		out[fn] = val
 	}
@@ -738,7 +765,7 @@ func (rec *Record) ToMap() (map[string]interface{}, error) {
 func (rec *Record) ToJSON(trimspaces bool) ([]byte, error) {
 	m, err := rec.ToMap()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-reader-to-json-1:FAILED:%v", err)
 	}
 	if trimspaces {
 		for k, v := range m {
@@ -757,12 +784,12 @@ func (rec *Record) ToJSON(trimspaces bool) ([]byte, error) {
 func (rec *Record) ToStruct(v interface{}) error {
 	jsonRecord, err := rec.ToJSON(true)
 	if err != nil {
-		return nil
+		return fmt.Errorf("dbase-reader-to-struct-1:FAILED:%v", err)
 	}
 
 	err = json.Unmarshal(jsonRecord, v)
 	if err != nil {
-		return nil
+		return fmt.Errorf("dbase-reader-to-struct-2:FAILED:%v", err)
 	}
 
 	return nil
@@ -771,7 +798,7 @@ func (rec *Record) ToStruct(v interface{}) error {
 // Field gets a fields value by field pos (index)
 func (r *Record) Field(pos int) (interface{}, error) {
 	if pos < 0 || len(r.Data) < pos {
-		return 0, ERROR_INVALID.AsError()
+		return 0, fmt.Errorf("dbase-reader-field-1:FAILED:%v", ERROR_INVALID.AsError())
 	}
 	return r.Data[pos], nil
 }
@@ -796,7 +823,7 @@ func (dbf *DBF) parseDate(raw []byte) (time.Time, error) {
 
 func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
 	if len(raw) != 8 {
-		return time.Time{}, ERROR_INVALID.AsError()
+		return time.Time{}, fmt.Errorf("dbase-reader-parse-date-time-1:FAILED:%v", ERROR_INVALID.AsError())
 	}
 	julDat := int(binary.LittleEndian.Uint32(raw[:4]))
 	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
@@ -835,7 +862,7 @@ func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
 func (dbf *DBF) toUTF8String(raw []byte) (string, error) {
 	utf8, err := dbf.decoder.Decode(raw)
 	if err != nil {
-		return string(raw), err
+		return string(raw), fmt.Errorf("dbase-reader-to-utf8-string-1:FAILED:%v", err)
 	}
 	return string(utf8), nil
 }

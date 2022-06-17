@@ -13,12 +13,11 @@ There are several similar packages like the go-foxpro-dbf package but they are n
 * Support for FPT (memo) files
 * Full support for Windows-1250 encoding to UTF8
 * File readers for scanning files (instead of reading the entire file to memory)
-
 * Conversion to map, json and struct
+* Non blocking IO operation with syscall
 
 We also aim to support the following features:
 
-* Non blocking IO operation
 * Writing to dBase database files
 
 The focus is on performance while also trying to keep the code readable and easy to use.
@@ -74,8 +73,8 @@ type Test struct {
 	CompanyName string    `json:"COMP_NAME"`
 	CompanyOS   string    `json:"COMP_OS"`
 	Melding     string    `json:"MELDING"`
-	Number      int64     `json:"NUMBER"`
-	Float       float64   `json:"FLOAT"`
+	Number      float64   `json:"NUMBER"`
+	Float       int64     `json:"FLOAT"`
 	Bool        bool      `json:"BOOL"`
 }
 
