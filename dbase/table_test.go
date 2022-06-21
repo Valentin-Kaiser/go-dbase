@@ -7,7 +7,7 @@ import (
 
 func TestFieldHeader(t *testing.T) {
 	want := "{Name:[73 68 0 0 0 0 0 0 0 0 0] Type:73 Position:1 Length:4 Decimals:0 Flags:0 Next:5 Step:1 Reserved:[0 0 0 0 0 0 0 78]}"
-	have := fmt.Sprintf("%+v", dBaseFile.fields[0])
+	have := fmt.Sprintf("%+v", dBaseFile.table.fields[0])
 	if have != want {
 		t.Errorf("[TEST] OpenStream failed #1 - Error: First field from header does not match signature >> Want %s, have %s", want, have)
 	}

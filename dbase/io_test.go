@@ -12,7 +12,7 @@ var dBaseStream *DBF
 
 func TestOpenFile(t *testing.T) {
 	var err error
-	dBaseFile, err = Open(testFilePath+".DBF", new(Win1250Decoder))
+	dBaseFile, err = Open(testFilePath+".DBF", new(Win1250Converter))
 	if err != nil {
 		t.Fatalf("[TEST] OpenFile failed #1 - Error: %v", err.Error())
 	}

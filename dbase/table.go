@@ -8,39 +8,26 @@ import (
 	"time"
 )
 
-type DBF struct {
-	dbaseFileHandle *syscall.Handle
-	memoFileHandle  *syscall.Handle
+const (
+	yearOffset      = 1900
+	null       byte = 0x00
+	blank      byte = 0x20
 
-	decoder Decoder
+	fieldNameByteLength          = 11
+	maxUsableNameByteLength      = fieldNameByteLength - 1
+	endOfFieldNameMarker    byte = 0x0
 
-	dbaseHeader *DBaseFileHeader
-	memoHeader  *MemoFileHeader
+	recordDeletionFlagIndex = 0
+	recordIsActive          = blank
+	recordIsDeleted         = 0x2A
 
+	eofMarker byte = 0x1A
+)
+
+type Table struct {
 	fields []FieldHeader
 
 	recordPointer uint32 // Internal record pointer, can be moved
-}
-
-// Containing all raw DBF header fields.
-type DBaseFileHeader struct {
-	FileVersion  byte     // File type flag
-	Year         uint8    // Last update year (0-99)
-	Month        uint8    // Last update month
-	Day          uint8    // Last update day
-	RecordsCount uint32   // Number of records in file
-	FirstRecord  uint16   // Position of first data record
-	RecordLength uint16   // Length of one data record, including delete flag
-	Reserved     [16]byte // Reserved
-	TableFlags   byte     // Table flags
-	CodePage     byte     // Code page mark
-}
-
-// The raw header of the Memo file.
-type MemoFileHeader struct {
-	NextFree  uint32  // Location of next free block
-	Unused    [2]byte // Unused
-	BlockSize uint16  // Block size (bytes per block)
 }
 
 // Contains the raw field info structure from the DBF header.
@@ -125,12 +112,12 @@ func readMemoHeader(fd syscall.Handle) (*MemoFileHeader, error) {
 
 // Returns if the internal recordpointer is at end of file
 func (dbf *DBF) EOF() bool {
-	return dbf.recordPointer >= dbf.dbaseHeader.RecordsCount
+	return dbf.table.recordPointer >= dbf.dbaseHeader.RecordsCount
 }
 
 // Returns if the internal recordpointer is before first record
 func (dbf *DBF) BOF() bool {
-	return dbf.recordPointer == 0
+	return dbf.table.recordPointer == 0
 }
 
 // Returns the dBase database file header struct for inspecting
@@ -145,28 +132,28 @@ func (dbf *DBF) RecordsCount() uint32 {
 
 // Returns all the FieldHeaders
 func (dbf *DBF) Fields() []FieldHeader {
-	return dbf.fields
+	return dbf.table.fields
 }
 
 // Returns the number of fields
 func (dbf *DBF) FieldsCount() uint16 {
-	return uint16(len(dbf.fields))
+	return uint16(len(dbf.table.fields))
 }
 
 // Returns a slice of all the field names
 func (dbf *DBF) FieldNames() []string {
-	num := len(dbf.fields)
+	num := len(dbf.table.fields)
 	names := make([]string, num)
 	for i := 0; i < num; i++ {
-		names[i] = dbf.fields[i].FieldName()
+		names[i] = dbf.table.fields[i].FieldName()
 	}
 	return names
 }
 
 // Returns the field position of a fieldname or -1 if not found.
 func (dbf *DBF) FieldPos(fieldname string) int {
-	for i := 0; i < len(dbf.fields); i++ {
-		if dbf.fields[i].FieldName() == fieldname {
+	for i := 0; i < len(dbf.table.fields); i++ {
+		if dbf.table.fields[i].FieldName() == fieldname {
 			return i
 		}
 	}
@@ -175,7 +162,7 @@ func (dbf *DBF) FieldPos(fieldname string) int {
 
 // Reads field number fieldpos at the record number the internal pointer is pointing to and returns its Go value
 func (dbf *DBF) Field(fieldPosition int) (interface{}, error) {
-	data, err := dbf.readField(dbf.recordPointer, fieldPosition)
+	data, err := dbf.readField(dbf.table.recordPointer, fieldPosition)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-reader-field-1:FAILED:%v", err)
 	}
@@ -183,13 +170,14 @@ func (dbf *DBF) Field(fieldPosition int) (interface{}, error) {
 	return dbf.FieldToValue(data, fieldPosition)
 }
 
+// Parses a memo file from raw []byte, decodes and returns as []byte
 func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	memo, isText, err := dbf.readMemo(raw)
 	if err != nil {
 		return []byte{}, false, fmt.Errorf("dbase-reader-parse-memo-1:FAILED:%v", err)
 	}
 	if isText {
-		memo, err = dbf.decoder.Decode(memo)
+		memo, err = dbf.convert.Decode(memo)
 		if err != nil {
 			return []byte{}, false, fmt.Errorf("dbase-reader-parse-memo-2:FAILED:%v", err)
 		}

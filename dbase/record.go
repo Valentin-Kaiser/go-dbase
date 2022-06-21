@@ -61,7 +61,7 @@ func (dbf *DBF) Records(skipInvalid bool) ([]*Record, error) {
 
 // Returns the requested record at dbf.recordPointer.
 func (dbf *DBF) GetRecord() (*Record, error) {
-	data, err := dbf.readRecord(dbf.recordPointer)
+	data, err := dbf.readRecord(dbf.table.recordPointer)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-reader-get-record-1:FAILED:%v", err)
 	}

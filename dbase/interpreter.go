@@ -13,11 +13,11 @@ import (
 func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error) {
 	// Not all field types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed
-	if fieldPosition < 0 || len(dbf.fields) < fieldPosition {
+	if fieldPosition < 0 || len(dbf.table.fields) < fieldPosition {
 		return nil, fmt.Errorf("dbase-reader-field-to-value-1:FAILED:%v", ERROR_INVALID.AsError())
 	}
 
-	switch dbf.fields[fieldPosition].FieldType() {
+	switch dbf.table.fields[fieldPosition].FieldType() {
 	case "M":
 		// M values contain the address in the FPT file from where to read data
 		memo, isText, err := dbf.parseMemo(raw)
@@ -69,7 +69,7 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 		return float64(float64(binary.LittleEndian.Uint64(raw)) / 10000), nil
 	case "N":
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
-		if dbf.fields[fieldPosition].Decimals == 0 {
+		if dbf.table.fields[fieldPosition].Decimals == 0 {
 			i, err := dbf.parseNumericInt(raw)
 			if err != nil {
 				return i, fmt.Errorf("dbase-reader-field-to-value-7:FAILED:%v", err)
@@ -85,7 +85,7 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 		}
 		return f, nil
 	default:
-		return nil, fmt.Errorf("dbase-reader-field-to-value-9:FAILED:Unsupported fieldtype: %s", dbf.fields[fieldPosition].FieldType())
+		return nil, fmt.Errorf("dbase-reader-field-to-value-9:FAILED:Unsupported fieldtype: %s", dbf.table.fields[fieldPosition].FieldType())
 	}
 }
 
@@ -113,7 +113,7 @@ func (dbf *DBF) DeletedAt(recordPosition uint32) (bool, error) {
 
 // Returns if the record at the internal record pos is deleted
 func (dbf *DBF) Deleted() (bool, error) {
-	return dbf.DeletedAt(dbf.recordPointer)
+	return dbf.DeletedAt(dbf.table.recordPointer)
 }
 
 // Converts raw record data to a Record struct
@@ -132,7 +132,7 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 
 	offset := uint16(1) // deleted flag already read
 	for i := 0; i < len(rec.Data); i++ {
-		fieldinfo := dbf.fields[i]
+		fieldinfo := dbf.table.fields[i]
 		val, err := dbf.FieldToValue(data[offset:offset+uint16(fieldinfo.Length)], i)
 		if err != nil {
 			return rec, fmt.Errorf("dbase-reader-bytes-to-record-2:FAILED:%v", err)
