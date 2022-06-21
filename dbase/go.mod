@@ -1,5 +1,5 @@
-module github.com/Valentin-Kaiser/go-dbase
+module github.com/Valentin-Kaiser/go-dbase/dbase
 
-go 1.17
+go 1.18
 
-require golang.org/x/text v0.3.7 // indirect
+require golang.org/x/text v0.3.7
