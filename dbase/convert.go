@@ -78,56 +78,23 @@ func JDToDate(number int) (time.Time, error) {
 
 /**
  *	################################################################
- *	#		casting helper functions for field values
+ *	#					helper functions
  *	################################################################
  */
 
-// ToString always returns a string
-func ToString(in interface{}) string {
-	if str, ok := in.(string); ok {
-		return str
-	}
-	return ""
+func Uint16ToBytes(x uint16) []byte {
+	var buf [2]byte
+	buf[0] = byte(x >> 0)
+	buf[1] = byte(x >> 8)
+	return buf[:]
 }
-
-// ToTrimmedString always returns a string with spaces trimmed
-func ToTrimmedString(in interface{}) string {
-	if str, ok := in.(string); ok {
-		return strings.TrimSpace(str)
-	}
-	return ""
-}
-
-// ToInt64 always returns an int64
-func ToInt64(in interface{}) int64 {
-	if i, ok := in.(int64); ok {
-		return i
-	}
-	return 0
-}
-
-// ToFloat64 always returns a float64
-func ToFloat64(in interface{}) float64 {
-	if f, ok := in.(float64); ok {
-		return f
-	}
-	return 0.0
-}
-
-// ToTime always returns a time.Time
-func ToTime(in interface{}) time.Time {
-	if t, ok := in.(time.Time); ok {
-		return t
-	}
-	return time.Time{}
-}
-
-// ToBool always returns a boolean
-func ToBool(in interface{}) bool {
-	if b, ok := in.(bool); ok {
-		return b
-	}
-	return false
+func Uint32ToBytes(x uint32) []byte {
+	var buf [4]byte
+	buf[0] = byte(x >> 0)
+	buf[1] = byte(x >> 8)
+	buf[2] = byte(x >> 16)
+	buf[3] = byte(x >> 24)
+	return buf[:]
 }
 
 /**
@@ -135,6 +102,13 @@ func ToBool(in interface{}) bool {
  *	#					Field data type helper
  *	################################################################
  */
+
+func appendBlanks(v []byte, fieldSize uint8) []byte {
+	for i := len(v); i < int(fieldSize); i++ {
+		v = append(v, blank)
+	}
+	return v
+}
 
 func (dbf *DBF) parseDate(raw []byte) (time.Time, error) {
 	if string(raw) == strings.Repeat(" ", 8) {
