@@ -10,7 +10,7 @@ var testFilePath = filepath.Join("../test_data", "TEST")
 var dBaseFile *DBF
 var dBaseStream *DBF
 
-func TestOpenFile(t *testing.T) {
+func TestOpen(t *testing.T) {
 	var err error
 	dBaseFile, err = Open(testFilePath+".DBF", new(Win1250Converter))
 	if err != nil {
@@ -72,6 +72,30 @@ func TestSkip(t *testing.T) {
 	if !dBaseFile.BOF() {
 		t.Error("[TEST] Skip failed #6 - Error: Expected to be at BOF")
 	}
+}
+
+func TestPrepareDBF(t *testing.T) {
+
+}
+
+func TestReadDBFHeader(t *testing.T) {
+
+}
+
+func TestReadColumn(t *testing.T) {
+
+}
+
+func TestReadColumnInfos(t *testing.T) {
+
+}
+
+func TestReadMemo(t *testing.T) {
+
+}
+
+func TestValidateFileVersion(t *testing.T) {
+
 }
 
 // Close file handles

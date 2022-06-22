@@ -31,3 +31,23 @@ func TestJDToDate(t *testing.T) {
 		t.Errorf("Want %v, have %v", want, have)
 	}
 }
+
+func TestParseDate(t *testing.T) {
+
+}
+
+func TestParseDateTime(t *testing.T) {
+
+}
+
+func TestParseNumericInt(t *testing.T) {
+
+}
+
+func TestParseFloat(t *testing.T) {
+
+}
+
+func TestToUTF8String(t *testing.T) {
+
+}

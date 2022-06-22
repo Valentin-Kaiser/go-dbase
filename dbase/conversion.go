@@ -54,7 +54,7 @@ func JDToDate(number int) (time.Time, error) {
 
 /**
  *	################################################################
- *	#					Column data type helper
+ *	#				Internal Column data type helper
  *	################################################################
  */
 
