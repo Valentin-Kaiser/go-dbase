@@ -93,7 +93,7 @@ func main() {
 
 	// Get columninfo for all columns
 	for _, column := range dbf.Columns() {
-		fmt.Println(column.ColumnName(), column.ColumnType(), column.Decimals)
+		fmt.Println(column.Name(), column.Type(), column.Decimals)
 	}
 
 	err = dbf.GoTo(1)
@@ -102,7 +102,7 @@ func main() {
 	}
 
 	// Read the complete second row
-	row, err := dbf.GetRow()
+	row, err := dbf.Row()
 	if err != nil {
 		panic(err)
 	}
@@ -122,7 +122,7 @@ func main() {
 	// Reads the complete row
 	for !dbf.EOF() {
 		// This reads the complete row
-		row, err := dbf.GetRow()
+		row, err := dbf.Row()
 		if err != nil {
 			panic(err)
 		}
@@ -158,9 +158,9 @@ func main() {
 
 	fmt.Println("\n --- row specific column --- \n")
 	// Read only the third column of rows 1, 2 and 3
-	recnumbers := []uint32{1, 2, 3}
-	for _, rec := range recnumbers {
-		err := dbf.GoTo(rec)
+	rownumbers := []uint32{1, 2, 3}
+	for _, row := range rownumbers {
+		err := dbf.GoTo(row)
 		if err != nil {
 			panic(err)
 		}
@@ -171,15 +171,20 @@ func main() {
 		}
 
 		if deleted {
-			fmt.Printf("Row %v deleted \n", rec)
+			fmt.Printf("Row %v deleted \n", row)
 			continue
 		}
 
-		column3, err := dbf.Column(3)
+		row, err := dbf.Row()
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("Row %v column 3: %v \n", rec, column3)
+
+		column3, err := row.Column(3)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Row %v column 3: %v \n", row, column3)
 
 	}
 }

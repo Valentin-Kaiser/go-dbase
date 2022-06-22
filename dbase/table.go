@@ -259,7 +259,7 @@ func (dbf *DBF) Rows(skipInvalid bool) ([]*Row, error) {
 	rows := make([]*Row, 0)
 	for !dbf.EOF() {
 		// This reads the complete row
-		row, err := dbf.GetRow()
+		row, err := dbf.Row()
 		if err != nil && !skipInvalid {
 			return nil, fmt.Errorf("dbase-table-rows-1:FAILED:%v", err)
 		}
@@ -277,7 +277,7 @@ func (dbf *DBF) Rows(skipInvalid bool) ([]*Row, error) {
 }
 
 // Returns the requested row at dbf.rowPointer.
-func (dbf *DBF) GetRow() (*Row, error) {
+func (dbf *DBF) Row() (*Row, error) {
 	data, err := dbf.readRow(dbf.table.rowPointer)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-table-get-row-1:FAILED:%v", err)
