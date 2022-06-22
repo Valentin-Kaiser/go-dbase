@@ -1,6 +1,7 @@
 package dbase
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,6 +17,8 @@ func TestOpenFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("[TEST] OpenFile failed #1 - Error: %v", err.Error())
 	}
+
+	fmt.Printf("%+v", dBaseFile.memoHeader)
 }
 
 func TestGoTo(t *testing.T) {
@@ -72,6 +75,10 @@ func TestSkip(t *testing.T) {
 	if !dBaseFile.BOF() {
 		t.Error("[TEST] Skip failed #6 - Error: Expected to be at BOF")
 	}
+}
+
+func TestToByte(t *testing.T) {
+	dBaseFile.AddEmptyRecord()
 }
 
 // Close file handles

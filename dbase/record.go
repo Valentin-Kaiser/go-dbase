@@ -9,9 +9,11 @@ import (
 
 // Contains the raw record data and a deleted flag
 type Record struct {
-	DBF     *DBF
-	Deleted bool
-	Data    []interface{}
+	DBF      *DBF
+	Position int64
+	Deleted  bool
+	Data     []interface{}
+	Raw      []byte
 }
 
 // Reads raw record data of one record at recordPosition
@@ -66,7 +68,7 @@ func (dbf *DBF) GetRecord() (*Record, error) {
 		return nil, fmt.Errorf("dbase-reader-get-record-1:FAILED:%v", err)
 	}
 
-	return dbf.bytesToRecord(data)
+	return dbf.bytesToRecord(data, dbf.table.recordPointer)
 }
 
 /**
@@ -144,6 +146,26 @@ func (dbf *DBF) RecordsToStruct(v interface{}, skipInvalid bool, trimspaces bool
 	}
 
 	return out, nil
+}
+
+func (rec *Record) ToRaw() ([]byte, error) {
+	data := make([]byte, 1)
+
+	// a record should start with te delete flag, a space (0x20) or * (0x2A)
+	data[0] = 0x20
+	if rec.Deleted {
+		data[0] = 0x2A
+	}
+
+	for i := 0; i < len(rec.Data); i++ {
+		val, err := rec.DBF.FieldToRaw(rec.Data[i], i)
+		if err != nil {
+			return nil, fmt.Errorf("dbase-reader-bytes-to-record-2:FAILED:%v", err)
+		}
+		data = append(data, val...)
+	}
+
+	return data, nil
 }
 
 // Returns a complete record as a map.

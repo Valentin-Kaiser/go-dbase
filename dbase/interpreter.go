@@ -1,10 +1,13 @@
 package dbase
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strconv"
 	"syscall"
+	"time"
 )
 
 // Converts raw field data to the correct type for the given field
@@ -89,6 +92,97 @@ func (dbf *DBF) FieldToValue(raw []byte, fieldPosition int) (interface{}, error)
 	}
 }
 
+func (dbf *DBF) FieldToRaw(v interface{}, fieldPosition int) ([]byte, error) {
+	// Not all field types have been implemented because we don't use them in our DBFs
+	// Extend this function if needed
+	if fieldPosition < 0 || len(dbf.table.fields) < fieldPosition {
+		return nil, fmt.Errorf("dbase-reader-field-to-raw-1:FAILED:%v", ERROR_INVALID.AsError())
+	}
+
+	length := dbf.table.fields[fieldPosition].Length
+	switch dbf.table.fields[fieldPosition].FieldType() {
+	case "M":
+		// M values contain the address in the FPT file from where to read data
+		switch v.(type) {
+		case string:
+			enc, err := dbf.convert.Encode([]byte(v.(string)))
+			if err != nil {
+				return nil, err
+			}
+			return dbf.writeMemo(enc, 1)
+		case []byte:
+			return dbf.writeMemo(v.([]byte), 0)
+		default:
+			return nil, ERROR_INVALID.AsError()
+		}
+	case "I":
+		// I values are stored as numeric values
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.LittleEndian, v.(int32))
+		return appendBlanks(buf.Bytes(), length), nil
+	case "B":
+		// B (double) values are stored as numeric values
+
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.LittleEndian, v.(float64))
+		return appendBlanks(buf.Bytes(), length), nil
+	case "D":
+		// D values are stored as string in format YYYYMMDD, convert to time.Time
+		return appendBlanks([]byte(v.(time.Time).Format("20060102")), length), nil
+	case "T":
+		// T values are stores as two 4 byte integers
+		//  integer one is the date in julian format
+		//  integer two is the number of milliseconds since midnight
+		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
+		y, m, d := v.(time.Time).Date()
+		t := time.Date(y, m, d, 0, 0, 0, 0, v.(time.Time).Location())
+
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.LittleEndian, int32(YMD2JD(y, int(m), d)))
+		binary.Write(buf, binary.LittleEndian, int32(v.(time.Time).Sub(t).Seconds()))
+
+		return appendBlanks(buf.Bytes(), length), nil
+	case "L":
+		// L values are stored as strings T or F, we only check for T, the rest is false...
+		if !v.(bool) {
+			return appendBlanks([]byte("F"), length), nil
+		}
+		return appendBlanks([]byte("T"), length), nil
+	case "Y":
+		// Y values are currency values stored as ints with 4 decimal places
+		return appendBlanks([]byte(fmt.Sprintf("%.4f", v.(float64))), length), nil
+	case "V":
+		// V values just return the raw value
+		fallthrough
+	case "N":
+		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
+		switch v.(type) {
+		case int64:
+			s := strconv.Itoa(int(v.(int64)))
+
+			enc, err := dbf.convert.Encode([]byte(s))
+			if err != nil {
+				return nil, err
+			}
+			return appendBlanks(enc, length), nil
+		}
+
+		fallthrough // same as "F"
+	case "F":
+		// F values are stored as string values
+		return appendBlanks([]byte(fmt.Sprintf("%.4f", v.(float64))), length), nil
+	case "C":
+		// C values are stored as strings
+		enc, err := dbf.convert.Encode([]byte(v.(string)))
+		if err != nil {
+			return nil, err
+		}
+		return appendBlanks(enc, length), nil
+	}
+
+	return appendBlanks([]byte(""), length), nil
+}
+
 // Returns if the record at recordPosition is deleted
 func (dbf *DBF) DeletedAt(recordPosition uint32) (bool, error) {
 	if recordPosition >= dbf.dbaseHeader.RecordsCount {
@@ -118,7 +212,7 @@ func (dbf *DBF) Deleted() (bool, error) {
 
 // Converts raw record data to a Record struct
 // If the data points to a memo (FPT) file this file is also read
-func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
+func (dbf *DBF) bytesToRecord(data []byte, position uint32) (*Record, error) {
 	rec := &Record{}
 	rec.DBF = dbf
 
@@ -127,6 +221,9 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 	if !rec.Deleted && data[0] != 0x20 {
 		return nil, fmt.Errorf("dbase-reader-bytes-to-record-1:FAILED:invalid record data, no delete flag found at beginning of record")
 	}
+
+	rec.Raw = data
+	rec.Position = int64(dbf.dbaseHeader.FirstRecord) + (int64(position) * int64(dbf.dbaseHeader.RecordLength))
 
 	rec.Data = make([]interface{}, dbf.FieldsCount())
 

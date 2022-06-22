@@ -6,7 +6,24 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
+)
+
+const (
+	yearOffset      = 1900
+	null       byte = 0x00
+	blank      byte = 0x20
+
+	fieldNameByteLength          = 11
+	maxUsableNameByteLength      = fieldNameByteLength - 1
+	endOfFieldNameMarker    byte = 0x0
+
+	recordDeletionFlagIndex = 0
+	recordIsActive          = blank
+	recordIsDeleted         = 0x2A
+
+	eofMarker byte = 0x1A
 )
 
 type DBF struct {
@@ -18,6 +35,7 @@ type DBF struct {
 	dbaseHeader *DBaseFileHeader
 	memoHeader  *MemoFileHeader
 
+	mutex *sync.Mutex
 	table *Table
 }
 
@@ -112,7 +130,7 @@ func (dbf *DBF) Close() error {
 
 /**
  *	################################################################
- *	#				dBase database file handler
+ *	#				dBase database file read handler
  *	################################################################
  */
 
@@ -138,6 +156,7 @@ func prepareDBF(fd syscall.Handle, conv Converter) (*DBF, error) {
 	dbf := &DBF{
 		dbaseHeader:     header,
 		dbaseFileHandle: &fd,
+		mutex:           &sync.Mutex{},
 		table: &Table{
 			fields: fields,
 		},
@@ -152,7 +171,7 @@ func readDBFHeader(fd syscall.Handle) (*DBaseFileHeader, error) {
 		return nil, fmt.Errorf("dbase-reader-read-dbf-header-1:FAILED:%v", err)
 	}
 
-	b := make([]byte, 1024)
+	b := make([]byte, 32)
 	n, err := syscall.Read(syscall.Handle(fd), b)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-reader-read-dbf-header-2:FAILED:%v", err)
@@ -162,6 +181,43 @@ func readDBFHeader(fd syscall.Handle) (*DBaseFileHeader, error) {
 	err = binary.Read(bytes.NewReader(b[:n]), binary.LittleEndian, h)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-reader-read-dbf-header-3:FAILED:%v", err)
+	}
+	return h, nil
+}
+
+/**
+ *	################################################################
+ *	#					dBase memo file handler
+ *	################################################################
+ */
+
+func (dbf *DBF) prepareMemo(fd syscall.Handle) error {
+	memoHeader, err := readMemoHeader(fd)
+	if err != nil {
+		return fmt.Errorf("dbase-reader-prepare-memo-1:FAILED:%v", err)
+
+	}
+
+	dbf.memoFileHandle = &fd
+	dbf.memoHeader = memoHeader
+	return nil
+}
+
+func readMemoHeader(fd syscall.Handle) (*MemoFileHeader, error) {
+	h := &MemoFileHeader{}
+	if _, err := syscall.Seek(syscall.Handle(fd), 0, 0); err != nil {
+		return nil, fmt.Errorf("dbase-reader-read-memo-header-1:FAILED:%v", err)
+	}
+
+	b := make([]byte, 512)
+	n, err := syscall.Read(syscall.Handle(fd), b)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-reader-read-memo-header-2:FAILED:%v", err)
+	}
+
+	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-reader-read-memo-header-3:FAILED:%v", err)
 	}
 	return h, nil
 }
@@ -285,6 +341,102 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
+func (dbf *DBF) writeMemo(data []byte, signature int) ([]byte, error) {
+	if dbf.memoFileHandle == nil {
+		return nil, fmt.Errorf("dbase-io-write-memo-1:FAILED:%v", ERROR_NO_FPT_FILE.AsError())
+	}
+
+	if uint16(len(data)) > dbf.memoHeader.BlockSize {
+		return nil, fmt.Errorf("dbase-io-write-memo-2:FAILED:length of data exceeds the block size")
+	}
+
+	currentBlock := new(bytes.Buffer)
+	binary.Write(currentBlock, binary.LittleEndian, uint32(dbf.memoHeader.NextFree))
+
+	// The position in the file is dbf.memoHeader.NextFree*dbf.memoHeader.BlockSize
+	_, err := syscall.Seek(syscall.Handle(*dbf.memoFileHandle), int64(dbf.memoHeader.BlockSize)*int64(dbf.memoHeader.NextFree), 0)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-io-write-memo-3:FAILED:%v", err)
+	}
+
+	// Write block header
+	blockHeader := new(bytes.Buffer)
+	binary.Write(blockHeader, binary.LittleEndian, uint32(signature))
+	binary.Write(blockHeader, binary.LittleEndian, uint32(len(data)))
+
+	written, err := syscall.Write(syscall.Handle(*dbf.memoFileHandle), append(blockHeader.Bytes(), data...))
+	if err != nil {
+		return nil, fmt.Errorf("dbase-reader-read-memo-4:FAILED:%v", err)
+	}
+
+	if uint16(written) > dbf.memoHeader.BlockSize {
+		return nil, fmt.Errorf("dbase-io-write-memo-5:FAILED:written over blocksize limit")
+	}
+
+	// Write memo file header
+	dbf.memoHeader.NextFree++
+	dbf.writeMemoHeader()
+
+	return currentBlock.Bytes(), nil
+}
+
+func (dbf *DBF) writeMemoHeader() error {
+	header := new(bytes.Buffer)
+	err := binary.Write(header, binary.BigEndian, dbf.memoHeader)
+	if err != nil {
+		return fmt.Errorf("dbase-io-write-memo-header-1:FAILED:%v", err)
+	}
+
+	if _, err := syscall.Seek(syscall.Handle(*dbf.memoFileHandle), 0, 0); err != nil {
+		return fmt.Errorf("dbase-io-write-memo-header-2:FAILED:%v", err)
+	}
+
+	written, err := syscall.Write(syscall.Handle(*dbf.memoFileHandle), header.Bytes())
+	if err != nil {
+		return fmt.Errorf("dbase-io-write-memo-header-3:FAILED:%v", err)
+	}
+
+	if written != len(header.Bytes()) {
+		return fmt.Errorf("dbase-io-write-memo-header-4:FAILED:size written and header missmatch")
+
+	}
+
+	return nil
+}
+
+func (dbf *DBF) DetermineNextFreeBlock() (uint64, error) {
+	// Scan every Block until a free one is found
+	nextfree := dbf.memoHeader.NextFree
+	for {
+		// The position in the file is blocknumber*blocksize
+		_, err := syscall.Seek(syscall.Handle(*dbf.memoFileHandle), int64(dbf.memoHeader.BlockSize)*int64(nextfree), 0)
+		if err != nil {
+			return 0, fmt.Errorf("dbase-reader-read-memo-2:FAILED:%v", err)
+		}
+
+		// Read the memo block header, instead of reading into a struct using binary.Read we just read the two
+		// uints in one buffer and then convert, this saves seconds for large DBF files with many memo fields
+		// as it avoids using the reflection in binary.Read
+		hbuf := make([]byte, 8)
+		_, err = syscall.Read(syscall.Handle(*dbf.memoFileHandle), hbuf)
+		if err != nil {
+			return 0, fmt.Errorf("dbase-reader-read-memo-3:FAILED:%v", err)
+		}
+
+		sign := binary.BigEndian.Uint32(hbuf[:4])
+		leng := binary.BigEndian.Uint32(hbuf[4:])
+		if leng != 0 && sign != 0 {
+			// block isn't empty
+			nextfree++
+			continue
+		}
+
+		break
+	}
+
+	return uint64(nextfree), nil
+}
+
 func validateFileVersion(version byte) error {
 	switch version {
 	default:
@@ -320,5 +472,52 @@ func (dbf *DBF) Skip(offset int64) error {
 		return fmt.Errorf("dbase-reader-skip-2:FAILED:%v", ERROR_BOF.AsError())
 	}
 	dbf.table.recordPointer = uint32(newval)
+	return nil
+}
+
+/**
+ *	################################################################
+ *	#				dBase database file write handler
+ *	################################################################
+ */
+
+func (dbf *DBF) DBFHeaderToByte() []byte {
+	b := make([]byte, 32)
+
+	b[0] = dbf.dbaseHeader.FileVersion
+	b[1] = dbf.dbaseHeader.Year
+	b[2] = dbf.dbaseHeader.Month
+	b[3] = dbf.dbaseHeader.Day
+	b[4] = byte(dbf.dbaseHeader.RecordsCount >> 0)
+	b[5] = byte(dbf.dbaseHeader.RecordsCount >> 8)
+	b[6] = byte(dbf.dbaseHeader.RecordsCount >> 16)
+	b[7] = byte(dbf.dbaseHeader.RecordsCount >> 24)
+	b[8] = byte(dbf.dbaseHeader.FirstRecord >> 0)
+	b[9] = byte(dbf.dbaseHeader.FirstRecord >> 8)
+	b[10] = byte(dbf.dbaseHeader.RecordLength >> 0)
+	b[11] = byte(dbf.dbaseHeader.RecordLength >> 8)
+
+	for i, r := range dbf.dbaseHeader.Reserved {
+		b[12+i] = r
+	}
+
+	b[28] = dbf.dbaseHeader.TableFlags
+	b[29] = dbf.dbaseHeader.CodePage
+	b[30] = null
+	b[31] = null
+
+	return b
+}
+
+func (dbf *DBF) Write(data []byte, offset int64) error {
+	if _, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), offset, 0); err != nil {
+		return fmt.Errorf("dbase-write-1:FAILED:%v", err)
+	}
+
+	_, err := syscall.Write(syscall.Handle(*dbf.dbaseFileHandle), data)
+	if err != nil {
+		return fmt.Errorf("dbase-write-2:FAILED:%v", err)
+	}
+
 	return nil
 }

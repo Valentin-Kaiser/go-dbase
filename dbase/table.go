@@ -2,26 +2,8 @@ package dbase
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
-	"syscall"
 	"time"
-)
-
-const (
-	yearOffset      = 1900
-	null       byte = 0x00
-	blank      byte = 0x20
-
-	fieldNameByteLength          = 11
-	maxUsableNameByteLength      = fieldNameByteLength - 1
-	endOfFieldNameMarker    byte = 0x0
-
-	recordDeletionFlagIndex = 0
-	recordIsActive          = blank
-	recordIsDeleted         = 0x2A
-
-	eofMarker byte = 0x1A
 )
 
 type Table struct {
@@ -65,43 +47,6 @@ func (h *DBaseFileHeader) FieldsCount() uint16 {
 // Returns the calculated file size based on the header info
 func (h *DBaseFileHeader) FileSize() int64 {
 	return 296 + int64(h.FieldsCount()*32) + int64(h.RecordsCount*uint32(h.RecordLength))
-}
-
-/**
- *	################################################################
- *	#					dBase memo file handler
- *	################################################################
- */
-
-func (dbf *DBF) prepareMemo(fd syscall.Handle) error {
-	memoHeader, err := readMemoHeader(fd)
-	if err != nil {
-		return fmt.Errorf("dbase-reader-prepare-memo-1:FAILED:%v", err)
-
-	}
-
-	dbf.memoFileHandle = &fd
-	dbf.memoHeader = memoHeader
-	return nil
-}
-
-func readMemoHeader(fd syscall.Handle) (*MemoFileHeader, error) {
-	h := &MemoFileHeader{}
-	if _, err := syscall.Seek(syscall.Handle(fd), 0, 0); err != nil {
-		return nil, fmt.Errorf("dbase-reader-read-memo-header-1:FAILED:%v", err)
-	}
-
-	b := make([]byte, 1024)
-	n, err := syscall.Read(syscall.Handle(fd), b)
-	if err != nil {
-		return nil, fmt.Errorf("dbase-reader-read-memo-header-2:FAILED:%v", err)
-	}
-
-	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
-	if err != nil {
-		return nil, fmt.Errorf("dbase-reader-read-memo-header-3:FAILED:%v", err)
-	}
-	return h, nil
 }
 
 /**
@@ -183,6 +128,35 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 		}
 	}
 	return memo, isText, nil
+}
+
+func (dbf *DBF) AddEmptyRecord() error {
+	dbf.mutex.Lock()
+	defer dbf.mutex.Unlock()
+
+	pos := int64(dbf.dbaseHeader.FirstRecord) + (int64(dbf.dbaseHeader.RecordsCount) * int64(dbf.dbaseHeader.RecordLength))
+
+	year, month, day := time.Now().Date()
+	dbf.dbaseHeader.Year = uint8(year)
+	dbf.dbaseHeader.Month = uint8(month)
+	dbf.dbaseHeader.Day = uint8(day)
+
+	newRecord := make([]byte, dbf.dbaseHeader.RecordLength)
+	newRecord[recordDeletionFlagIndex] = recordIsActive
+
+	dbf.dbaseHeader.RecordsCount++
+
+	err := dbf.Write(dbf.DBFHeaderToByte(), 0)
+	if err != nil {
+		return err
+	}
+
+	err = dbf.Write(newRecord, pos)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 /**
