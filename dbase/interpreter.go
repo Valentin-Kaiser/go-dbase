@@ -1,25 +1,26 @@
-// This file contains the functions to convert a dbase database entry as byte array into a row struct
-// with the columns converted into the corresponding data types.
-//
 // At this moment not all FoxPro column types are supported.
 // When reading column values, the value returned by this package is always `interface{}`.
 //
 // The supported column types with their return Go types are:
 //
-// | Column Type | Column Type Name | Golang type |
-// |------------|-----------------|-------------|
-// | B | Double | float64 |
-// | C | Character | string |
-// | D | Date | time.Time |
-// | F | Float | float64 |
-// | I | Integer | int32 |
-// | L | Logical | bool |
-// | M | Memo  | string |
-// | M | Memo (Binary) | []byte |
-// | N | Numeric (0 decimals) | int64 |
-// | N | Numeric (with decimals) | float64 |
-// | T | DateTime | time.Time |
-// | Y | Currency | float64 |
+//  Column Type >> Column Type Name >> Golang type
+//
+//  B  >>  Double  >>  float64
+//  C  >>  Character  >>  string
+//  D  >>  Date  >>  time.Time
+//  F  >>  Float  >>  float64
+//  I  >>  Integer  >>  int32
+//  L  >>  Logical  >>  bool
+//  M  >>  Memo   >>  string
+//  M  >>  Memo (Binary)  >>  []byte
+//  N  >>  Numeric (0 decimals)  >>  int64
+//  N  >>  Numeric (with decimals)  >>  float64
+//  T  >>  DateTime  >>  time.Time
+//  Y  >>  Currency  >>  float64
+//
+// This module contains the functions to convert a dbase database entry as byte array into a row struct
+// with the columns converted into the corresponding data types.
+//
 package dbase
 
 import (
