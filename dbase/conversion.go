@@ -1,19 +1,11 @@
 package dbase
 
 import (
-	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
-
-	"golang.org/x/text/encoding/charmap"
-	"golang.org/x/text/transform"
 )
 
 // convert year, month and day to a julian day number
@@ -41,22 +33,6 @@ func JD2YMD(date int) (int, int, int) {
 	return y, m, d
 }
 
-// convert year, month and day delimited by hyphen to a julian day number
-// julian day number -> days since 01-01-4712 BC
-func JDToNumber(date string) (int, error) {
-	dateString := strings.FieldsFunc(date, unicode.IsPunct)
-	if len(dateString) != 3 {
-		return 0, errors.New("expected 3 punctuation delimited fields.")
-	}
-	y, ei := strconv.Atoi(dateString[0])
-	m, ej := strconv.Atoi(dateString[1])
-	d, ek := strconv.Atoi(dateString[2])
-	if ei != nil || ej != nil || ek != nil {
-		return 0, errors.New("expected 3 integers")
-	}
-	return YMD2JD(y, m, d), nil
-}
-
 // convert julian day number to golang time.Time
 // julian day number -> days since 01-01-4712 BC
 func JDToDate(number int) (time.Time, error) {
@@ -78,61 +54,7 @@ func JDToDate(number int) (time.Time, error) {
 
 /**
  *	################################################################
- *	#		casting helper functions for field values
- *	################################################################
- */
-
-// ToString always returns a string
-func ToString(in interface{}) string {
-	if str, ok := in.(string); ok {
-		return str
-	}
-	return ""
-}
-
-// ToTrimmedString always returns a string with spaces trimmed
-func ToTrimmedString(in interface{}) string {
-	if str, ok := in.(string); ok {
-		return strings.TrimSpace(str)
-	}
-	return ""
-}
-
-// ToInt64 always returns an int64
-func ToInt64(in interface{}) int64 {
-	if i, ok := in.(int64); ok {
-		return i
-	}
-	return 0
-}
-
-// ToFloat64 always returns a float64
-func ToFloat64(in interface{}) float64 {
-	if f, ok := in.(float64); ok {
-		return f
-	}
-	return 0.0
-}
-
-// ToTime always returns a time.Time
-func ToTime(in interface{}) time.Time {
-	if t, ok := in.(time.Time); ok {
-		return t
-	}
-	return time.Time{}
-}
-
-// ToBool always returns a boolean
-func ToBool(in interface{}) bool {
-	if b, ok := in.(bool); ok {
-		return b
-	}
-	return false
-}
-
-/**
- *	################################################################
- *	#					Field data type helper
+ *	#					Column data type helper
  *	################################################################
  */
 
@@ -164,6 +86,7 @@ func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
 	return time.Date(y, time.Month(m), d, 0, 0, nSec, mSec*int(time.Millisecond), time.UTC), nil
 }
 
+// parses a string as byte array to int64
 func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if len(trimmed) == 0 {
@@ -172,6 +95,7 @@ func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
 	return strconv.ParseInt(trimmed, 10, 64)
 }
 
+// parses a string as byte array to float64
 func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if len(trimmed) == 0 {
@@ -187,38 +111,4 @@ func (dbf *DBF) toUTF8String(raw []byte) (string, error) {
 		return string(raw), fmt.Errorf("dbase-reader-to-utf8-string-1:FAILED:%v", err)
 	}
 	return string(utf8), nil
-}
-
-// Decoder is the interface as passed to OpenFile
-type Converter interface {
-	Decode(in []byte) ([]byte, error)
-	Encode(in []byte) ([]byte, error)
-}
-
-// Win1250Decoder translates a Windows-1250 DBF to UTF8 and back
-type Win1250Converter struct{}
-
-// Decode decodes a Windows1250 byte slice to a UTF8 byte slice
-func (d *Win1250Converter) Decode(in []byte) ([]byte, error) {
-	if utf8.Valid(in) {
-		return in, nil
-	}
-	r := transform.NewReader(bytes.NewReader(in), charmap.Windows1250.NewDecoder())
-	data, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-// Decode decodes a UTF8 byte slice to a Windows1250 byte slice
-func (d *Win1250Converter) Encode(in []byte) ([]byte, error) {
-	out := make([]byte, len(in))
-	enc := charmap.Windows1250.NewEncoder()
-	nDst, _, err := enc.Transform(out, in, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return out[:nDst], nil
 }

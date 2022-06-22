@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var testFilePath = filepath.Join("test_data", "TEST")
+var testFilePath = filepath.Join("../test_data", "TEST")
 var dBaseFile *DBF
 var dBaseStream *DBF
 

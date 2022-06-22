@@ -10,36 +10,16 @@ import (
 )
 
 type DBF struct {
+	// the used converter instance passed by opening a file
+	convert EncodingConverter
+	// dBase and memo file syscall handle pointer
 	dbaseFileHandle *syscall.Handle
 	memoFileHandle  *syscall.Handle
-
-	convert Converter
-
-	dbaseHeader *DBaseFileHeader
-	memoHeader  *MemoFileHeader
-
+	// dBase and memo file header containing relevant information
+	dbaseHeader *DBaseHeader
+	memoHeader  *MemoHeader
+	// containing the columns and internal row pointer
 	table *Table
-}
-
-// Containing all raw DBF header fields.
-type DBaseFileHeader struct {
-	FileVersion  byte     // File type flag
-	Year         uint8    // Last update year (0-99)
-	Month        uint8    // Last update month
-	Day          uint8    // Last update day
-	RecordsCount uint32   // Number of records in file
-	FirstRecord  uint16   // Position of first data record
-	RecordLength uint16   // Length of one data record, including delete flag
-	Reserved     [16]byte // Reserved
-	TableFlags   byte     // Table flags
-	CodePage     byte     // Code page mark
-}
-
-// The raw header of the Memo file.
-type MemoFileHeader struct {
-	NextFree  uint32  // Location of next free block
-	Unused    [2]byte // Unused
-	BlockSize uint16  // Block size (bytes per block)
 }
 
 /**
@@ -50,7 +30,7 @@ type MemoFileHeader struct {
 
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the embedded file handle(s) call DBF.Close().
-func Open(filename string, conv Converter) (*DBF, error) {
+func Open(filename string, conv EncodingConverter) (*DBF, error) {
 	filename = filepath.Clean(filename)
 
 	// open file in non blocking mode with syscall
@@ -117,8 +97,8 @@ func (dbf *DBF) Close() error {
  */
 
 // Returns a DBF object pointer
-// Reads the DBF Header, the field infos and validates file version.
-func prepareDBF(fd syscall.Handle, conv Converter) (*DBF, error) {
+// Reads the DBF Header, the column infos and validates file version.
+func prepareDBF(fd syscall.Handle, conv EncodingConverter) (*DBF, error) {
 	header, err := readDBFHeader(fd)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-reader-prepare-dbf-1:FAILED:%v", err)
@@ -129,8 +109,8 @@ func prepareDBF(fd syscall.Handle, conv Converter) (*DBF, error) {
 		return nil, fmt.Errorf("dbase-reader-prepare-dbf-2:FAILED:%v", err)
 	}
 
-	// read fieldinfo
-	fields, err := readFieldInfos(fd)
+	// read columninfo
+	columns, err := readColumnInfos(fd)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-reader-prepare-dbf-3:FAILED:%v", err)
 	}
@@ -139,15 +119,15 @@ func prepareDBF(fd syscall.Handle, conv Converter) (*DBF, error) {
 		dbaseHeader:     header,
 		dbaseFileHandle: &fd,
 		table: &Table{
-			fields: fields,
+			columns: columns,
 		},
 		convert: conv,
 	}
 	return dbf, nil
 }
 
-func readDBFHeader(fd syscall.Handle) (*DBaseFileHeader, error) {
-	h := &DBaseFileHeader{}
+func readDBFHeader(fd syscall.Handle) (*DBaseHeader, error) {
+	h := &DBaseHeader{}
 	if _, err := syscall.Seek(syscall.Handle(fd), 0, 0); err != nil {
 		return nil, fmt.Errorf("dbase-reader-read-dbf-header-1:FAILED:%v", err)
 	}
@@ -166,83 +146,83 @@ func readDBFHeader(fd syscall.Handle) (*DBaseFileHeader, error) {
 	return h, nil
 }
 
-// Reads raw field data of one field at fieldPosition at recordPosition
-func (dbf *DBF) readField(recordPosition uint32, fieldPosition int) ([]byte, error) {
-	if recordPosition >= dbf.dbaseHeader.RecordsCount {
-		return nil, fmt.Errorf("dbase-reader-read-field-1:FAILED:%v", ERROR_EOF.AsError())
+// Reads raw column data of one column at columnPosition at rowPosition
+func (dbf *DBF) readColumn(rowPosition uint32, columnPosition int) ([]byte, error) {
+	if rowPosition >= dbf.dbaseHeader.RowsCount {
+		return nil, fmt.Errorf("dbase-reader-read-column-1:FAILED:%v", ERROR_EOF.AsError())
 	}
 
-	if fieldPosition < 0 || fieldPosition > int(dbf.FieldsCount()) {
-		return nil, fmt.Errorf("dbase-reader-read-field-2:FAILED:%v", ERROR_INVALID.AsError())
+	if columnPosition < 0 || columnPosition > int(dbf.ColumnsCount()) {
+		return nil, fmt.Errorf("dbase-reader-read-column-2:FAILED:%v", ERROR_INVALID.AsError())
 	}
 
-	buf := make([]byte, dbf.table.fields[fieldPosition].Length)
-	pos := int64(dbf.dbaseHeader.FirstRecord) + (int64(recordPosition) * int64(dbf.dbaseHeader.RecordLength)) + int64(dbf.table.fields[fieldPosition].Position)
+	buf := make([]byte, dbf.table.columns[columnPosition].Length)
+	pos := int64(dbf.dbaseHeader.FirstRow) + (int64(rowPosition) * int64(dbf.dbaseHeader.RowLength)) + int64(dbf.table.columns[columnPosition].Position)
 
 	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), pos, 0)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-reader-read-field-3:FAILED:%v", err)
+		return buf, fmt.Errorf("dbase-reader-read-column-3:FAILED:%v", err)
 	}
 
 	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-reader-read-field-4:FAILED:%v", err)
+		return buf, fmt.Errorf("dbase-reader-read-column-4:FAILED:%v", err)
 	}
 
-	if read != int(dbf.table.fields[fieldPosition].Length) {
-		return buf, fmt.Errorf("dbase-reader-read-field-5:FAILED:%v", ERROR_INCOMPLETE.AsError())
+	if read != int(dbf.table.columns[columnPosition].Length) {
+		return buf, fmt.Errorf("dbase-reader-read-column-5:FAILED:%v", ERROR_INCOMPLETE.AsError())
 	}
 	return buf, nil
 }
 
-// Reads field infos from DBF header, starting at pos 32, until it finds the Header record terminator (0x0D).
-func readFieldInfos(fd syscall.Handle) ([]FieldHeader, error) {
-	fields := make([]FieldHeader, 0)
+// Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator (0x0D).
+func readColumnInfos(fd syscall.Handle) ([]Column, error) {
+	columns := make([]Column, 0)
 
 	offset := int64(32)
 	b := make([]byte, 1)
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
 		if _, err := syscall.Seek(syscall.Handle(fd), offset, 0); err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-field-infos-1:FAILED:%v", err)
+			return nil, fmt.Errorf("dbase-reader-read-column-infos-1:FAILED:%v", err)
 		}
 		if _, err := syscall.Read(syscall.Handle(fd), b); err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-field-infos-2:FAILED:%v", err)
+			return nil, fmt.Errorf("dbase-reader-read-column-infos-2:FAILED:%v", err)
 		}
 		if b[0] == 0x0D {
 			break
 		}
 
-		// Position back one byte and read the field
+		// Position back one byte and read the column
 		if _, err := syscall.Seek(syscall.Handle(fd), -1, 1); err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-field-infos-3:FAILED:%v", err)
+			return nil, fmt.Errorf("dbase-reader-read-column-infos-3:FAILED:%v", err)
 		}
 
 		buf := make([]byte, 2048)
 		n, err := syscall.Read(syscall.Handle(fd), buf)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-field-infos-4:FAILED:%v", err)
+			return nil, fmt.Errorf("dbase-reader-read-column-infos-4:FAILED:%v", err)
 		}
 
-		field := FieldHeader{}
-		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, &field)
+		column := Column{}
+		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, &column)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-reader-read-field-infos-5:FAILED:%v", err)
+			return nil, fmt.Errorf("dbase-reader-read-column-infos-5:FAILED:%v", err)
 		}
 
-		if field.FieldName() == "_NullFlags" {
+		if column.Name() == "_NullFlags" {
 			offset += 32
 			continue
 		}
 
-		fields = append(fields, field)
+		columns = append(columns, column)
 
 		offset += 32
 	}
-	return fields, nil
+	return columns, nil
 }
 
-// Reads one or more blocks from the FPT file, called for each memo field.
+// Reads one or more blocks from the FPT file, called for each memo column.
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	if dbf.memoFileHandle == nil {
@@ -258,7 +238,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	}
 
 	// Read the memo block header, instead of reading into a struct using binary.Read we just read the two
-	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo fields
+	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
 	// as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
 	read, err := syscall.Read(syscall.Handle(*dbf.memoFileHandle), hbuf)
@@ -294,31 +274,31 @@ func validateFileVersion(version byte) error {
 	}
 }
 
-// GoTo sets the internal record pointer to record recNumber
-// Returns and EOF error if at EOF and positions the pointer at lastRecord+1
-func (dbf *DBF) GoTo(recNumber uint32) error {
-	if recNumber > dbf.dbaseHeader.RecordsCount {
-		dbf.table.recordPointer = dbf.dbaseHeader.RecordsCount
-		return fmt.Errorf("dbase-reader-go-to-1:FAILED:go to %v > %v:%v", recNumber, dbf.dbaseHeader.RecordsCount, ERROR_EOF.AsError())
+// GoTo sets the internal row pointer to row rowNumber
+// Returns and EOF error if at EOF and positions the pointer at lastRow+1
+func (dbf *DBF) GoTo(rowNumber uint32) error {
+	if rowNumber > dbf.dbaseHeader.RowsCount {
+		dbf.table.rowPointer = dbf.dbaseHeader.RowsCount
+		return fmt.Errorf("dbase-reader-go-to-1:FAILED:go to %v > %v:%v", rowNumber, dbf.dbaseHeader.RowsCount, ERROR_EOF.AsError())
 	}
-	dbf.table.recordPointer = recNumber
+	dbf.table.rowPointer = rowNumber
 	return nil
 }
 
-// Skip adds offset to the internal record pointer
-// Returns EOF error if at end of file and positions the pointer at lastRecord+1
-// Returns BOF error is the record pointer would be become negative and positions the pointer at 0
-// Does not skip deleted records
+// Skip adds offset to the internal row pointer
+// Returns EOF error if at end of file and positions the pointer at lastRow+1
+// Returns BOF error is the row pointer would be become negative and positions the pointer at 0
+// Does not skip deleted rows
 func (dbf *DBF) Skip(offset int64) error {
-	newval := int64(dbf.table.recordPointer) + offset
-	if newval >= int64(dbf.dbaseHeader.RecordsCount) {
-		dbf.table.recordPointer = dbf.dbaseHeader.RecordsCount
+	newval := int64(dbf.table.rowPointer) + offset
+	if newval >= int64(dbf.dbaseHeader.RowsCount) {
+		dbf.table.rowPointer = dbf.dbaseHeader.RowsCount
 		return fmt.Errorf("dbase-reader-skip-1:FAILED:%v", ERROR_EOF.AsError())
 	}
 	if newval < 0 {
-		dbf.table.recordPointer = 0
+		dbf.table.rowPointer = 0
 		return fmt.Errorf("dbase-reader-skip-2:FAILED:%v", ERROR_BOF.AsError())
 	}
-	dbf.table.recordPointer = uint32(newval)
+	dbf.table.rowPointer = uint32(newval)
 	return nil
 }

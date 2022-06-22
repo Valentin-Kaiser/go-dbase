@@ -20,15 +20,15 @@ We also aim to support the following features:
 
 The focus is on performance while also trying to keep the code readable and easy to use.
 
-# Supported field types
+# Supported column types
 
-At this moment not all FoxPro field types are supported.
-When reading field values, the value returned by this package is always `interface{}`. 
+At this moment not all FoxPro column types are supported.
+When reading column values, the value returned by this package is always `interface{}`. 
 If you need to cast this to the correct value helper functions are provided.
 
-The supported field types with their return Go types are: 
+The supported column types with their return Go types are: 
 
-| Field Type | Field Type Name | Golang type |
+| Column Type | Column Type Name | Golang type |
 |------------|-----------------|-------------|
 | B | Double | float64 |
 | C | Character | string |
@@ -84,16 +84,16 @@ func main() {
 	}
 	defer dbf.Close()
 
-	// Print all the fieldnames
-	for _, name := range dbf.FieldNames() {
+	// Print all the columnnames
+	for _, name := range dbf.ColumnNames() {
 		fmt.Println(name)
 	}
 
-	fmt.Println("--- database file fields --- \n")
+	fmt.Println("--- database file columns --- \n")
 
-	// Get fieldinfo for all fields
-	for _, field := range dbf.Fields() {
-		fmt.Println(field.FieldName(), field.FieldType(), field.Decimals)
+	// Get columninfo for all columns
+	for _, column := range dbf.Columns() {
+		fmt.Println(column.ColumnName(), column.ColumnType(), column.Decimals)
 	}
 
 	err = dbf.GoTo(1)
@@ -101,16 +101,16 @@ func main() {
 		panic(err)
 	}
 
-	// Read the complete second record
-	record, err := dbf.GetRecord()
+	// Read the complete second row
+	row, err := dbf.GetRow()
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println("--- database row as slice --- \n")
 
-	// Print all the fields in their Go values
-	fmt.Println(record.FieldSlice())
+	// Print all the columns in their Go values
+	fmt.Println(row.ColumnSlice())
 
 	// Go back to start
 	err = dbf.GoTo(0)
@@ -118,46 +118,46 @@ func main() {
 		panic(err)
 	}
 
-	// Loop through all records using recordPointer in DBF struct
-	// Reads the complete record
+	// Loop through all rows using rowPointer in DBF struct
+	// Reads the complete row
 	for !dbf.EOF() {
-		// This reads the complete record
-		record, err := dbf.GetRecord()
+		// This reads the complete row
+		row, err := dbf.GetRow()
 		if err != nil {
 			panic(err)
 		}
 
 		dbf.Skip(1)
-		// skip deleted records
-		if record.Deleted {
+		// skip deleted rows
+		if row.Deleted {
 			continue
 		}
 
-		// get field by position
-		_, err = record.Field(0)
+		// get column by position
+		_, err = row.Column(0)
 		if err != nil {
 			panic(err)
 		}
 
-		// get field by name
-		_, err = record.Field(dbf.FieldPos("COMP_NAME"))
+		// get column by name
+		_, err = row.Column(dbf.ColumnPos("COMP_NAME"))
 		if err != nil {
 			panic(err)
 		}
 
 		fmt.Println("\n --- converted to struct --- \n")
 
-		// convert record into struct
+		// convert row into struct
 		t := &Test{}
-		err = record.ToStruct(t, true)
+		err = row.ToStruct(t, true)
 		if err != nil {
 			panic(err)
 		}
 		fmt.Printf("TESTDATA Company: %+v \n", t.CompanyName)
 	}
 
-	fmt.Println("\n --- record specific field --- \n")
-	// Read only the third field of records 1, 2 and 3
+	fmt.Println("\n --- row specific column --- \n")
+	// Read only the third column of rows 1, 2 and 3
 	recnumbers := []uint32{1, 2, 3}
 	for _, rec := range recnumbers {
 		err := dbf.GoTo(rec)
@@ -171,15 +171,15 @@ func main() {
 		}
 
 		if deleted {
-			fmt.Printf("Record %v deleted \n", rec)
+			fmt.Printf("Row %v deleted \n", rec)
 			continue
 		}
 
-		field3, err := dbf.Field(3)
+		column3, err := dbf.Column(3)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("Record %v field 3: %v \n", rec, field3)
+		fmt.Printf("Row %v column 3: %v \n", rec, column3)
 
 	}
 }
