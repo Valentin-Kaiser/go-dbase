@@ -2,7 +2,6 @@ package dbase
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -10,50 +9,30 @@ import (
 	"time"
 )
 
-const (
-	yearOffset      = 1900
-	null       byte = 0x00
-	blank      byte = 0x20
-
-	columnNameByteLength         = 11
-	maxUsableNameByteLength      = columnNameByteLength - 1
-	endOfColumnNameMarker   byte = 0x0
-
-	rowDeletionFlagIndex = 0
-	rowIsActive          = blank
-	rowIsDeleted         = 0x2A
-
-	eofMarker byte = 0x1A
-)
-
-// Containing all raw DBF header columns.
+// Containing DBF header information like dBase FileType, last change and rows count.
+// https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80)#table-header-record-structure
 type DBaseHeader struct {
-	FileVersion byte     // File type flag
-	Year        uint8    // Last update year (0-99)
-	Month       uint8    // Last update month
-	Day         uint8    // Last update day
-	RowsCount   uint32   // Number of rows in file
-	FirstRow    uint16   // Position of first data row
-	RowLength   uint16   // Length of one data row, including delete flag
-	Reserved    [16]byte // Reserved
-	TableFlags  byte     // Table flags
-	CodePage    byte     // Code page mark
-}
-
-// The raw header of the Memo file.
-type MemoHeader struct {
-	NextFree  uint32  // Location of next free block
-	Unused    [2]byte // Unused
-	BlockSize uint16  // Block size (bytes per block)
+	FileType   byte     // File type flag
+	Year       uint8    // Last update year (0-99)
+	Month      uint8    // Last update month
+	Day        uint8    // Last update day
+	RowsCount  uint32   // Number of rows in file
+	FirstRow   uint16   // Position of first data row
+	RowLength  uint16   // Length of one data row, including delete flag
+	Reserved   [16]byte // Reserved
+	TableFlags byte     // Table flags
+	CodePage   byte     // Code page mark
 }
 
 type Table struct {
+	// Columns defined in this table
 	columns []Column
-
-	rowPointer uint32 // Internal row pointer, can be moved
+	// Internal row pointer, can be moved
+	rowPointer uint32
 }
 
 // Contains the raw column info structure from the DBF header.
+// https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80)#field-subrecords-structure
 type Column struct {
 	ColumnName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
 	DataType   byte     // Column type
@@ -95,43 +74,6 @@ func (h *DBaseHeader) ColumnsCount() uint16 {
 // Returns the calculated file size based on the header info
 func (h *DBaseHeader) FileSize() int64 {
 	return 296 + int64(h.ColumnsCount()*32) + int64(h.RowsCount*uint32(h.RowLength))
-}
-
-/**
- *	################################################################
- *	#					dBase memo helper
- *	################################################################
- */
-
-func (dbf *DBF) prepareMemo(fd syscall.Handle) error {
-	memoHeader, err := readMemoHeader(fd)
-	if err != nil {
-		return fmt.Errorf("dbase-table-prepare-memo-1:FAILED:%v", err)
-
-	}
-
-	dbf.memoFileHandle = &fd
-	dbf.memoHeader = memoHeader
-	return nil
-}
-
-func readMemoHeader(fd syscall.Handle) (*MemoHeader, error) {
-	h := &MemoHeader{}
-	if _, err := syscall.Seek(syscall.Handle(fd), 0, 0); err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-1:FAILED:%v", err)
-	}
-
-	b := make([]byte, 1024)
-	n, err := syscall.Read(syscall.Handle(fd), b)
-	if err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-2:FAILED:%v", err)
-	}
-
-	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
-	if err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-3:FAILED:%v", err)
-	}
-	return h, nil
 }
 
 /**
@@ -198,21 +140,6 @@ func (dbf *DBF) Value(columnposition int) (interface{}, error) {
 	}
 	// columnposition is valid or readColumn would have returned an error
 	return dbf.ColumnDataToValue(data, columnposition)
-}
-
-// Parses a memo file from raw []byte, decodes and returns as []byte
-func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
-	memo, isText, err := dbf.readMemo(raw)
-	if err != nil {
-		return []byte{}, false, fmt.Errorf("dbase-table-parse-memo-1:FAILED:%v", err)
-	}
-	if isText {
-		memo, err = dbf.convert.Decode(memo)
-		if err != nil {
-			return []byte{}, false, fmt.Errorf("dbase-table-parse-memo-2:FAILED:%v", err)
-		}
-	}
-	return memo, isText, nil
 }
 
 /**
