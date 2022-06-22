@@ -6,9 +6,7 @@ This package provides a reader for reading FoxPro database files.
 Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
 # Features 
 
-This project is an extended clone of the [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) package from [Sebastiaan Klippert](https://github.com/SebastiaanKlippert).
-
-There are several similar packages like the go-foxpro-dbf package but they are not suited for our use case, this package implemented:
+There are several similar packages like the [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) package but they are not suited for our use case, this package implemented:
 
 * Support for FPT (memo) files
 * Full support for Windows-1250 encoding to UTF8
@@ -47,7 +45,7 @@ The supported field types with their return Go types are:
 
 # Installation
 ``` 
-go get github.com/Valentin-Kaiser/go-dbase@latest
+go get github.com/Valentin-Kaiser/go-dbase/dbase
 ```
 
 # Example
@@ -59,7 +57,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Valentin-Kaiser/go-dbase"
+	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
 
 type Test struct {
@@ -80,7 +78,7 @@ type Test struct {
 
 func main() {
 	// Open file
-	dbf, err := dbase.OpenFile("./test_data/TEST.DBF", new(dbase.Win1250Decoder))
+	dbf, err := dbase.Open("./test_data/TEST.DBF", new(dbase.Win1250Converter))
 	if err != nil {
 		panic(err)
 	}
@@ -151,7 +149,7 @@ func main() {
 
 		// convert record into struct
 		t := &Test{}
-		err = record.ToStruct(t)
+		err = record.ToStruct(t, true)
 		if err != nil {
 			panic(err)
 		}
@@ -187,7 +185,3 @@ func main() {
 }
 
 ```
-
-# Thanks
-
-* To [Sebastiaan Klippert](https://github.com/SebastiaanKlippert) for the inspiration and the source code
