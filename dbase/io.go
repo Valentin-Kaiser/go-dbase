@@ -49,7 +49,7 @@ func Open(filename string, conv EncodingConverter) (*DBF, error) {
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
 	// If the FPT file does not exist an error is returned.
-	if (dbf.dbaseHeader.TableFlags & 0x02) != 0 {
+	if (dbf.dbaseHeader.TableFlags & MEMO) != 0 {
 		ext := filepath.Ext(filename)
 		fptExt := ".fpt"
 		if strings.ToUpper(ext) == ext {
@@ -105,7 +105,7 @@ func prepareDBF(fd syscall.Handle, conv EncodingConverter) (*DBF, error) {
 	}
 
 	// check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(header.FileVersion); err != nil {
+	if err := validateFileVersion(header.FileType); err != nil {
 		return nil, fmt.Errorf("dbase-reader-prepare-dbf-2:FAILED:%v", err)
 	}
 
@@ -175,7 +175,7 @@ func (dbf *DBF) readColumn(rowPosition uint32, columnPosition int) ([]byte, erro
 	return buf, nil
 }
 
-// Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator (0x0D).
+// Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
 func readColumnInfos(fd syscall.Handle) ([]Column, error) {
 	columns := make([]Column, 0)
 
@@ -189,7 +189,7 @@ func readColumnInfos(fd syscall.Handle) ([]Column, error) {
 		if _, err := syscall.Read(syscall.Handle(fd), b); err != nil {
 			return nil, fmt.Errorf("dbase-reader-read-column-infos-2:FAILED:%v", err)
 		}
-		if b[0] == 0x0D {
+		if b[0] == END_OF_COLUMN {
 			break
 		}
 
@@ -269,7 +269,7 @@ func validateFileVersion(version byte) error {
 	switch version {
 	default:
 		return fmt.Errorf("dbase-reader-validate-file-version-1:FAILED:untested DBF file version: %d (%x hex)", version, version)
-	case 0x30, 0x31:
+	case FOXPRO, FOXPRO_AUTOINCREMENT:
 		return nil
 	}
 }
