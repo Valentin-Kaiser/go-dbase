@@ -33,12 +33,11 @@ import (
 // If the data points to a memo (FPT) file this file is also read
 func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	rec := &Row{}
-	rec.DBF = dbf
 	rec.Data = make([]interface{}, dbf.ColumnsCount())
 
-	// a row should start with te delete flag, a space (0x20) or * (0x2A)
-	rec.Deleted = data[0] == 0x2A
-	if !rec.Deleted && data[0] != 0x20 {
+	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
+	rec.Deleted = data[0] == DELETED
+	if !rec.Deleted && data[0] != ACTIVE {
 		return nil, fmt.Errorf("dbase-reader-bytestorow-1:FAILED:invalid row data, no delete flag found at beginning of row")
 	}
 
@@ -158,5 +157,5 @@ func (dbf *DBF) Deleted() (bool, error) {
 	if read != 1 {
 		return false, fmt.Errorf("dbase-reader-deletedat-4:FAILED:%v", ERROR_INCOMPLETE.AsError())
 	}
-	return buf[0] == 0x2A, nil
+	return buf[0] == DELETED, nil
 }
