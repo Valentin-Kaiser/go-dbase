@@ -1,5 +1,7 @@
 # go-dbase
 
+[![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/Valentin-Kaiser/go-dbase)
+
 Golang package for reading FoxPro dBase database files.
 This package provides a reader for reading FoxPro database files.
 
@@ -84,36 +86,22 @@ func main() {
 	}
 	defer dbf.Close()
 
-	// Print all the columnnames
-	for _, name := range dbf.ColumnNames() {
-		fmt.Println(name)
-	}
-
-	fmt.Println("--- database file columns --- \n")
-
-	// Get columninfo for all columns
+	// Print all database column infos
 	for _, column := range dbf.Columns() {
 		fmt.Println(column.Name(), column.Type(), column.Decimals)
 	}
 
-	err = dbf.GoTo(1)
-	if err != nil {
-		panic(err)
-	}
-
-	// Read the complete second row
+	// Read the complete first row
 	row, err := dbf.Row()
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("--- database row as slice --- \n")
-
-	// Print all the columns in their Go values
-	fmt.Println(row.ColumnSlice())
+	// Print all the columns in their Go values as slice
+	fmt.Println(row.Values())
 
 	// Go back to start
-	err = dbf.GoTo(0)
+	err = dbf.Skip(0)
 	if err != nil {
 		panic(err)
 	}
@@ -133,19 +121,17 @@ func main() {
 			continue
 		}
 
-		// get column by position
-		_, err = row.Column(0)
+		// get value by position
+		_, err = row.Value(0)
 		if err != nil {
 			panic(err)
 		}
 
-		// get column by name
-		_, err = row.Column(dbf.ColumnPos("COMP_NAME"))
+		// get value by name
+		_, err = row.Value(dbf.ColumnPos("COMP_NAME"))
 		if err != nil {
 			panic(err)
 		}
-
-		fmt.Println("\n --- converted to struct --- \n")
 
 		// convert row into struct
 		t := &Test{}
@@ -153,10 +139,9 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("TESTDATA Company: %+v \n", t.CompanyName)
+		fmt.Printf("%+v \n", t)
 	}
 
-	fmt.Println("\n --- row specific column --- \n")
 	// Read only the third column of rows 1, 2 and 3
 	rownumbers := []uint32{1, 2, 3}
 	for _, row := range rownumbers {
@@ -175,17 +160,16 @@ func main() {
 			continue
 		}
 
-		row, err := dbf.Row()
+		r, err := dbf.Row()
 		if err != nil {
 			panic(err)
 		}
 
-		column3, err := row.Column(3)
+		column, err := r.Value(7)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("Row %v column 3: %v \n", row, column3)
-
+		fmt.Printf("Row %v column 7: %v \n", row, column)
 	}
 }
 
