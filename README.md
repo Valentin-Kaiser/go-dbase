@@ -73,8 +73,8 @@ type Test struct {
 	CompanyName string    `json:"COMP_NAME"`
 	CompanyOS   string    `json:"COMP_OS"`
 	Melding     string    `json:"MELDING"`
-	Number      float64   `json:"NUMBER"`
-	Float       int64     `json:"FLOAT"`
+	Number      int64     `json:"NUMBER"`
+	Float       float64   `json:"FLOAT"`
 	Bool        bool      `json:"BOOL"`
 }
 
@@ -134,8 +134,12 @@ func main() {
 		}
 
 		// convert row into struct
+		keyMapping := make(map[string]string)
+		keyMapping["NUMBER"] = "FLOAT"
+		keyMapping["FLOAT"] = "NUMBER"
+
 		t := &Test{}
-		err = row.ToStruct(t, true)
+		err = row.ToStruct(t, true, keyMapping)
 		if err != nil {
 			panic(err)
 		}
@@ -172,5 +176,6 @@ func main() {
 		fmt.Printf("Row %v column 7: %v \n", row, column)
 	}
 }
+
 
 ```
