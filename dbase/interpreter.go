@@ -33,14 +33,14 @@ import (
 // Converts raw column data to the correct type for the given column
 // For C and M columns a charset conversion is done
 // For M columns the data is read from the memo file
-func (dbf *DBF) DataToValue(raw []byte, columnPosition int) (interface{}, error) {
+func (dbf *DBF) DataToValue(raw []byte, column Column) (interface{}, error) {
 	// Not all column types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed
-	if columnPosition < 0 || len(dbf.table.columns) < columnPosition {
-		return nil, fmt.Errorf("dbase-interpreter-datatovalue-1:FAILED:%v", ERROR_INVALID.AsError())
+	if len(raw) != int(column.Length) {
+		return nil, fmt.Errorf("dbase-interpreter-datatovalue-1:FAILED:invalid length %v Bytes != %v Bytes", len(raw), column.Length)
 	}
 
-	switch dbf.table.columns[columnPosition].Type() {
+	switch column.Type() {
 	case "M":
 		// M values contain the address in the FPT file from where to read data
 		memo, isText, err := dbf.parseMemo(raw)
@@ -92,7 +92,7 @@ func (dbf *DBF) DataToValue(raw []byte, columnPosition int) (interface{}, error)
 		return float64(float64(binary.LittleEndian.Uint64(raw)) / 10000), nil
 	case "N":
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
-		if dbf.table.columns[columnPosition].Decimals == 0 {
+		if column.Decimals == 0 {
 			i, err := dbf.parseNumericInt(raw)
 			if err != nil {
 				return i, fmt.Errorf("dbase-interpreter-datatovalue-7:FAILED:%v", err)
@@ -108,7 +108,7 @@ func (dbf *DBF) DataToValue(raw []byte, columnPosition int) (interface{}, error)
 		}
 		return f, nil
 	default:
-		return nil, fmt.Errorf("dbase-interpreter-datatovalue-9:FAILED:Unsupported columntype: %s", dbf.table.columns[columnPosition].Type())
+		return nil, fmt.Errorf("dbase-interpreter-datatovalue-9:FAILED:Unsupported column data type: %s", column.Type())
 	}
 }
 

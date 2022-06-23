@@ -93,6 +93,11 @@ func (dbf *DBF) BOF() bool {
 	return dbf.table.rowPointer == 0
 }
 
+// Returns the current row pointer position
+func (dbf *DBF) Pointer() uint32 {
+	return dbf.table.rowPointer
+}
+
 // Returns the dBase database file header struct for inspecting
 func (dbf *DBF) Header() *DBaseHeader {
 	return dbf.dbaseHeader
@@ -140,7 +145,7 @@ func (dbf *DBF) Value(columnposition int) (interface{}, error) {
 		return nil, fmt.Errorf("dbase-table-value-1:FAILED:%v", err)
 	}
 	// columnposition is valid or readColumn would have returned an error
-	return dbf.DataToValue(data, columnposition)
+	return dbf.DataToValue(data, dbf.table.columns[columnposition])
 }
 
 /**
@@ -240,19 +245,23 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	rec.DBF = dbf
 	rec.Data = make([]interface{}, dbf.ColumnsCount())
 
+	if len(data) < int(dbf.dbaseHeader.RowLength) {
+		return nil, fmt.Errorf("dbase-table-bytestorow-1:FAILED:invalid row data size %v Bytes < %v Bytes", len(data), int(dbf.dbaseHeader.RowLength))
+	}
+
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 	rec.Deleted = data[0] == DELETED
 	if !rec.Deleted && data[0] != ACTIVE {
-		return nil, fmt.Errorf("dbase-table-bytestorow-1:FAILED:invalid row data, no delete flag found at beginning of row")
+		return nil, fmt.Errorf("dbase-table-bytestorow-2:FAILED:invalid row data, no delete flag found at beginning of row")
 	}
 
 	// deleted flag already read
 	offset := uint16(1)
 	for i := 0; i < len(rec.Data); i++ {
 		columninfo := dbf.table.columns[i]
-		val, err := dbf.DataToValue(data[offset:offset+uint16(columninfo.Length)], i)
+		val, err := dbf.DataToValue(data[offset:offset+uint16(columninfo.Length)], dbf.table.columns[i])
 		if err != nil {
-			return rec, fmt.Errorf("dbase-table-bytestorow-2:FAILED:%v", err)
+			return rec, fmt.Errorf("dbase-table-bytestorow-3:FAILED:%v", err)
 		}
 		rec.Data[i] = val
 		offset += uint16(columninfo.Length)
