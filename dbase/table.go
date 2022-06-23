@@ -277,7 +277,7 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
  */
 
 // Returns all rows as a slice of maps.
-func (dbf *DBF) RowsToMap(skipInvalid bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) ([]map[string]interface{}, error) {
+func (dbf *DBF) RowsToMap(skipInvalid bool, trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) ([]map[string]interface{}, error) {
 	out := make([]map[string]interface{}, 0)
 
 	rows, err := dbf.Rows(skipInvalid)
@@ -286,7 +286,7 @@ func (dbf *DBF) RowsToMap(skipInvalid bool, keyMapping map[string]string, conver
 	}
 
 	for _, row := range rows {
-		rmap, err := row.ToMap(keyMapping, convertMapping)
+		rmap, err := row.ToMap(trimspaces, keyMapping, convertMapping)
 		if err != nil {
 			return nil, err
 		}
@@ -300,7 +300,7 @@ func (dbf *DBF) RowsToMap(skipInvalid bool, keyMapping map[string]string, conver
 // Returns all rows as json
 // If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the row map are re-assigned)
 func (dbf *DBF) RowsToJSON(skipInvalid bool, trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) ([]byte, error) {
-	rows, err := dbf.RowsToMap(skipInvalid, keyMapping, convertMapping)
+	rows, err := dbf.RowsToMap(skipInvalid, trimspaces, keyMapping, convertMapping)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-table-to-json-1:FAILED:%v", err)
 	}
@@ -348,13 +348,19 @@ func (dbf *DBF) RowsToStruct(v interface{}, skipInvalid bool, trimspaces bool, k
 }
 
 // Returns a complete row as a map.
-func (rec *Row) ToMap(keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) (map[string]interface{}, error) {
+func (rec *Row) ToMap(trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 	for i, cn := range rec.DBF.ColumnNames() {
 		val, err := rec.Value(i)
 		if err != nil {
 			return out, fmt.Errorf("dbase-table-to-map-1:FAILED:error on column %s (column %d): %s", cn, i, err)
 		}
+		if trimspaces {
+			if str, ok := val.(string); ok {
+				val = strings.TrimSpace(str)
+			}
+		}
+
 		if len(convertMapping) != 0 {
 			if convert, ok := convertMapping[cn]; ok {
 				val = convert(val)
@@ -375,16 +381,9 @@ func (rec *Row) ToMap(keyMapping map[string]string, convertMapping map[string]fu
 // Returns a complete row as a JSON object.
 // If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the row map are re-assigned)
 func (rec *Row) ToJSON(trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) ([]byte, error) {
-	m, err := rec.ToMap(keyMapping, convertMapping)
+	m, err := rec.ToMap(trimspaces, keyMapping, convertMapping)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-table-to-json-1:FAILED:%v", err)
-	}
-	if trimspaces {
-		for k, v := range m {
-			if str, ok := v.(string); ok {
-				m[k] = strings.TrimSpace(str)
-			}
-		}
 	}
 	return json.Marshal(m)
 }
