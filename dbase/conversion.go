@@ -67,7 +67,7 @@ func (dbf *DBF) parseDate(raw []byte) (time.Time, error) {
 
 func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
 	if len(raw) != 8 {
-		return time.Time{}, fmt.Errorf("dbase-reader-parse-date-time-1:FAILED:%v", ERROR_INVALID.AsError())
+		return time.Time{}, fmt.Errorf("dbase-conversion-parsedate-1:FAILED:%v", ERROR_INVALID.AsError())
 	}
 	julDat := int(binary.LittleEndian.Uint32(raw[:4]))
 	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
@@ -108,7 +108,7 @@ func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
 func (dbf *DBF) toUTF8String(raw []byte) (string, error) {
 	utf8, err := dbf.convert.Decode(raw)
 	if err != nil {
-		return string(raw), fmt.Errorf("dbase-reader-to-utf8-string-1:FAILED:%v", err)
+		return string(raw), fmt.Errorf("dbase-conversion-toutf8string-1:FAILED:%v", err)
 	}
 	return string(utf8), nil
 }

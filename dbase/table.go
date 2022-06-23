@@ -47,9 +47,10 @@ type Column struct {
 
 // Contains the raw row data and a deleted flag
 type Row struct {
-	DBF     *DBF
-	Deleted bool
-	Data    []interface{}
+	DBF      *DBF
+	Position uint32
+	Deleted  bool
+	Data     []interface{}
 }
 
 /**
@@ -102,7 +103,7 @@ func (dbf *DBF) RowsCount() uint32 {
 	return dbf.dbaseHeader.RowsCount
 }
 
-// Returns all columns
+// Returns all columns infos
 func (dbf *DBF) Columns() []Column {
 	return dbf.table.columns
 }
@@ -139,7 +140,7 @@ func (dbf *DBF) Value(columnposition int) (interface{}, error) {
 		return nil, fmt.Errorf("dbase-table-value-1:FAILED:%v", err)
 	}
 	// columnposition is valid or readColumn would have returned an error
-	return dbf.ColumnDataToValue(data, columnposition)
+	return dbf.DataToValue(data, columnposition)
 }
 
 /**
@@ -158,30 +159,13 @@ func (f *Column) Type() string {
 	return string(f.DataType)
 }
 
-// Reads raw row data of one row at rowPosition
-func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
-	if rowPosition >= dbf.dbaseHeader.RowsCount {
-		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", ERROR_EOF.AsError())
-	}
-	buf := make([]byte, dbf.dbaseHeader.RowLength)
+/**
+ *	################################################################
+ *	#						Rows helper
+ *	################################################################
+ */
 
-	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), int64(dbf.dbaseHeader.FirstRow)+(int64(rowPosition)*int64(dbf.dbaseHeader.RowLength)), 0)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%v", err)
-	}
-
-	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%v", err)
-	}
-
-	if read != int(dbf.dbaseHeader.RowLength) {
-		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", ERROR_INCOMPLETE.AsError())
-	}
-	return buf, nil
-}
-
-// Returns all rows
+// Returns all rows as a slice
 func (dbf *DBF) Rows(skipInvalid bool) ([]*Row, error) {
 	rows := make([]*Row, 0)
 	for !dbf.EOF() {
@@ -211,6 +195,70 @@ func (dbf *DBF) Row() (*Row, error) {
 	}
 
 	return dbf.BytesToRow(data)
+}
+
+// Column gets a column value by column pos (index)
+func (r *Row) Value(pos int) (interface{}, error) {
+	if pos < 0 || len(r.Data) < pos {
+		return 0, fmt.Errorf("dbase-table-column-1:FAILED:%v", ERROR_INVALID.AsError())
+	}
+	return r.Data[pos], nil
+}
+
+// Values gets all columns as a slice
+func (r *Row) Values() []interface{} {
+	return r.Data
+}
+
+// Reads raw row data of one row at rowPosition
+func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
+	if rowPosition >= dbf.dbaseHeader.RowsCount {
+		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", ERROR_EOF.AsError())
+	}
+	buf := make([]byte, dbf.dbaseHeader.RowLength)
+
+	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), int64(dbf.dbaseHeader.FirstRow)+(int64(rowPosition)*int64(dbf.dbaseHeader.RowLength)), 0)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%v", err)
+	}
+
+	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%v", err)
+	}
+
+	if read != int(dbf.dbaseHeader.RowLength) {
+		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", ERROR_INCOMPLETE.AsError())
+	}
+	return buf, nil
+}
+
+// Converts raw row data to a Row struct
+// If the data points to a memo (FPT) file this file is also read
+func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
+	rec := &Row{}
+	rec.DBF = dbf
+	rec.Data = make([]interface{}, dbf.ColumnsCount())
+
+	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
+	rec.Deleted = data[0] == DELETED
+	if !rec.Deleted && data[0] != ACTIVE {
+		return nil, fmt.Errorf("dbase-table-bytestorow-1:FAILED:invalid row data, no delete flag found at beginning of row")
+	}
+
+	// deleted flag already read
+	offset := uint16(1)
+	for i := 0; i < len(rec.Data); i++ {
+		columninfo := dbf.table.columns[i]
+		val, err := dbf.DataToValue(data[offset:offset+uint16(columninfo.Length)], i)
+		if err != nil {
+			return rec, fmt.Errorf("dbase-table-bytestorow-2:FAILED:%v", err)
+		}
+		rec.Data[i] = val
+		offset += uint16(columninfo.Length)
+	}
+
+	return rec, nil
 }
 
 /**
@@ -294,7 +342,7 @@ func (dbf *DBF) RowsToStruct(v interface{}, skipInvalid bool, trimspaces bool) (
 func (rec *Row) ToMap() (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 	for i, fn := range rec.DBF.ColumnNames() {
-		val, err := rec.Column(i)
+		val, err := rec.Value(i)
 		if err != nil {
 			return out, fmt.Errorf("dbase-table-to-map-1:FAILED:error on column %s (column %d): %s", fn, i, err)
 		}
@@ -336,17 +384,4 @@ func (rec *Row) ToStruct(v interface{}, trimspaces bool) error {
 	}
 
 	return nil
-}
-
-// Column gets a columns value by column pos (index)
-func (r *Row) Column(pos int) (interface{}, error) {
-	if pos < 0 || len(r.Data) < pos {
-		return 0, fmt.Errorf("dbase-table-column-1:FAILED:%v", ERROR_INVALID.AsError())
-	}
-	return r.Data[pos], nil
-}
-
-// ColumnSlice gets all columns as a slice
-func (r *Row) ColumnSlice() []interface{} {
-	return r.Data
 }

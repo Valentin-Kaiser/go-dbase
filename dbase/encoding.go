@@ -2,6 +2,7 @@ package dbase
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"unicode/utf8"
 
@@ -26,7 +27,7 @@ func (d *Win1250Converter) Decode(in []byte) ([]byte, error) {
 	r := transform.NewReader(bytes.NewReader(in), charmap.Windows1250.NewDecoder())
 	data, err := ioutil.ReadAll(r)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-encoding-decode-1:FAILED:%v", err)
 	}
 	return data, nil
 }
@@ -37,7 +38,7 @@ func (d *Win1250Converter) Encode(in []byte) ([]byte, error) {
 	enc := charmap.Windows1250.NewEncoder()
 	nDst, _, err := enc.Transform(out, in, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbase-encoding-encode-1:FAILED:%v", err)
 	}
 
 	return out[:nDst], nil

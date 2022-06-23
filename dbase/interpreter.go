@@ -30,41 +30,14 @@ import (
 	"syscall"
 )
 
-// Converts raw row data to a Row struct
-// If the data points to a memo (FPT) file this file is also read
-func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
-	rec := &Row{}
-	rec.Data = make([]interface{}, dbf.ColumnsCount())
-
-	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
-	rec.Deleted = data[0] == DELETED
-	if !rec.Deleted && data[0] != ACTIVE {
-		return nil, fmt.Errorf("dbase-reader-bytestorow-1:FAILED:invalid row data, no delete flag found at beginning of row")
-	}
-
-	// deleted flag already read
-	offset := uint16(1)
-	for i := 0; i < len(rec.Data); i++ {
-		columninfo := dbf.table.columns[i]
-		val, err := dbf.ColumnDataToValue(data[offset:offset+uint16(columninfo.Length)], i)
-		if err != nil {
-			return rec, fmt.Errorf("dbase-reader-bytestorow-2:FAILED:%v", err)
-		}
-		rec.Data[i] = val
-		offset += uint16(columninfo.Length)
-	}
-
-	return rec, nil
-}
-
 // Converts raw column data to the correct type for the given column
 // For C and M columns a charset conversion is done
 // For M columns the data is read from the memo file
-func (dbf *DBF) ColumnDataToValue(raw []byte, columnPosition int) (interface{}, error) {
+func (dbf *DBF) DataToValue(raw []byte, columnPosition int) (interface{}, error) {
 	// Not all column types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed
 	if columnPosition < 0 || len(dbf.table.columns) < columnPosition {
-		return nil, fmt.Errorf("dbase-reader-rowcolumntovalue-1:FAILED:%v", ERROR_INVALID.AsError())
+		return nil, fmt.Errorf("dbase-interpreter-datatovalue-1:FAILED:%v", ERROR_INVALID.AsError())
 	}
 
 	switch dbf.table.columns[columnPosition].Type() {
@@ -73,7 +46,7 @@ func (dbf *DBF) ColumnDataToValue(raw []byte, columnPosition int) (interface{}, 
 		memo, isText, err := dbf.parseMemo(raw)
 		if isText {
 			if err != nil {
-				return string(memo), fmt.Errorf("dbase-reader-rowcolumntovalue-2:FAILED:%v", err)
+				return string(memo), fmt.Errorf("dbase-interpreter-datatovalue-2:FAILED:%v", err)
 			}
 			return string(memo), nil
 		}
@@ -82,7 +55,7 @@ func (dbf *DBF) ColumnDataToValue(raw []byte, columnPosition int) (interface{}, 
 		// C values are stored as strings, the returned string is not trimmed
 		str, err := dbf.toUTF8String(raw)
 		if err != nil {
-			return str, fmt.Errorf("dbase-reader-rowcolumntovalue-4:FAILED:%v", err)
+			return str, fmt.Errorf("dbase-interpreter-datatovalue-4:FAILED:%v", err)
 		}
 		return str, nil
 	case "I":
@@ -95,7 +68,7 @@ func (dbf *DBF) ColumnDataToValue(raw []byte, columnPosition int) (interface{}, 
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
 		date, err := dbf.parseDate(raw)
 		if err != nil {
-			return date, fmt.Errorf("dbase-reader-rowcolumntovalue-5:FAILED:%v", err)
+			return date, fmt.Errorf("dbase-interpreter-datatovalue-5:FAILED:%v", err)
 		}
 		return date, nil
 	case "T":
@@ -105,7 +78,7 @@ func (dbf *DBF) ColumnDataToValue(raw []byte, columnPosition int) (interface{}, 
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
 		dateTime, err := dbf.parseDateTime(raw)
 		if err != nil {
-			return dateTime, fmt.Errorf("dbase-reader-rowcolumntovalue-6:FAILED:%v", err)
+			return dateTime, fmt.Errorf("dbase-interpreter-datatovalue-6:FAILED:%v", err)
 		}
 		return dateTime, nil
 	case "L":
@@ -122,7 +95,7 @@ func (dbf *DBF) ColumnDataToValue(raw []byte, columnPosition int) (interface{}, 
 		if dbf.table.columns[columnPosition].Decimals == 0 {
 			i, err := dbf.parseNumericInt(raw)
 			if err != nil {
-				return i, fmt.Errorf("dbase-reader-rowcolumntovalue-7:FAILED:%v", err)
+				return i, fmt.Errorf("dbase-interpreter-datatovalue-7:FAILED:%v", err)
 			}
 			return i, nil
 		}
@@ -131,32 +104,32 @@ func (dbf *DBF) ColumnDataToValue(raw []byte, columnPosition int) (interface{}, 
 		// F values are stored as string values
 		f, err := dbf.parseFloat(raw)
 		if err != nil {
-			return f, fmt.Errorf("dbase-reader-rowcolumntovalue-8:FAILED:%v", err)
+			return f, fmt.Errorf("dbase-interpreter-datatovalue-8:FAILED:%v", err)
 		}
 		return f, nil
 	default:
-		return nil, fmt.Errorf("dbase-reader-rowcolumntovalue-9:FAILED:Unsupported columntype: %s", dbf.table.columns[columnPosition].Type())
+		return nil, fmt.Errorf("dbase-interpreter-datatovalue-9:FAILED:Unsupported columntype: %s", dbf.table.columns[columnPosition].Type())
 	}
 }
 
 // Returns if the row at internal row pointer is deleted
 func (dbf *DBF) Deleted() (bool, error) {
 	if dbf.table.rowPointer >= dbf.dbaseHeader.RowsCount {
-		return false, fmt.Errorf("dbase-reader-deletedat-1:FAILED:%v", ERROR_EOF.AsError())
+		return false, fmt.Errorf("dbase-interpreter-deleted-1:FAILED:%v", ERROR_EOF.AsError())
 	}
 
 	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), int64(dbf.dbaseHeader.FirstRow)+(int64(dbf.table.rowPointer)*int64(dbf.dbaseHeader.RowLength)), 0)
 	if err != nil {
-		return false, fmt.Errorf("dbase-reader-deletedat-2:FAILED:%v", err)
+		return false, fmt.Errorf("dbase-interpreter-deleted-2:FAILED:%v", err)
 	}
 
 	buf := make([]byte, 1)
 	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
 	if err != nil {
-		return false, fmt.Errorf("dbase-reader-deletedat-3:FAILED:%v", err)
+		return false, fmt.Errorf("dbase-interpreter-deleted-3:FAILED:%v", err)
 	}
 	if read != 1 {
-		return false, fmt.Errorf("dbase-reader-deletedat-4:FAILED:%v", ERROR_INCOMPLETE.AsError())
+		return false, fmt.Errorf("dbase-interpreter-deleted-4:FAILED:%v", ERROR_INCOMPLETE.AsError())
 	}
 	return buf[0] == DELETED, nil
 }
