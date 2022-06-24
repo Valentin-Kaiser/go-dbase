@@ -33,7 +33,7 @@ import (
 // Converts raw column data to the correct type for the given column
 // For C and M columns a charset conversion is done
 // For M columns the data is read from the memo file
-func (dbf *DBF) DataToValue(raw []byte, column Column) (interface{}, error) {
+func (dbf *DBF) DataToValue(raw []byte, column *Column) (interface{}, error) {
 	// Not all column types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed
 	if len(raw) != int(column.Length) {

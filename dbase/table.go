@@ -26,9 +26,13 @@ type DBaseHeader struct {
 
 type Table struct {
 	// Columns defined in this table
-	columns []Column
+	columns []*Column
+	// Modification to change values or name of columns
+	columnMods []*ColumnModification
 	// Internal row pointer, can be moved
 	rowPointer uint32
+	// Trimspaces default value
+	trimSpaces bool
 }
 
 // Contains the raw column info structure from the DBF header.
@@ -43,6 +47,12 @@ type Column struct {
 	Next       uint32   // Value of autoincrement Next value
 	Step       uint16   // Value of autoincrement Step value
 	Reserved   [8]byte  // Reserved
+}
+
+type ColumnModification struct {
+	Trimspaces  bool
+	Convert     func(interface{}) interface{}
+	ExternalKey string
 }
 
 // Contains the raw row data and a deleted flag
@@ -109,7 +119,7 @@ func (dbf *DBF) RowsCount() uint32 {
 }
 
 // Returns all columns infos
-func (dbf *DBF) Columns() []Column {
+func (dbf *DBF) Columns() []*Column {
 	return dbf.table.columns
 }
 
@@ -138,6 +148,22 @@ func (dbf *DBF) ColumnPos(colname string) int {
 	return -1
 }
 
+func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string, convert func(interface{}) interface{}, v interface{}) {
+	dbf.table.columnMods[position] = &ColumnModification{
+		Trimspaces:  trimspaces,
+		Convert:     convert,
+		ExternalKey: key,
+	}
+}
+
+func (dbf *DBF) SetTrimspacesDefault(b bool) {
+	dbf.table.trimSpaces = b
+}
+
+func (dbf *DBF) GetColumnModification(position int) *ColumnModification {
+	return dbf.table.columnMods[position]
+}
+
 // Reads column number columnposition at the row number the internal pointer is pointing to and returns its Go value
 func (dbf *DBF) Value(columnposition int) (interface{}, error) {
 	data, err := dbf.readColumn(dbf.table.rowPointer, columnposition)
@@ -155,13 +181,13 @@ func (dbf *DBF) Value(columnposition int) (interface{}, error) {
  */
 
 // Returns the name of the column as a trimmed string (max length 10)
-func (f *Column) Name() string {
-	return string(bytes.TrimRight(f.ColumnName[:], "\x00"))
+func (c *Column) Name() string {
+	return string(bytes.TrimRight(c.ColumnName[:], "\x00"))
 }
 
 // Returns the type of the column as string (length 1)
-func (f *Column) Type() string {
-	return string(f.DataType)
+func (c *Column) Type() string {
+	return string(c.DataType)
 }
 
 /**
@@ -277,7 +303,7 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
  */
 
 // Returns all rows as a slice of maps.
-func (dbf *DBF) RowsToMap(skipInvalid bool, trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) ([]map[string]interface{}, error) {
+func (dbf *DBF) RowsToMap(skipInvalid bool) ([]map[string]interface{}, error) {
 	out := make([]map[string]interface{}, 0)
 
 	rows, err := dbf.Rows(skipInvalid)
@@ -286,7 +312,7 @@ func (dbf *DBF) RowsToMap(skipInvalid bool, trimspaces bool, keyMapping map[stri
 	}
 
 	for _, row := range rows {
-		rmap, err := row.ToMap(trimspaces, keyMapping, convertMapping)
+		rmap, err := row.ToMap()
 		if err != nil {
 			return nil, err
 		}
@@ -299,17 +325,18 @@ func (dbf *DBF) RowsToMap(skipInvalid bool, trimspaces bool, keyMapping map[stri
 
 // Returns all rows as json
 // If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the row map are re-assigned)
-func (dbf *DBF) RowsToJSON(skipInvalid bool, trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) ([]byte, error) {
-	rows, err := dbf.RowsToMap(skipInvalid, trimspaces, keyMapping, convertMapping)
+func (dbf *DBF) RowsToJSON(skipInvalid bool) ([]byte, error) {
+	rows, err := dbf.RowsToMap(skipInvalid)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-table-to-json-1:FAILED:%v", err)
 	}
 
 	mapRows := make([]map[string]interface{}, 0)
 	for _, row := range rows {
-		if trimspaces {
-			for k, v := range row {
+		for k, v := range row {
+			if dbf.table.columnMods[dbf.ColumnPos(k)].Trimspaces {
 				if str, ok := v.(string); ok {
+
 					row[k] = strings.TrimSpace(str)
 				}
 			}
@@ -327,7 +354,7 @@ func (dbf *DBF) RowsToJSON(skipInvalid bool, trimspaces bool, keyMapping map[str
 // preferring an exact match but also accepting a case-insensitive match.
 // v keeps the last converted struct.
 // If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the row map are re-assigned)
-func (dbf *DBF) RowsToStruct(v interface{}, skipInvalid bool, trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) ([]interface{}, error) {
+func (dbf *DBF) RowsToStruct(v interface{}, skipInvalid bool) ([]interface{}, error) {
 	out := make([]interface{}, 0)
 
 	rows, err := dbf.Rows(skipInvalid)
@@ -336,7 +363,7 @@ func (dbf *DBF) RowsToStruct(v interface{}, skipInvalid bool, trimspaces bool, k
 	}
 
 	for _, row := range rows {
-		err := row.ToStruct(v, trimspaces, keyMapping, convertMapping)
+		err := row.ToStruct(v)
 		if err != nil {
 			return nil, err
 		}
@@ -348,31 +375,31 @@ func (dbf *DBF) RowsToStruct(v interface{}, skipInvalid bool, trimspaces bool, k
 }
 
 // Returns a complete row as a map.
-func (rec *Row) ToMap(trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) (map[string]interface{}, error) {
+func (row *Row) ToMap() (map[string]interface{}, error) {
 	out := make(map[string]interface{})
-	for i, cn := range rec.DBF.ColumnNames() {
-		val, err := rec.Value(i)
+	for i, cn := range row.DBF.ColumnNames() {
+		val, err := row.Value(i)
 		if err != nil {
 			return out, fmt.Errorf("dbase-table-to-map-1:FAILED:error on column %s (column %d): %s", cn, i, err)
 		}
-		if trimspaces {
-			if str, ok := val.(string); ok {
-				val = strings.TrimSpace(str)
+		colMod := row.DBF.table.columnMods[i]
+		if colMod != nil {
+			if row.DBF.table.trimSpaces && colMod.Trimspaces || colMod.Trimspaces {
+				if str, ok := val.(string); ok {
+					val = strings.TrimSpace(str)
+				}
 			}
-		}
 
-		if len(convertMapping) != 0 {
-			if convert, ok := convertMapping[cn]; ok {
-				val = convert(val)
+			if colMod.Convert != nil {
+				val = colMod.Convert(val)
 			}
-		}
 
-		if len(keyMapping) != 0 {
-			if key, ok := keyMapping[cn]; ok {
-				out[key] = val
+			if len(colMod.ExternalKey) != 0 {
+				out[colMod.ExternalKey] = val
 				continue
 			}
 		}
+
 		out[cn] = val
 	}
 	return out, nil
@@ -380,8 +407,8 @@ func (rec *Row) ToMap(trimspaces bool, keyMapping map[string]string, convertMapp
 
 // Returns a complete row as a JSON object.
 // If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the row map are re-assigned)
-func (rec *Row) ToJSON(trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) ([]byte, error) {
-	m, err := rec.ToMap(trimspaces, keyMapping, convertMapping)
+func (row *Row) ToJSON() ([]byte, error) {
+	m, err := row.ToMap()
 	if err != nil {
 		return nil, fmt.Errorf("dbase-table-to-json-1:FAILED:%v", err)
 	}
@@ -392,8 +419,8 @@ func (rec *Row) ToJSON(trimspaces bool, keyMapping map[string]string, convertMap
 // If v is nil or not a pointer, an InvalidUnmarshalError will be returned.
 // To convert the row into a struct, json.Unmarshal matches incoming object keys to either the struct column name or its tag,
 // preferring an exact match but also accepting a case-insensitive match.
-func (rec *Row) ToStruct(v interface{}, trimspaces bool, keyMapping map[string]string, convertMapping map[string]func(interface{}) interface{}) error {
-	jsonRow, err := rec.ToJSON(trimspaces, keyMapping, convertMapping)
+func (row *Row) ToStruct(v interface{}) error {
+	jsonRow, err := row.ToJSON()
 	if err != nil {
 		return fmt.Errorf("dbase-table-to-struct-1:FAILED:%v", err)
 	}

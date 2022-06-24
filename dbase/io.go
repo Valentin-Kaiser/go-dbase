@@ -119,7 +119,8 @@ func prepareDBF(fd syscall.Handle, conv EncodingConverter) (*DBF, error) {
 		dbaseHeader:     header,
 		dbaseFileHandle: &fd,
 		table: &Table{
-			columns: columns,
+			columns:    columns,
+			columnMods: make([]*ColumnModification, len(columns)),
 		},
 		convert: conv,
 	}
@@ -176,8 +177,8 @@ func (dbf *DBF) readColumn(rowPosition uint32, columnPosition int) ([]byte, erro
 }
 
 // Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
-func readColumnInfos(fd syscall.Handle) ([]Column, error) {
-	columns := make([]Column, 0)
+func readColumnInfos(fd syscall.Handle) ([]*Column, error) {
+	columns := make([]*Column, 0)
 
 	offset := int64(32)
 	b := make([]byte, 1)
@@ -204,8 +205,8 @@ func readColumnInfos(fd syscall.Handle) ([]Column, error) {
 			return nil, fmt.Errorf("dbase-io-readcolumninfos-4:FAILED:%v", err)
 		}
 
-		column := Column{}
-		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, &column)
+		column := &Column{}
+		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
 			return nil, fmt.Errorf("dbase-io-readcolumninfos-5:FAILED:%v", err)
 		}

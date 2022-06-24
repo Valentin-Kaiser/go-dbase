@@ -133,13 +133,16 @@ func main() {
 			panic(err)
 		}
 
-		// convert row into struct
-		keyMapping := make(map[string]string)
-		keyMapping["NUMBER"] = "FLOAT"
-		keyMapping["FLOAT"] = "NUMBER"
+		// Set space trimming per default
+		dbf.SetTrimspacesDefault(true)
+		// Disable space trimming for the company name
+		dbf.SetColumnModification(dbf.ColumnPos("COMP_NAME"), false, "", nil, nil)
+		// add a column modification to switch the names of "NUMBER" and "Float" to match the data types
+		dbf.SetColumnModification(dbf.ColumnPos("NUMBER"), true, "FLOAT", nil, nil)
+		dbf.SetColumnModification(dbf.ColumnPos("FLOAT"), true, "NUMBER", nil, nil)
 
 		t := &Test{}
-		err = row.ToStruct(t, true, keyMapping)
+		err = row.ToStruct(t)
 		if err != nil {
 			panic(err)
 		}
@@ -176,6 +179,4 @@ func main() {
 		fmt.Printf("Row %v column 7: %v \n", row, column)
 	}
 }
-
-
 ```
