@@ -148,7 +148,7 @@ func (dbf *DBF) ColumnPos(colname string) int {
 	return -1
 }
 
-func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string, convert func(interface{}) interface{}, v interface{}) {
+func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string, convert func(interface{}) interface{}) {
 	dbf.table.columnMods[position] = &ColumnModification{
 		Trimspaces:  trimspaces,
 		Convert:     convert,

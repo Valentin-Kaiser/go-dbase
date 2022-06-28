@@ -136,10 +136,10 @@ func main() {
 		// Set space trimming per default
 		dbf.SetTrimspacesDefault(true)
 		// Disable space trimming for the company name
-		dbf.SetColumnModification(dbf.ColumnPos("COMP_NAME"), false, "", nil, nil)
+		dbf.SetColumnModification(dbf.ColumnPos("COMP_NAME"), false, "", nil)
 		// add a column modification to switch the names of "NUMBER" and "Float" to match the data types
-		dbf.SetColumnModification(dbf.ColumnPos("NUMBER"), true, "FLOAT", nil, nil)
-		dbf.SetColumnModification(dbf.ColumnPos("FLOAT"), true, "NUMBER", nil, nil)
+		dbf.SetColumnModification(dbf.ColumnPos("NUMBER"), true, "FLOAT", nil)
+		dbf.SetColumnModification(dbf.ColumnPos("FLOAT"), true, "NUMBER", nil)
 
 		t := &Test{}
 		err = row.ToStruct(t)
