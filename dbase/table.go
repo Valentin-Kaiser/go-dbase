@@ -149,6 +149,11 @@ func (dbf *DBF) ColumnPos(colname string) int {
 }
 
 func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string, convert func(interface{}) interface{}) {
+	// Skip if position is out of range
+	if position < 0 || position >= len(dbf.table.columns) {
+		return
+	}
+
 	dbf.table.columnMods[position] = &ColumnModification{
 		Trimspaces:  trimspaces,
 		Convert:     convert,
