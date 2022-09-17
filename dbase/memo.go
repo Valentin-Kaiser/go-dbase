@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"syscall"
+
+	syscall "golang.org/x/sys/windows"
 )
 
 // The raw header of the Memo file.

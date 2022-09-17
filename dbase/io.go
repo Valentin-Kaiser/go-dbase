@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"syscall"
+
+	syscall "golang.org/x/sys/windows"
 )
 
 type DBF struct {
