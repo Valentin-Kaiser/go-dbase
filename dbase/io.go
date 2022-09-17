@@ -243,7 +243,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
 	// as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
-	read, err := syscall.Read(syscall.Handle(*dbf.memoFileHandle), hbuf)
+	_, err = syscall.Read(syscall.Handle(*dbf.memoFileHandle), hbuf)
 	if err != nil {
 		return nil, false, fmt.Errorf("dbase-io-readmemo-3:FAILED:%v", err)
 	}
@@ -257,7 +257,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 
 	// Now read the actual data
 	buf := make([]byte, leng)
-	read, err = syscall.Read(syscall.Handle(*dbf.memoFileHandle), buf)
+	read, err := syscall.Read(syscall.Handle(*dbf.memoFileHandle), buf)
 	if err != nil {
 		return buf, false, fmt.Errorf("dbase-io-readmemo-4:FAILED:%v", err)
 	}
