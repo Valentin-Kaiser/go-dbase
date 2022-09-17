@@ -211,7 +211,11 @@ func (dbf *DBF) Rows(skipInvalid bool) ([]*Row, error) {
 			return nil, fmt.Errorf("dbase-table-rows-1:FAILED:%v", err)
 		}
 
-		dbf.Skip(1)
+		err = dbf.Skip(1)
+		if err != nil {
+			return nil, fmt.Errorf("dbase-table-rows-2:FAILED:%v", err)
+		}
+
 		// skip deleted rows
 		if row.Deleted {
 			continue
