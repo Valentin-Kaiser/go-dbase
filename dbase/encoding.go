@@ -3,8 +3,9 @@ package dbase
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"unicode/utf8"
+
+	"io"
 
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/transform"
@@ -25,7 +26,7 @@ func (d *Win1250Converter) Decode(in []byte) ([]byte, error) {
 		return in, nil
 	}
 	r := transform.NewReader(bytes.NewReader(in), charmap.Windows1250.NewDecoder())
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-encoding-decode-1:FAILED:%v", err)
 	}
