@@ -1,6 +1,7 @@
 # go-dbase
 
 [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/Valentin-Kaiser/go-dbase)
+[![golangci-lint](https://github.com/Valentin-Kaiser/go-dbase/workflows/golangci-lint/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
 
 Golang package for reading FoxPro dBase database files.
 This package provides a reader for reading FoxPro database files.
