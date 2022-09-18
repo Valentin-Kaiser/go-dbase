@@ -4,7 +4,7 @@
 ## Super Linter GitHub Actions ##
 #################################
 #################################
-name: Lint Code Base
+name: Github Super Linter
 
 #
 # Documentation:
@@ -27,7 +27,7 @@ jobs:
     # Name the Job
     name: Lint Code Base
     # Set the agent to run on
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     ##################
     # Load all steps #
