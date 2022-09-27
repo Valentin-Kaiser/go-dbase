@@ -37,6 +37,7 @@ linters:
     - nosnakecase
     - ifshort
     - gci
+    - gofmt
 
     # disabled because of generics
     - rowserrcheck
