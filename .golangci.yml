@@ -38,6 +38,7 @@ linters:
     - ifshort
     - gci
     - gofmt
+    - goimports
 
     # disabled because of generics
     - rowserrcheck
