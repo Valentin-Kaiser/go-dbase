@@ -1,42 +1,36 @@
 package dbase
 
-import "fmt"
-
-type DBaseError string
+type Error string
 
 const (
-	// returned when the end of a dBase database file is reached
-	ERROR_EOF DBaseError = "EOF"
-	// returned when the row pointer is attempted to be moved before the first row
-	ERROR_BOF DBaseError = "BOF"
-	// returned when the read of a row or column did not finish
-	ERROR_INCOMPLETE DBaseError = "INCOMPLETE"
-	// returned when an invalid column position is used (x<1 or x>number of columns)
-	ERROR_INVALID DBaseError = "INVALID"
-	// returned when a file operation is attempted on a non existent file
-	ERROR_NO_DBF_FILE      DBaseError = "FPT_FILE_NOT_FOUND"
-	ERROR_NO_FPT_FILE      DBaseError = "DBF_FILE_NOT_FOUND"
-	ERROR_INVALID_ENCODING DBaseError = "INVALID_ENCODING"
+	// Returned when the end of a dBase database file is reached
+	EOF Error = "EOF"
+	// Returned when the row pointer is attempted to be moved before the first row
+	BOF Error = "BOF"
+	// Returned when the read of a row or column did not finish
+	Incomplete Error = "INCOMPLETE"
+	// Returned when a file operation is attempted on a non existent file
+	NoFPT Error = "FPT_FILE_NOT_FOUND"
+	NoDBF Error = "DBF_FILE_NOT_FOUND"
+	// Returned when an invalid column position is used (x<1 or x>number of columns)
+	InvalidPosition Error = "INVALID_Position"
+	InvalidEncoding Error = "INVALID_ENCODING"
 
 	// Supported file types
-	FOXPRO               byte = 0x30
-	FOXPRO_AUTOINCREMENT byte = 0x31
+	FoxPro              byte = 0x30
+	FoxProAutoincrement byte = 0x31
 
 	// Relevant byte marker
-	NULL          byte = 0x00
-	BLANK         byte = 0x20
-	END_OF_COLUMN byte = 0x0D
-	ACTIVE             = BLANK
-	DELETED            = 0x2A
-	EOF_MARKER    byte = 0x1A
+	Null      byte = 0x00
+	Blank     byte = 0x20
+	ColumnEnd byte = 0x0D
+	Active         = Blank
+	Deleted        = 0x2A
+	EOFMarker byte = 0x1A
 
-	// dBase Table flags
-	STRUCTURAL      byte = 0x01
-	MEMO            byte = 0x02
-	STRUCTURAL_MEMO byte = 0x03
-	DATABASE        byte = 0x04
+	// DBase Table flags
+	Structural     byte = 0x01
+	Memo           byte = 0x02
+	StructuralMemo byte = 0x03
+	Database       byte = 0x04
 )
-
-func (re DBaseError) AsError() error {
-	return fmt.Errorf(string(re))
-}

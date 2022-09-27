@@ -1,62 +1,3 @@
-# go-dbase
-
-[![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/Valentin-Kaiser/go-dbase)
-[![golangci-lint](https://github.com/Valentin-Kaiser/go-dbase/workflows/golangci-lint/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-Golang package for reading FoxPro dBase database files.
-This package provides a reader for reading FoxPro database files.
-
-Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
-# Features 
-
-There are several similar packages like the [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) package but they are not suited for our use case, this package implemented:
-
-* Support for FPT (memo) files
-* Full support for Windows-1250 encoding to UTF8
-* File readers for scanning files (instead of reading the entire file to memory)
-* Conversion to map, json and struct
-* Non blocking IO operation with syscall
-
-We also aim to support the following features:
-
-* Writing to dBase database files
-
-The focus is on performance while also trying to keep the code readable and easy to use.
-
-# Supported column types
-
-At this moment not all FoxPro column types are supported.
-When reading column values, the value returned by this package is always `interface{}`. 
-If you need to cast this to the correct value helper functions are provided.
-
-The supported column types with their return Go types are: 
-
-| Column Type | Column Type Name | Golang type |
-|------------|-----------------|-------------|
-| B | Double | float64 |
-| C | Character | string |
-| D | Date | time.Time |
-| F | Float | float64 |
-| I | Integer | int32 |
-| L | Logical | bool |
-| M | Memo  | string |
-| M | Memo (Binary) | []byte |
-| N | Numeric (0 decimals) | int64 |
-| N | Numeric (with decimals) | float64 |
-| T | DateTime | time.Time |
-| Y | Currency | float64 |
-
-If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
-
-# Installation
-``` 
-go get github.com/Valentin-Kaiser/go-dbase/dbase
-```
-
-# Example
-
-```go
 package main
 
 import (
@@ -186,4 +127,3 @@ func main() {
 		fmt.Printf("Row %v column 7: %v \n", row, column)
 	}
 }
-```
