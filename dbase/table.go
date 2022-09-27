@@ -211,10 +211,8 @@ func (dbf *DBF) Rows(skipInvalid bool) ([]*Row, error) {
 			return nil, fmt.Errorf("dbase-table-rows-1:FAILED:%v", err)
 		}
 
-		err = dbf.Skip(1)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-table-rows-2:FAILED:%v", err)
-		}
+		// Increment the row pointer
+		dbf.Skip(1)
 
 		// skip deleted rows
 		if row.Deleted {
@@ -237,7 +235,7 @@ func (dbf *DBF) Row() (*Row, error) {
 	return dbf.BytesToRow(data)
 }
 
-// Column gets a column value by column pos (index)
+// Value gets a column value by column pos (index)
 func (r *Row) Value(pos int) (interface{}, error) {
 	if pos < 0 || len(r.Data) < pos {
 		return 0, fmt.Errorf("dbase-table-column-1:FAILED:%v", ERROR_INVALID.AsError())

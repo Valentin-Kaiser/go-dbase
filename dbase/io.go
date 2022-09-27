@@ -288,19 +288,16 @@ func (dbf *DBF) GoTo(rowNumber uint32) error {
 }
 
 // Skip adds offset to the internal row pointer
-// Returns EOF error if at end of file and positions the pointer at lastRow+1
-// Returns BOF error is the row pointer would be become negative and positions the pointer at 0
+// If at end of file positions the pointer at lastRow+1
+// If the row pointer would be become negative positions the pointer at 0
 // Does not skip deleted rows
-func (dbf *DBF) Skip(offset int64) error {
+func (dbf *DBF) Skip(offset int64) {
 	newval := int64(dbf.table.rowPointer) + offset
 	if newval >= int64(dbf.dbaseHeader.RowsCount) {
 		dbf.table.rowPointer = dbf.dbaseHeader.RowsCount
-		return fmt.Errorf("dbase-io-skip-1:FAILED:%v", ERROR_EOF.AsError())
 	}
 	if newval < 0 {
 		dbf.table.rowPointer = 0
-		return fmt.Errorf("dbase-io-skip-2:FAILED:%v", ERROR_BOF.AsError())
 	}
 	dbf.table.rowPointer = uint32(newval)
-	return nil
 }
