@@ -11,7 +11,7 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// Converter is the interface as passed to Open
+// EncodingConverter is the interface as passed to Open
 type EncodingConverter interface {
 	Decode(in []byte) ([]byte, error)
 	Encode(in []byte) ([]byte, error)
@@ -28,7 +28,7 @@ func (d *Win1250Converter) Decode(in []byte) ([]byte, error) {
 	r := transform.NewReader(bytes.NewReader(in), charmap.Windows1250.NewDecoder())
 	data, err := io.ReadAll(r)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-encoding-decode-1:FAILED:%v", err)
+		return nil, fmt.Errorf("dbase-encoding-decode-1:FAILED:%w", err)
 	}
 	return data, nil
 }
@@ -39,8 +39,7 @@ func (d *Win1250Converter) Encode(in []byte) ([]byte, error) {
 	enc := charmap.Windows1250.NewEncoder()
 	nDst, _, err := enc.Transform(out, in, false)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-encoding-encode-1:FAILED:%v", err)
+		return nil, fmt.Errorf("dbase-encoding-encode-1:FAILED:%w", err)
 	}
-
 	return out[:nDst], nil
 }
