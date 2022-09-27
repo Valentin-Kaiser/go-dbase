@@ -13,7 +13,7 @@ type Test struct {
 	Date        time.Time `json:"DATUM"`
 	TIJD        string    `json:"TIJD"`
 	SOORT       float64   `json:"SOORT"`
-	ID_NR       int32     `json:"ID_NR"`
+	IDNR        int32     `json:"ID_NR"`
 	UserNR      int32     `json:"USERNR"`
 	CompanyName string    `json:"COMP_NAME"`
 	CompanyOS   string    `json:"COMP_OS"`
