@@ -47,6 +47,8 @@ The supported column types with their return Go types are:
 | T | DateTime | time.Time |
 | Y | Currency | float64 |
 
+If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
+
 # Installation
 ``` 
 go get github.com/Valentin-Kaiser/go-dbase/dbase
@@ -70,7 +72,7 @@ type Test struct {
 	Date        time.Time `json:"DATUM"`
 	TIJD        string    `json:"TIJD"`
 	SOORT       float64   `json:"SOORT"`
-	ID_NR       int32     `json:"ID_NR"`
+	IDNR        int32     `json:"ID_NR"`
 	UserNR      int32     `json:"USERNR"`
 	CompanyName string    `json:"COMP_NAME"`
 	CompanyOS   string    `json:"COMP_OS"`
@@ -81,99 +83,102 @@ type Test struct {
 }
 
 func main() {
-	// Open file
+	// Open the example database file.
 	dbf, err := dbase.Open("./test_data/TEST.DBF", new(dbase.Win1250Converter))
 	if err != nil {
 		panic(err)
 	}
 	defer dbf.Close()
 
-	// Print all database column infos
+	// Print all database column infos.
 	for _, column := range dbf.Columns() {
-		fmt.Println(column.Name(), column.Type(), column.Decimals)
+		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
 	}
 
-	// Read the complete first row
+	// Read the complete first row.
 	row, err := dbf.Row()
 	if err != nil {
 		panic(err)
 	}
 
-	// Print all the columns in their Go values as slice
-	fmt.Println(row.Values())
+	// Print all the columns in their Go values as slice.
+	fmt.Printf("%+v", row.Values())
 
-	// Go back to start
-	err = dbf.Skip(0)
-	if err != nil {
-		panic(err)
-	}
+	// Go back to start.
+	dbf.Skip(0)
 
-	// Loop through all rows using rowPointer in DBF struct
-	// Reads the complete row
+	// Loop through all rows using rowPointer in DBF struct.
 	for !dbf.EOF() {
-		// This reads the complete row
+		fmt.Printf("EOF: %v - Pointer: %v \n", dbf.EOF(), dbf.Pointer())
+
+		// This reads the complete row.
 		row, err := dbf.Row()
 		if err != nil {
 			panic(err)
 		}
 
+		// Increase the pointer.
 		dbf.Skip(1)
-		// skip deleted rows
+
+		// Skip deleted rows.
 		if row.Deleted {
 			continue
 		}
 
-		// get value by position
+		// Get value by column position
 		_, err = row.Value(0)
 		if err != nil {
 			panic(err)
 		}
 
-		// get value by name
+		// Get value by column name
 		_, err = row.Value(dbf.ColumnPos("COMP_NAME"))
 		if err != nil {
 			panic(err)
 		}
 
-		// Set space trimming per default
+		// Enable space trimming per default
 		dbf.SetTrimspacesDefault(true)
 		// Disable space trimming for the company name
 		dbf.SetColumnModification(dbf.ColumnPos("COMP_NAME"), false, "", nil)
-		// add a column modification to switch the names of "NUMBER" and "Float" to match the data types
+		// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
 		dbf.SetColumnModification(dbf.ColumnPos("NUMBER"), true, "FLOAT", nil)
 		dbf.SetColumnModification(dbf.ColumnPos("FLOAT"), true, "NUMBER", nil)
 
+		// Read the row into a struct.
 		t := &Test{}
 		err = row.ToStruct(t)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("%+v \n", t)
+
+		fmt.Printf("Company: %v", t.CompanyName)
 	}
 
 	// Read only the third column of rows 1, 2 and 3
-	rownumbers := []uint32{1, 2, 3}
-	for _, row := range rownumbers {
+	for _, row := range []uint32{1, 2, 3} {
 		err := dbf.GoTo(row)
 		if err != nil {
 			panic(err)
 		}
 
+		// Check if the row is deleted
 		deleted, err := dbf.Deleted()
 		if err != nil {
 			panic(err)
 		}
-
 		if deleted {
 			fmt.Printf("Row %v deleted \n", row)
 			continue
 		}
 
+		// Read the entire row
 		r, err := dbf.Row()
 		if err != nil {
 			panic(err)
 		}
 
+		// Read the seventh column
 		column, err := r.Value(7)
 		if err != nil {
 			panic(err)
