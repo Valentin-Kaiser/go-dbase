@@ -26,7 +26,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"syscall"
 )
 
 // Converts raw column data to the correct type for the given column
@@ -108,24 +107,4 @@ func (dbf *DBF) DataToValue(raw []byte, column *Column) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("dbase-interpreter-datatovalue-9:FAILED:Unsupported column data type: %s", column.Type())
 	}
-}
-
-// Returns if the row at internal row pointer is deleted
-func (dbf *DBF) Deleted() (bool, error) {
-	if dbf.table.rowPointer >= dbf.header.RowsCount {
-		return false, fmt.Errorf("dbase-interpreter-deleted-1:FAILED:%v", EOF)
-	}
-	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), int64(dbf.header.FirstRow)+(int64(dbf.table.rowPointer)*int64(dbf.header.RowLength)), 0)
-	if err != nil {
-		return false, fmt.Errorf("dbase-interpreter-deleted-2:FAILED:%w", err)
-	}
-	buf := make([]byte, 1)
-	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
-	if err != nil {
-		return false, fmt.Errorf("dbase-interpreter-deleted-3:FAILED:%w", err)
-	}
-	if read != 1 {
-		return false, fmt.Errorf("dbase-interpreter-deleted-4:FAILED:%v", Incomplete)
-	}
-	return buf[0] == Deleted, nil
 }

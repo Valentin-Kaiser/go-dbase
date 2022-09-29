@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -241,26 +240,6 @@ func (row *Row) Value(pos int) (interface{}, error) {
 // Values gets all columns as a slice
 func (row *Row) Values() []interface{} {
 	return row.Data
-}
-
-// Reads raw row data of one row at rowPosition
-func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
-	if rowPosition >= dbf.header.RowsCount {
-		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", EOF)
-	}
-	buf := make([]byte, dbf.header.RowLength)
-	_, err := syscall.Seek(syscall.Handle(*dbf.dbaseFileHandle), int64(dbf.header.FirstRow)+(int64(rowPosition)*int64(dbf.header.RowLength)), 0)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%w", err)
-	}
-	read, err := syscall.Read(syscall.Handle(*dbf.dbaseFileHandle), buf)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%w", err)
-	}
-	if read != int(dbf.header.RowLength) {
-		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", Incomplete)
-	}
-	return buf, nil
 }
 
 // Converts raw row data to a Row struct
