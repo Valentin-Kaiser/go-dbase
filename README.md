@@ -3,6 +3,7 @@
 [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/Valentin-Kaiser/go-dbase)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![golangci-lint](https://github.com/Valentin-Kaiser/go-dbase/workflows/golangci-lint/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
+[![CodeQL](https://github.com/Valentin-Kaiser/go-dbase/workflows/CodeQL/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
 [![goreport](https://goreportcard.com/badge/github.com/Valentin-Kaiser/go-dbase)](https://goreportcard.com/report/github.com/Valentin-Kaiser/go-dbase)
 [![Lines code](https://img.shields.io/tokei/lines/github.com/Valentin-Kaiser/go-dbase)](https://github.com/Valentin-Kaiser/go-dbase)
 
