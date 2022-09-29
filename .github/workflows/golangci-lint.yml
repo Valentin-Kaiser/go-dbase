@@ -12,7 +12,7 @@ permissions:
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   # pull-requests: read
 jobs:
-  golangci:
+  golangci-unix:
     name: lint unix
     runs-on: ubuntu-latest
     steps:
@@ -25,7 +25,7 @@ jobs:
         with:
           version: latest
           args: --timeout=3m
-  golangci:
+  golangci-windows:
     name: lint windows
     runs-on: windows-latest
     steps:
