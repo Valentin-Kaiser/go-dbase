@@ -1,13 +1,15 @@
+//go:build !windows
+// +build !windows
+
 package dbase
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
-
-	syscall "golang.org/x/sys/windows"
 )
 
 // DBF is the main struct to handle a dBase file.
@@ -15,8 +17,8 @@ type DBF struct {
 	// The used converter instance passed by opening a file
 	convert EncodingConverter
 	// DBase and memo file syscall handle pointer
-	dbaseFileHandle *syscall.Handle
-	memoFileHandle  *syscall.Handle
+	dbaseFile *os.File
+	memoFile  *os.File
 	// DBase and memo file header containing relevant information
 	header     *Header
 	memoHeader *MemoHeader
@@ -35,15 +37,15 @@ type DBF struct {
 func Open(filename string, conv EncodingConverter) (*DBF, error) {
 	filename = filepath.Clean(filename)
 	// Open file in non blocking mode with syscall
-	fd, err := syscall.Open(filename, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0644)
+	dbaseFile, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-open-1:FAILED:%w", err)
 	}
-	dbf, err := prepareDBF(fd, conv)
+	dbf, err := prepareDBF(dbaseFile, conv)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-open-2:FAILED:%w", err)
 	}
-	dbf.dbaseFileHandle = &fd
+	dbf.dbaseFile = dbaseFile
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
 	// If the FPT file does not exist an error is returned.
@@ -53,29 +55,29 @@ func Open(filename string, conv EncodingConverter) (*DBF, error) {
 		if strings.ToUpper(ext) == ext {
 			fptExt = ".FPT"
 		}
-		fd, err := syscall.Open(strings.TrimSuffix(filename, ext)+fptExt, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0644)
+		memoFile, err := os.Open(strings.TrimSuffix(filename, ext) + fptExt)
 		if err != nil {
 			return nil, fmt.Errorf("dbase-io-open-3:FAILED:%w", err)
 		}
-		err = dbf.prepareMemo(fd)
+		err = dbf.prepareMemo(memoFile)
 		if err != nil {
 			return nil, fmt.Errorf("dbase-io-open-4:FAILED:%w", err)
 		}
-		dbf.memoFileHandle = &fd
+		dbf.memoFile = memoFile
 	}
 	return dbf, nil
 }
 
 // Closes the file handlers.
 func (dbf *DBF) Close() error {
-	if dbf.dbaseFileHandle != nil {
-		err := syscall.Close(*dbf.dbaseFileHandle)
+	if dbf.dbaseFile != nil {
+		err := dbf.dbaseFile.Close()
 		if err != nil {
 			return fmt.Errorf("dbase-io-close-1:FAILED:Closing DBF failed with error: %w", err)
 		}
 	}
-	if dbf.memoFileHandle != nil {
-		err := syscall.Close(*dbf.memoFileHandle)
+	if dbf.memoFile != nil {
+		err := dbf.memoFile.Close()
 		if err != nil {
 			return fmt.Errorf("dbase-io-close-2:FAILED:Closing FPT failed with error: %w", err)
 		}
@@ -91,8 +93,8 @@ func (dbf *DBF) Close() error {
 
 // Returns a DBF object pointer
 // Reads the DBF Header, the column infos and validates file version.
-func prepareDBF(fd syscall.Handle, conv EncodingConverter) (*DBF, error) {
-	header, err := readDBFHeader(fd)
+func prepareDBF(dbaseFile *os.File, conv EncodingConverter) (*DBF, error) {
+	header, err := readDBFHeader(dbaseFile)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-1:FAILED:%w", err)
 	}
@@ -100,13 +102,13 @@ func prepareDBF(fd syscall.Handle, conv EncodingConverter) (*DBF, error) {
 	if err := validateFileVersion(header.FileType); err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-2:FAILED:%w", err)
 	}
-	columns, err := readColumnInfos(fd)
+	columns, err := readColumnInfos(dbaseFile)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-3:FAILED:%w", err)
 	}
 	dbf := &DBF{
-		header:          header,
-		dbaseFileHandle: &fd,
+		header:    header,
+		dbaseFile: dbaseFile,
 		table: &Table{
 			columns:    columns,
 			columnMods: make([]*ColumnModification, len(columns)),
@@ -117,13 +119,13 @@ func prepareDBF(fd syscall.Handle, conv EncodingConverter) (*DBF, error) {
 }
 
 // Reads the DBF header from the file handle.
-func readDBFHeader(fd syscall.Handle) (*Header, error) {
+func readDBFHeader(dbaseFile *os.File) (*Header, error) {
 	h := &Header{}
-	if _, err := syscall.Seek(fd, 0, 0); err != nil {
+	if _, err := dbaseFile.Seek(0, 0); err != nil {
 		return nil, fmt.Errorf("dbase-io-readdbfheader-1:FAILED:%w", err)
 	}
 	b := make([]byte, 1024)
-	n, err := syscall.Read(fd, b)
+	n, err := dbaseFile.Read(b)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-readdbfheader-2:FAILED:%w", err)
 	}
@@ -145,11 +147,11 @@ func (dbf *DBF) readColumn(rowPosition uint32, columnPosition int) ([]byte, erro
 	}
 	buf := make([]byte, dbf.table.columns[columnPosition].Length)
 	pos := int64(dbf.header.FirstRow) + (int64(rowPosition) * int64(dbf.header.RowLength)) + int64(dbf.table.columns[columnPosition].Position)
-	_, err := syscall.Seek(*dbf.dbaseFileHandle, pos, 0)
+	_, err := dbf.dbaseFile.Seek(pos, 0)
 	if err != nil {
 		return buf, fmt.Errorf("dbase-io-readcolumn-3:FAILED:%w", err)
 	}
-	read, err := syscall.Read(*dbf.dbaseFileHandle, buf)
+	read, err := dbf.dbaseFile.Read(buf)
 	if err != nil {
 		return buf, fmt.Errorf("dbase-io-readcolumn-4:FAILED:%w", err)
 	}
@@ -160,27 +162,27 @@ func (dbf *DBF) readColumn(rowPosition uint32, columnPosition int) ([]byte, erro
 }
 
 // Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
-func readColumnInfos(fd syscall.Handle) ([]*Column, error) {
+func readColumnInfos(dbaseFile *os.File) ([]*Column, error) {
 	columns := make([]*Column, 0)
 	offset := int64(32)
 	b := make([]byte, 1)
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
-		if _, err := syscall.Seek(fd, offset, 0); err != nil {
+		if _, err := dbaseFile.Seek(offset, 0); err != nil {
 			return nil, fmt.Errorf("dbase-io-readcolumninfos-1:FAILED:%w", err)
 		}
-		if _, err := syscall.Read(fd, b); err != nil {
+		if _, err := dbaseFile.Read(b); err != nil {
 			return nil, fmt.Errorf("dbase-io-readcolumninfos-2:FAILED:%w", err)
 		}
 		if b[0] == ColumnEnd {
 			break
 		}
 		// Position back one byte and read the column
-		if _, err := syscall.Seek(fd, -1, 1); err != nil {
+		if _, err := dbaseFile.Seek(-1, 1); err != nil {
 			return nil, fmt.Errorf("dbase-io-readcolumninfos-3:FAILED:%w", err)
 		}
 		buf := make([]byte, 2048)
-		n, err := syscall.Read(fd, buf)
+		n, err := dbaseFile.Read(buf)
 		if err != nil {
 			return nil, fmt.Errorf("dbase-io-readcolumninfos-4:FAILED:%w", err)
 		}
@@ -201,16 +203,65 @@ func readColumnInfos(fd syscall.Handle) ([]*Column, error) {
 	return columns, nil
 }
 
+// Reads raw row data of one row at rowPosition
+func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
+	if rowPosition >= dbf.header.RowsCount {
+		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", EOF)
+	}
+	buf := make([]byte, dbf.header.RowLength)
+	_, err := dbf.dbaseFile.Seek(int64(dbf.header.FirstRow)+(int64(rowPosition)*int64(dbf.header.RowLength)), 0)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%w", err)
+	}
+	read, err := dbf.dbaseFile.Read(buf)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%w", err)
+	}
+	if read != int(dbf.header.RowLength) {
+		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", Incomplete)
+	}
+	return buf, nil
+}
+
+// prepareMemo prepares the memo file for reading.
+func (dbf *DBF) prepareMemo(memoFile *os.File) error {
+	memoHeader, err := readMemoHeader(memoFile)
+	if err != nil {
+		return fmt.Errorf("dbase-table-prepare-memo-1:FAILED:%w", err)
+	}
+	dbf.memoFile = memoFile
+	dbf.memoHeader = memoHeader
+	return nil
+}
+
+// readMemoHeader reads the memo header from the given file handle.
+func readMemoHeader(memoFile *os.File) (*MemoHeader, error) {
+	h := &MemoHeader{}
+	if _, err := memoFile.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("dbase-table-read-memo-header-1:FAILED:%w", err)
+	}
+	b := make([]byte, 1024)
+	n, err := memoFile.Read(b)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-table-read-memo-header-2:FAILED:%w", err)
+	}
+	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-table-read-memo-header-3:FAILED:%w", err)
+	}
+	return h, nil
+}
+
 // Reads one or more blocks from the FPT file, called for each memo column.
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
-	if dbf.memoFileHandle == nil {
+	if dbf.memoFile == nil {
 		return nil, false, fmt.Errorf("dbase-io-readmemo-1:FAILED:%v", NoFPT)
 	}
 	// Determine the block number
 	block := binary.LittleEndian.Uint32(blockdata)
 	// The position in the file is blocknumber*blocksize
-	_, err := syscall.Seek(*dbf.memoFileHandle, int64(dbf.memoHeader.BlockSize)*int64(block), 0)
+	_, err := dbf.memoFile.Seek(int64(dbf.memoHeader.BlockSize)*int64(block), 0)
 	if err != nil {
 		return nil, false, fmt.Errorf("dbase-io-readmemo-2:FAILED:%w", err)
 	}
@@ -218,7 +269,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
 	// as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
-	_, err = syscall.Read(*dbf.memoFileHandle, hbuf)
+	_, err = dbf.memoFile.Read(hbuf)
 	if err != nil {
 		return nil, false, fmt.Errorf("dbase-io-readmemo-3:FAILED:%w", err)
 	}
@@ -230,7 +281,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	}
 	// Now read the actual data
 	buf := make([]byte, leng)
-	read, err := syscall.Read(*dbf.memoFileHandle, buf)
+	read, err := dbf.memoFile.Read(buf)
 	if err != nil {
 		return buf, false, fmt.Errorf("dbase-io-readmemo-4:FAILED:%w", err)
 	}
@@ -273,4 +324,24 @@ func (dbf *DBF) Skip(offset int64) {
 		dbf.table.rowPointer = 0
 	}
 	dbf.table.rowPointer = uint32(newval)
+}
+
+// Returns if the row at internal row pointer is deleted
+func (dbf *DBF) Deleted() (bool, error) {
+	if dbf.table.rowPointer >= dbf.header.RowsCount {
+		return false, fmt.Errorf("dbase-interpreter-deleted-1:FAILED:%v", EOF)
+	}
+	_, err := dbf.dbaseFile.Seek(int64(dbf.header.FirstRow)+(int64(dbf.table.rowPointer)*int64(dbf.header.RowLength)), 0)
+	if err != nil {
+		return false, fmt.Errorf("dbase-interpreter-deleted-2:FAILED:%w", err)
+	}
+	buf := make([]byte, 1)
+	read, err := dbf.dbaseFile.Read(buf)
+	if err != nil {
+		return false, fmt.Errorf("dbase-interpreter-deleted-3:FAILED:%w", err)
+	}
+	if read != 1 {
+		return false, fmt.Errorf("dbase-interpreter-deleted-4:FAILED:%v", Incomplete)
+	}
+	return buf[0] == Deleted, nil
 }
