@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package dbase
 
 import (
@@ -201,6 +204,26 @@ func readColumnInfos(fd syscall.Handle) ([]*Column, error) {
 	return columns, nil
 }
 
+// Reads raw row data of one row at rowPosition
+func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
+	if rowPosition >= dbf.header.RowsCount {
+		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", EOF)
+	}
+	buf := make([]byte, dbf.header.RowLength)
+	_, err := syscall.Seek(*dbf.dbaseFileHandle, int64(dbf.header.FirstRow)+(int64(rowPosition)*int64(dbf.header.RowLength)), 0)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%w", err)
+	}
+	read, err := syscall.Read(*dbf.dbaseFileHandle, buf)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%w", err)
+	}
+	if read != int(dbf.header.RowLength) {
+		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", Incomplete)
+	}
+	return buf, nil
+}
+
 // Reads one or more blocks from the FPT file, called for each memo column.
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
@@ -273,4 +296,24 @@ func (dbf *DBF) Skip(offset int64) {
 		dbf.table.rowPointer = 0
 	}
 	dbf.table.rowPointer = uint32(newval)
+}
+
+// Returns if the row at internal row pointer is deleted
+func (dbf *DBF) Deleted() (bool, error) {
+	if dbf.table.rowPointer >= dbf.header.RowsCount {
+		return false, fmt.Errorf("dbase-interpreter-deleted-1:FAILED:%v", EOF)
+	}
+	_, err := syscall.Seek(*dbf.dbaseFileHandle, int64(dbf.header.FirstRow)+(int64(dbf.table.rowPointer)*int64(dbf.header.RowLength)), 0)
+	if err != nil {
+		return false, fmt.Errorf("dbase-interpreter-deleted-2:FAILED:%w", err)
+	}
+	buf := make([]byte, 1)
+	read, err := syscall.Read(*dbf.dbaseFileHandle, buf)
+	if err != nil {
+		return false, fmt.Errorf("dbase-interpreter-deleted-3:FAILED:%w", err)
+	}
+	if read != 1 {
+		return false, fmt.Errorf("dbase-interpreter-deleted-4:FAILED:%v", Incomplete)
+	}
+	return buf[0] == Deleted, nil
 }
