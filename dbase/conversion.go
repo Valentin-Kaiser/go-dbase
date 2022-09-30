@@ -57,7 +57,7 @@ func JDToDate(number int) (time.Time, error) {
  */
 
 // parseDate parses a date string from a byte slice and returns a time.Time
-func (dbf *DBF) parseDate(raw []byte) (time.Time, error) {
+func parseDate(raw []byte) (time.Time, error) {
 	if string(raw) == strings.Repeat(" ", 8) {
 		return time.Time{}, nil
 	}
@@ -69,7 +69,7 @@ func (dbf *DBF) parseDate(raw []byte) (time.Time, error) {
 }
 
 // parseDateTIme parses a date and time string from a byte slice and returns a time.Time
-func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
+func parseDateTime(raw []byte) (time.Time, error) {
 	if len(raw) != 8 {
 		return time.Time{}, fmt.Errorf("dbase-conversion-parsedate-1:FAILED:%v", InvalidPosition)
 	}
@@ -88,7 +88,7 @@ func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
 }
 
 // parseNumericInt parses a string as byte array to int64
-func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
+func parseNumericInt(raw []byte) (int64, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if len(trimmed) == 0 {
 		return int64(0), nil
@@ -101,7 +101,7 @@ func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
 }
 
 // parseFloat parses a string as byte array to float64
-func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
+func parseFloat(raw []byte) (float64, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if len(trimmed) == 0 {
 		return float64(0), nil
@@ -114,25 +114,36 @@ func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
 }
 
 // toUTF8String converts a byte slice to a UTF8 string using the converter
-func (dbf *DBF) toUTF8String(raw []byte) (string, error) {
-	utf8, err := dbf.convert.Decode(raw)
+func toUTF8String(raw []byte, converter EncodingConverter) (string, error) {
+	utf8, err := converter.Decode(raw)
 	if err != nil {
 		return string(raw), fmt.Errorf("dbase-conversion-toutf8string-1:FAILED:%w", err)
 	}
 	return string(utf8), nil
 }
 
-func (dbf *DBF) fromUtf8String(raw []byte) ([]byte, error) {
-	utf8, err := dbf.convert.Encode(raw)
+func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
+	utf8, err := converter.Encode(raw)
 	if err != nil {
 		return raw, fmt.Errorf("dbase-conversion-fromutf8string-1:FAILED:%w", err)
 	}
 	return utf8, nil
 }
 
-func (dbf *DBF) appendSpace(raw []byte, length int) []byte {
+func appendSpaces(raw []byte, length int) []byte {
 	if len(raw) < length {
 		return append(raw, make([]byte, length-len(raw))...)
+	}
+	return raw
+}
+
+func prependSpaces(raw []byte, length int) []byte {
+	if len(raw) < length {
+		result := make([]byte, length-len(raw))
+		for i := 0; i < len(result); i++ {
+			result[i] = ' '
+		}
+		return append(result, raw...)
 	}
 	return raw
 }
