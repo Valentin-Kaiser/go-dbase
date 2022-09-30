@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
@@ -42,15 +41,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println("\n\n\n")
-
-	_, err = row.ToBytes()
-	if err != nil {
-		panic(err)
-	}
-
-	os.Exit(0)
 
 	// Print all the row fields as interface{} slice.
 	fmt.Printf("%+v \n", row.Values())
