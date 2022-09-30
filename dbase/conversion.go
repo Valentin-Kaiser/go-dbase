@@ -139,8 +139,8 @@ func appendSpaces(raw []byte, length int) []byte {
 
 func prependSpaces(raw []byte, length int) []byte {
 	if len(raw) < length {
-		result := make([]byte, length-len(raw))
-		for i := 0; i < len(result); i++ {
+		result := make([]byte, 0)
+		for i := 0; i < length-len(raw); i++ {
 			result[i] = ' '
 		}
 		return append(result, raw...)
