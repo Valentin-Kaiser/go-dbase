@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"golang.org/x/sys/windows"
 )
@@ -23,6 +24,9 @@ type DBF struct {
 	// DBase and memo file header containing relevant information
 	header     *Header
 	memoHeader *MemoHeader
+	// Mutex locks
+	dbaseMutex *sync.Mutex
+	memoMutex  *sync.Mutex
 	// Containing the columns and internal row pointer
 	table *Table
 }
@@ -121,7 +125,9 @@ func prepareDBF(fd windows.Handle, conv EncodingConverter) (*DBF, error) {
 			columns: columns,
 			mods:    make([]*Modification, len(columns)),
 		},
-		converter: conv,
+		dbaseMutex: &sync.Mutex{},
+		memoMutex:  &sync.Mutex{},
+		converter:  conv,
 	}
 	return dbf, nil
 }
@@ -283,6 +289,58 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	return memo, isText, nil
 }
 
+func (dbf *DBF) writeMemo(raw []byte) ([]byte, error) {
+	dbf.memoMutex.Lock()
+	defer dbf.memoMutex.Unlock()
+
+	if dbf.memoFileHandle == nil {
+		return nil, fmt.Errorf("dbase-io-writememo-1:FAILED:%v", NoFPT)
+	}
+	// Write the memo header
+	err := dbf.writeMemoHeader()
+	if err != nil {
+		return nil, fmt.Errorf("dbase-io-writememo-2:FAILED:%w", err)
+	}
+	// Seek to new the next free block
+	_, err = windows.Seek(*dbf.memoFileHandle, int64(dbf.memoHeader.NextFree-1)*int64(dbf.memoHeader.BlockSize), 0)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-io-writememop-3:FAILED:%w", err)
+	}
+	// Write the memo data
+	_, err = windows.Write(*dbf.memoFileHandle, raw)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-io-writememo-4:FAILED:%w", err)
+	}
+	// Convert the block number to []byte
+	address, err := toBinary(dbf.memoHeader.NextFree)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-io-writememo-5:FAILED:%w", err)
+	}
+	return address, nil
+}
+
+func (dbf *DBF) writeMemoHeader() error {
+	if dbf.memoFileHandle == nil {
+		return fmt.Errorf("dbase-io-writememoheader-1:FAILED:%v", NoFPT)
+	}
+	// Seek to the beginning of the file
+	_, err := windows.Seek(*dbf.memoFileHandle, 0, 0)
+	if err != nil {
+		return fmt.Errorf("dbase-io-writememoheader-2:FAILED:%w", err)
+	}
+	// Calculate the next free block
+	dbf.memoHeader.NextFree++
+	// Write the memo header
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint32(buf[:4], dbf.memoHeader.NextFree)
+	binary.BigEndian.PutUint16(buf[6:8], dbf.memoHeader.BlockSize)
+	_, err = windows.Write(*dbf.memoFileHandle, buf)
+	if err != nil {
+		return fmt.Errorf("dbase-io-writememoheader-4:FAILED:%w", err)
+	}
+	return nil
+}
+
 /**
  *	################################################################
  *	#				Row and Field IO handler
@@ -307,6 +365,55 @@ func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", Incomplete)
 	}
 	return buf, nil
+}
+
+// writeRow writes raw row data to the given row position
+func (row *Row) writeRow() error {
+	row.DBF.dbaseMutex.Lock()
+	defer row.DBF.dbaseMutex.Unlock()
+	// Update the header
+	if row.Position >= row.DBF.header.RowsCount {
+		row.DBF.header.RowsCount++
+	}
+	err := row.DBF.writeHeader()
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-row-4:FAILED:%w", err)
+	}
+	// Seek to the correct position
+	_, err = windows.Seek(*row.DBF.dbaseFileHandle, int64(row.DBF.header.FirstRow)+(int64(row.Position-1)*int64(row.DBF.header.RowLength)), 0)
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-row-1:FAILED:%w", err)
+	}
+	// Convert the row to raw bytes
+	r, err := row.ToBytes()
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-row-2:FAILED:%w", err)
+	}
+	// Write the row
+	_, err = windows.Write(*row.DBF.dbaseFileHandle, r)
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-row-3:FAILED:%w", err)
+	}
+	return nil
+}
+
+func (dbf *DBF) writeHeader() error {
+	// Seek to the beginning of the file
+	_, err := windows.Seek(*dbf.dbaseFileHandle, 0, 0)
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-header-1:FAILED:%w", err)
+	}
+	// Write the header
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, dbf.header)
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-header-2:FAILED:%w", err)
+	}
+	_, err = windows.Write(*dbf.dbaseFileHandle, buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-header-3:FAILED:%w", err)
+	}
+	return nil
 }
 
 /**
