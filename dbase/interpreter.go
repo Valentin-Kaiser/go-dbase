@@ -1,3 +1,5 @@
+package dbase
+
 // At this moment not all FoxPro column types are supported.
 // When reading column values, the value returned by this package is always `interface{}`.
 //
@@ -20,7 +22,6 @@
 //
 // This module contains the functions to convert a dbase database entry as byte array into a row struct
 // with the columns converted into the corresponding data types.
-package dbase
 
 import (
 	"bytes"
@@ -117,12 +118,34 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 	switch field.Type() {
 	case "M":
 		// M (string) values are stored in the FPT (memo) file and the address is stored in the DBF
-		fallthrough
+		memo := make([]byte, 0)
+		s, sok := field.value.(string)
+		if sok {
+			memo = []byte(s)
+		}
+		m, ok := field.value.([]byte)
+		if ok {
+			memo = m
+		}
+		if !ok && !sok {
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-1:FAILED:Invalid type for memo field: %T", field.value)
+		}
+		// Ensure we write the correct amount of bytes (block size)
+		data := append(make([]byte, int(dbf.memoHeader.BlockSize)-len(memo)), memo...)
+		if len(data) != int(dbf.memoHeader.BlockSize) {
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-2:FAILED:Invalid length for memo field: %v != %v", len(data), dbf.memoHeader.BlockSize)
+		}
+		// Write the memo to the memo file
+		address, err := dbf.writeMemo(data)
+		if err != nil {
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-2:FAILED:%w", err)
+		}
+		return address, nil
 	case "C":
 		// C values are stored as strings, the returned string is not trimmed
 		c, ok := field.value.(string)
 		if !ok {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-1:FAILED:invalid data type %T, expected string", field.value)
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-1:FAILED:invalid data type %T, expected string on column field: %v", field.value, field.Name())
 		}
 		raw := make([]byte, field.column.Length)
 		bin, err := fromUtf8String([]byte(c), dbf.converter)
