@@ -127,6 +127,7 @@ func prepareDBF(fd syscall.Handle, conv EncodingConverter) (*DBF, error) {
 }
 
 // Reads the DBF header from the file handle.
+// called by prepareDBF()
 func readDBFHeader(fd syscall.Handle) (*Header, error) {
 	h := &Header{}
 	if _, err := syscall.Seek(fd, 0, 0); err != nil {
@@ -145,28 +146,15 @@ func readDBFHeader(fd syscall.Handle) (*Header, error) {
 	return h, nil
 }
 
-// Reads raw column data of one column at columnPosition at rowPosition
-func (dbf *DBF) readColumn(rowPosition uint32, columnPosition int) ([]byte, error) {
-	if rowPosition >= dbf.header.RowsCount {
-		return nil, fmt.Errorf("dbase-io-readcolumn-1:FAILED:%v", EOF)
+// Validates the file version flag.
+// called by prepareDBF()
+func validateFileVersion(version byte) error {
+	switch version {
+	default:
+		return fmt.Errorf("dbase-io-validatefileversion-1:FAILED:untested DBF file version: %d (%x hex)", version, version)
+	case FoxPro, FoxProAutoincrement:
+		return nil
 	}
-	if columnPosition < 0 || columnPosition > int(dbf.ColumnsCount()) {
-		return nil, fmt.Errorf("dbase-io-readcolumn-2:FAILED:%v", InvalidPosition)
-	}
-	buf := make([]byte, dbf.table.columns[columnPosition].Length)
-	pos := int64(dbf.header.FirstRow) + (int64(rowPosition) * int64(dbf.header.RowLength)) + int64(dbf.table.columns[columnPosition].Position)
-	_, err := syscall.Seek(*dbf.dbaseFileHandle, pos, 0)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-io-readcolumn-3:FAILED:%w", err)
-	}
-	read, err := syscall.Read(*dbf.dbaseFileHandle, buf)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-io-readcolumn-4:FAILED:%w", err)
-	}
-	if read != int(dbf.table.columns[columnPosition].Length) {
-		return buf, fmt.Errorf("dbase-io-readcolumn-5:FAILED:%v", Incomplete)
-	}
-	return buf, nil
 }
 
 // Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
@@ -211,26 +199,6 @@ func readColumnInfos(fd syscall.Handle) ([]*Column, error) {
 	return columns, nil
 }
 
-// Reads raw row data of one row at rowPosition
-func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
-	if rowPosition >= dbf.header.RowsCount {
-		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", EOF)
-	}
-	buf := make([]byte, dbf.header.RowLength)
-	_, err := syscall.Seek(*dbf.dbaseFileHandle, int64(dbf.header.FirstRow)+(int64(rowPosition)*int64(dbf.header.RowLength)), 0)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%w", err)
-	}
-	read, err := syscall.Read(*dbf.dbaseFileHandle, buf)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%w", err)
-	}
-	if read != int(dbf.header.RowLength) {
-		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", Incomplete)
-	}
-	return buf, nil
-}
-
 // prepareMemo prepares the memo file for reading.
 func (dbf *DBF) prepareMemo(fd syscall.Handle) error {
 	memoHeader, err := readMemoHeader(fd)
@@ -243,6 +211,7 @@ func (dbf *DBF) prepareMemo(fd syscall.Handle) error {
 }
 
 // readMemoHeader reads the memo header from the given file handle.
+// called by prepareMemo()
 func readMemoHeader(fd syscall.Handle) (*MemoHeader, error) {
 	h := &MemoHeader{}
 	if _, err := syscall.Seek(fd, 0, 0); err != nil {
@@ -299,13 +268,48 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
-func validateFileVersion(version byte) error {
-	switch version {
-	default:
-		return fmt.Errorf("dbase-io-validatefileversion-1:FAILED:untested DBF file version: %d (%x hex)", version, version)
-	case FoxPro, FoxProAutoincrement:
-		return nil
+// Reads raw column data of one column at columnPosition at rowPosition
+func (dbf *DBF) readColumn(rowPosition uint32, columnPosition int) ([]byte, error) {
+	if rowPosition >= dbf.header.RowsCount {
+		return nil, fmt.Errorf("dbase-io-readcolumn-1:FAILED:%v", EOF)
 	}
+	if columnPosition < 0 || columnPosition > int(dbf.ColumnsCount()) {
+		return nil, fmt.Errorf("dbase-io-readcolumn-2:FAILED:%v", InvalidPosition)
+	}
+	buf := make([]byte, dbf.table.columns[columnPosition].Length)
+	pos := int64(dbf.header.FirstRow) + (int64(rowPosition) * int64(dbf.header.RowLength)) + int64(dbf.table.columns[columnPosition].Position)
+	_, err := syscall.Seek(*dbf.dbaseFileHandle, pos, 0)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-io-readcolumn-3:FAILED:%w", err)
+	}
+	read, err := syscall.Read(*dbf.dbaseFileHandle, buf)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-io-readcolumn-4:FAILED:%w", err)
+	}
+	if read != int(dbf.table.columns[columnPosition].Length) {
+		return buf, fmt.Errorf("dbase-io-readcolumn-5:FAILED:%v", Incomplete)
+	}
+	return buf, nil
+}
+
+// Reads raw row data of one row at rowPosition
+func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
+	if rowPosition >= dbf.header.RowsCount {
+		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", EOF)
+	}
+	buf := make([]byte, dbf.header.RowLength)
+	_, err := syscall.Seek(*dbf.dbaseFileHandle, int64(dbf.header.FirstRow)+(int64(rowPosition)*int64(dbf.header.RowLength)), 0)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%w", err)
+	}
+	read, err := syscall.Read(*dbf.dbaseFileHandle, buf)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%w", err)
+	}
+	if read != int(dbf.header.RowLength) {
+		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", Incomplete)
+	}
+	return buf, nil
 }
 
 // GoTo sets the internal row pointer to row rowNumber
