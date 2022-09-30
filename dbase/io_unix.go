@@ -15,7 +15,7 @@ import (
 // DBF is the main struct to handle a dBase file.
 type DBF struct {
 	// The used converter instance passed by opening a file
-	convert EncodingConverter
+	converter EncodingConverter
 	// DBase and memo file syscall handle pointer
 	dbaseFile *os.File
 	memoFile  *os.File
@@ -26,16 +26,16 @@ type DBF struct {
 	table *Table
 }
 
-// NewDBF creates a new DBF instance
-func NewDBF(conv EncodingConverter) *DBF {
-	return &DBF{
-		convert: conv,
-	}
+// The raw header of the Memo file.
+type MemoHeader struct {
+	NextFree  uint32  // Location of next free block
+	Unused    [2]byte // Unused
+	BlockSize uint16  // Block size (bytes per block)
 }
 
 /**
  *	################################################################
- *	#					Stream and File handler
+ *	#					IO Functions
  *	################################################################
  */
 
@@ -43,7 +43,6 @@ func NewDBF(conv EncodingConverter) *DBF {
 // To close the embedded file handle(s) call DBF.Close().
 func Open(filename string, conv EncodingConverter) (*DBF, error) {
 	filename = filepath.Clean(filename)
-	// Open file in non blocking mode with syscall
 	dbaseFile, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-open-1:FAILED:%w", err)
@@ -94,7 +93,7 @@ func (dbf *DBF) Close() error {
 
 /**
  *	################################################################
- *	#				dBase database file handler
+ *	#				dBase database file IO handler
  *	################################################################
  */
 
@@ -109,7 +108,7 @@ func prepareDBF(dbaseFile *os.File, conv EncodingConverter) (*DBF, error) {
 	if err := validateFileVersion(header.FileType); err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-2:FAILED:%w", err)
 	}
-	columns, err := readColumnInfos(dbaseFile)
+	columns, err := readColumns(dbaseFile)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-3:FAILED:%w", err)
 	}
@@ -117,16 +116,15 @@ func prepareDBF(dbaseFile *os.File, conv EncodingConverter) (*DBF, error) {
 		header:    header,
 		dbaseFile: dbaseFile,
 		table: &Table{
-			columns:    columns,
-			columnMods: make([]*ColumnModification, len(columns)),
+			columns: columns,
+			mods:    make([]*Modification, len(columns)),
 		},
-		convert: conv,
+		converter: conv,
 	}
 	return dbf, nil
 }
 
 // Reads the DBF header from the file handle.
-// called by prepareDBF
 func readDBFHeader(dbaseFile *os.File) (*Header, error) {
 	h := &Header{}
 	if _, err := dbaseFile.Seek(0, 0); err != nil {
@@ -145,8 +143,6 @@ func readDBFHeader(dbaseFile *os.File) (*Header, error) {
 	return h, nil
 }
 
-// Validates the file version flag.
-// called by prepareDBF
 func validateFileVersion(version byte) error {
 	switch version {
 	default:
@@ -157,47 +153,50 @@ func validateFileVersion(version byte) error {
 }
 
 // Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
-// called by prepareDBF
-func readColumnInfos(dbaseFile *os.File) ([]*Column, error) {
+func readColumns(dbaseFile *os.File) ([]*Column, error) {
 	columns := make([]*Column, 0)
 	offset := int64(32)
 	b := make([]byte, 1)
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
 		if _, err := dbaseFile.Seek(offset, 0); err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumninfos-1:FAILED:%w", err)
+			return nil, fmt.Errorf("dbase-io-readcolumns-1:FAILED:%w", err)
 		}
 		if _, err := dbaseFile.Read(b); err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumninfos-2:FAILED:%w", err)
+			return nil, fmt.Errorf("dbase-io-readcolumns-2:FAILED:%w", err)
 		}
 		if b[0] == ColumnEnd {
 			break
 		}
 		// Position back one byte and read the column
 		if _, err := dbaseFile.Seek(-1, 1); err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumninfos-3:FAILED:%w", err)
+			return nil, fmt.Errorf("dbase-io-readcolumns-3:FAILED:%w", err)
 		}
 		buf := make([]byte, 2048)
 		n, err := dbaseFile.Read(buf)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumninfos-4:FAILED:%w", err)
+			return nil, fmt.Errorf("dbase-io-readcolumns-4:FAILED:%w", err)
 		}
 		column := &Column{}
 		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumninfos-5:FAILED:%w", err)
+			return nil, fmt.Errorf("dbase-io-readcolumns-5:FAILED:%w", err)
 		}
 		if column.Name() == "_NullFlags" {
 			offset += 32
 			continue
 		}
-
 		columns = append(columns, column)
-
 		offset += 32
 	}
 	return columns, nil
 }
+
+/**
+ *	################################################################
+ *	#				Memo file IO handler
+ *	################################################################
+ */
 
 // prepareMemo prepares the memo file for reading.
 func (dbf *DBF) prepareMemo(memoFile *os.File) error {
@@ -211,7 +210,6 @@ func (dbf *DBF) prepareMemo(memoFile *os.File) error {
 }
 
 // readMemoHeader reads the memo header from the given file handle.
-// called by prepareMemo
 func readMemoHeader(memoFile *os.File) (*MemoHeader, error) {
 	h := &MemoHeader{}
 	if _, err := memoFile.Seek(0, 0); err != nil {
@@ -268,30 +266,26 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
-// Reads raw column data of one column at columnPosition at rowPosition
-func (dbf *DBF) readColumn(rowPosition uint32, columnPosition int) ([]byte, error) {
-	if rowPosition >= dbf.header.RowsCount {
-		return nil, fmt.Errorf("dbase-io-readcolumn-1:FAILED:%v", EOF)
-	}
-	if columnPosition < 0 || columnPosition > int(dbf.ColumnsCount()) {
-		return nil, fmt.Errorf("dbase-io-readcolumn-2:FAILED:%v", InvalidPosition)
-	}
-	buf := make([]byte, dbf.table.columns[columnPosition].Length)
-	pos := int64(dbf.header.FirstRow) + (int64(rowPosition) * int64(dbf.header.RowLength)) + int64(dbf.table.columns[columnPosition].Position)
-	_, err := dbf.dbaseFile.Seek(pos, 0)
+// Parses a memo file from raw []byte, decodes and returns as []byte
+func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
+	memo, isText, err := dbf.readMemo(raw)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-io-readcolumn-3:FAILED:%w", err)
+		return []byte{}, false, fmt.Errorf("dbase-table-parse-memo-1:FAILED:%w", err)
 	}
-	read, err := dbf.dbaseFile.Read(buf)
-	if err != nil {
-		return buf, fmt.Errorf("dbase-io-readcolumn-4:FAILED:%w", err)
+	if isText {
+		memo, err = dbf.converter.Decode(memo)
+		if err != nil {
+			return []byte{}, false, fmt.Errorf("dbase-table-parse-memo-2:FAILED:%w", err)
+		}
 	}
-	if read != int(dbf.table.columns[columnPosition].Length) {
-		return buf, fmt.Errorf("dbase-io-readcolumn-5:FAILED:%v", Incomplete)
-	}
-	return buf, nil
+	return memo, isText, nil
 }
 
+/**
+ *	################################################################
+ *	#				Row and Field IO handler
+ *	################################################################
+ */
 
 // Reads raw row data of one row at rowPosition
 func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
@@ -312,6 +306,36 @@ func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 	}
 	return buf, nil
 }
+
+// Reads field data at columnPosition of an row at rowPosition
+func (dbf *DBF) readFieldData(rowPosition uint32, columnPosition int) ([]byte, error) {
+	if rowPosition >= dbf.header.RowsCount {
+		return nil, fmt.Errorf("dbase-io-readfielddata-1:FAILED:%v", EOF)
+	}
+	if columnPosition < 0 || columnPosition > int(dbf.ColumnsCount()) {
+		return nil, fmt.Errorf("dbase-io-readfielddata-2:FAILED:%v", InvalidPosition)
+	}
+	buf := make([]byte, dbf.table.columns[columnPosition].Length)
+	pos := int64(dbf.header.FirstRow) + (int64(rowPosition) * int64(dbf.header.RowLength)) + int64(dbf.table.columns[columnPosition].Position)
+	_, err := dbf.dbaseFile.Seek(pos, 0)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-io-readfielddata-3:FAILED:%w", err)
+	}
+	read, err := dbf.dbaseFile.Read(buf)
+	if err != nil {
+		return buf, fmt.Errorf("dbase-io-readfielddata-4:FAILED:%w", err)
+	}
+	if read != int(dbf.table.columns[columnPosition].Length) {
+		return buf, fmt.Errorf("dbase-io-readfielddata-5:FAILED:%v", Incomplete)
+	}
+	return buf, nil
+}
+
+/**
+ *	################################################################
+ *	#				General DBF handler
+ *	################################################################
+ */
 
 // GoTo sets the internal row pointer to row rowNumber
 // Returns and EOF error if at EOF and positions the pointer at lastRow+1

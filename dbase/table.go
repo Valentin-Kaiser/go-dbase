@@ -23,19 +23,6 @@ type Header struct {
 	CodePage   byte     // Code page mark
 }
 
-type Table struct {
-	// Columns defined in this table
-	columns []*Column
-	// Modification to change values or name of columns
-	columnMods []*ColumnModification
-	// Internal row pointer, can be moved
-	rowPointer uint32
-	// Trimspaces default value
-	trimSpaces bool
-}
-
-// Contains the raw column info structure from the DBF header.
-// https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80)#field-subrecords-structure
 type Column struct {
 	ColumnName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
 	DataType   byte     // Column type
@@ -48,19 +35,33 @@ type Column struct {
 	Reserved   [8]byte  // Reserved
 }
 
-// ColumnModification contains the modification to change values or name of columns
-type ColumnModification struct {
-	Trimspaces  bool
-	Convert     func(interface{}) interface{}
-	ExternalKey string
+type Table struct {
+	// Columns defined in this table
+	columns []*Column
+	// Modification to change values or name of fields
+	mods []*Modification
+	// Internal row pointer, can be moved
+	rowPointer uint32
+	// Trimspaces default value
+	trimSpaces bool
 }
 
-// Contains the raw row data and a deleted flag
 type Row struct {
-	DBF      *DBF
+	DBF      *DBF // Pointer to the DBF object this row belongs to
 	Position uint32
 	Deleted  bool
-	Data     []interface{}
+	fields   []*Field
+}
+
+type Field struct {
+	column *Column
+	value  interface{}
+}
+
+type Modification struct {
+	TrimSpaces  bool
+	Convert     func(interface{}) (interface{}, error)
+	ExternalKey string
 }
 
 /**
@@ -70,14 +71,14 @@ type Row struct {
  */
 
 // Parses the year, month and day to time.Time.
-// Note: the year is stored in 2 digits, 15 is 2015
+// Note: the year is stored in 2 digits, so we assume the year is between 2000 and 2099.
 func (h *Header) Modified() time.Time {
 	return time.Date(2000+int(h.Year), time.Month(h.Month), int(h.Day), 0, 0, 0, 0, time.Local)
 }
 
 // Returns the calculated number of columns from the header info alone (without the need to read the columninfo from the header).
 // This is the fastest way to determine the number of rows in the file.
-// Note: when OpenFile is used the columns have already been parsed so it is better to call DBF.ColumnsCount in that case.
+// Note: when Open is used the columns have already been parsed so it is better to call DBF.ColumnsCount() in that case.
 func (h *Header) ColumnsCount() uint16 {
 	return (h.FirstRow - 296) / 32
 }
@@ -118,7 +119,7 @@ func (dbf *DBF) RowsCount() uint32 {
 	return dbf.header.RowsCount
 }
 
-// Returns all columns infos
+// Returns all columns
 func (dbf *DBF) Columns() []*Column {
 	return dbf.table.columns
 }
@@ -148,13 +149,19 @@ func (dbf *DBF) ColumnPos(colname string) int {
 	return -1
 }
 
-func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string, convert func(interface{}) interface{}) {
+/**
+ *	################################################################
+ *	#						Modifications
+ *	################################################################
+ */
+
+func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string, convert func(interface{}) (interface{}, error)) {
 	// Skip if position is out of range
 	if position < 0 || position >= len(dbf.table.columns) {
 		return
 	}
-	dbf.table.columnMods[position] = &ColumnModification{
-		Trimspaces:  trimspaces,
+	dbf.table.mods[position] = &Modification{
+		TrimSpaces:  trimspaces,
 		Convert:     convert,
 		ExternalKey: key,
 	}
@@ -164,18 +171,8 @@ func (dbf *DBF) SetTrimspacesDefault(b bool) {
 	dbf.table.trimSpaces = b
 }
 
-func (dbf *DBF) GetColumnModification(position int) *ColumnModification {
-	return dbf.table.columnMods[position]
-}
-
-// Reads column number columnposition at the row number the internal pointer is pointing to and returns its Go value
-func (dbf *DBF) Value(columnposition int) (interface{}, error) {
-	data, err := dbf.readColumn(dbf.table.rowPointer, columnposition)
-	if err != nil {
-		return nil, fmt.Errorf("dbase-table-value-1:FAILED:%w", err)
-	}
-	// columnposition is valid or readColumn would have returned an error
-	return dbf.DataToValue(data, dbf.table.columns[columnposition])
+func (dbf *DBF) GetColumnModification(position int) *Modification {
+	return dbf.table.mods[position]
 }
 
 /**
@@ -196,12 +193,12 @@ func (c *Column) Type() string {
 
 /**
  *	################################################################
- *	#						Rows helper
+ *	#						Rows
  *	################################################################
  */
 
 // Returns all rows as a slice
-func (dbf *DBF) Rows(skipInvalid bool) ([]*Row, error) {
+func (dbf *DBF) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 	rows := make([]*Row, 0)
 	for !dbf.EOF() {
 		// This reads the complete row
@@ -212,7 +209,7 @@ func (dbf *DBF) Rows(skipInvalid bool) ([]*Row, error) {
 		// Increment the row pointer
 		dbf.Skip(1)
 		// skip deleted rows
-		if row.Deleted {
+		if row.Deleted && skipDeleted {
 			continue
 		}
 		rows = append(rows, row)
@@ -229,25 +226,14 @@ func (dbf *DBF) Row() (*Row, error) {
 	return dbf.BytesToRow(data)
 }
 
-// Value gets a column value by column pos (index)
-func (row *Row) Value(pos int) (interface{}, error) {
-	if pos < 0 || len(row.Data) < pos {
-		return 0, fmt.Errorf("dbase-table-column-1:FAILED:%v", InvalidPosition)
-	}
-	return row.Data[pos], nil
-}
-
-// Values gets all columns as a slice
-func (row *Row) Values() []interface{} {
-	return row.Data
-}
-
 // Converts raw row data to a Row struct
 // If the data points to a memo (FPT) file this file is also read
 func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	rec := &Row{}
+	rec.Position = dbf.table.rowPointer
 	rec.DBF = dbf
-	rec.Data = make([]interface{}, dbf.ColumnsCount())
+	rec.fields = make([]*Field, dbf.ColumnsCount())
+
 	if len(data) < int(dbf.header.RowLength) {
 		return nil, fmt.Errorf("dbase-table-bytestorow-1:FAILED:invalid row data size %v Bytes < %v Bytes", len(data), int(dbf.header.RowLength))
 	}
@@ -258,120 +244,124 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	}
 	// deleted flag already read
 	offset := uint16(1)
-	for i := 0; i < len(rec.Data); i++ {
-		columninfo := dbf.table.columns[i]
-		val, err := dbf.DataToValue(data[offset:offset+uint16(columninfo.Length)], dbf.table.columns[i])
+	for i := 0; i < len(rec.fields); i++ {
+		column := dbf.table.columns[i]
+		fmt.Printf("Field [%v]{%v}(%v) data: %x \n\n", column.Name(), column.Type(), column.Length, data[offset:offset+uint16(column.Length)])
+		val, err := dbf.dataToValue(data[offset:offset+uint16(column.Length)], dbf.table.columns[i])
 		if err != nil {
 			return rec, fmt.Errorf("dbase-table-bytestorow-3:FAILED:%w", err)
 		}
-		rec.Data[i] = val
-		offset += uint16(columninfo.Length)
+		rec.fields[i] = &Field{
+			column: column,
+			value:  val,
+		}
+		offset += uint16(column.Length)
 	}
 	return rec, nil
 }
 
+// Returns all fields of the current row
+func (row *Row) Fields() []*Field {
+	return row.fields
+}
+
+// Returns the field of a row by position
+func (row *Row) Field(pos int) (*Field, error) {
+	if pos < 0 || len(row.fields) < pos {
+		return nil, fmt.Errorf("dbase-table-field-1:FAILED:%v", InvalidPosition)
+	}
+	return row.fields[pos], nil
+}
+
+// Returns all values of a row as a slice of interface{}
+func (row *Row) Values() []interface{} {
+	values := make([]interface{}, 0)
+	for _, field := range row.fields {
+		values = append(values, field.value)
+	}
+	return values
+}
+
+// Value returns the field value
+func (field *Field) Value() interface{} {
+	return field.value
+}
+
+// Name returns the field name
+func (field *Field) Name() string {
+	return field.column.Name()
+}
+
+// Type returns the field type
+func (field *Field) Type() string {
+	return field.column.Type()
+}
+
+// Column returns the field column definition
+func (field *Field) Column() *Column {
+	return field.column
+}
+
 /**
  *	################################################################
- *	#						Row conversion
+ *	#						Conversions
  *	################################################################
  */
 
-// Returns all rows as a slice of maps.
-func (dbf *DBF) RowsToMap(skipInvalid bool) ([]map[string]interface{}, error) {
-	out := make([]map[string]interface{}, 0)
-	rows, err := dbf.Rows(skipInvalid)
-	if err != nil {
-		return nil, err
+// Converts the row back to raw dbase data
+func (row *Row) ToBytes() ([]byte, error) {
+	data := make([]byte, row.DBF.header.RowLength)
+	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
+	if row.Deleted {
+		data[0] = Deleted
+	} else {
+		data[0] = Active
 	}
-	for _, row := range rows {
-		rmap, err := row.ToMap()
+	// deleted flag already read
+	offset := uint16(1)
+	for _, field := range row.fields {
+		val, err := row.DBF.valueToData(field)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbase-table-rowtobytes-1:FAILED:%w", err)
 		}
+		fmt.Printf("Field [%v]{%v}(%v) data: %x \n\n", field.Name(), field.Type(), field.column.Length, val)
+		copy(data[offset:offset+uint16(field.column.Length)], val)
+		offset += uint16(field.column.Length)
+	}
 
-		out = append(out, rmap)
-	}
-	return out, nil
-}
-
-// Returns all rows as json
-// If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the row map are re-assigned)
-func (dbf *DBF) RowsToJSON(skipInvalid bool) ([]byte, error) {
-	rows, err := dbf.RowsToMap(skipInvalid)
-	if err != nil {
-		return nil, fmt.Errorf("dbase-table-rows-to-json-1:FAILED:%w", err)
-	}
-	mapRows := make([]map[string]interface{}, 0)
-	for _, row := range rows {
-		for k, v := range row {
-			if dbf.table.columnMods[dbf.ColumnPos(k)].Trimspaces {
-				if str, ok := v.(string); ok {
-					row[k] = strings.TrimSpace(str)
-				}
-			}
-		}
-		mapRows = append(mapRows, row)
-	}
-	j, err := json.Marshal(mapRows)
-	if err != nil {
-		return j, fmt.Errorf("dbase-table-rows-to-json-2:FAILED:%w", err)
-	}
-	return j, nil
-}
-
-// Returns all rows as a slice of struct.
-// Parses the row from map to JSON-encoded data and stores the result in the value pointed to by v.
-// If v is nil or not a pointer, an InvalidUnmarshalError will be returned.
-// To convert the row into a struct, json.Unmarshal matches incoming object keys to either the struct column name or its tag,
-// preferring an exact match but also accepting a case-insensitive match.
-// v keeps the last converted struct.
-// If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the row map are re-assigned)
-func (dbf *DBF) RowsToStruct(v interface{}, skipInvalid bool) ([]interface{}, error) {
-	out := make([]interface{}, 0)
-	rows, err := dbf.Rows(skipInvalid)
-	if err != nil {
-		return nil, err
-	}
-	for _, row := range rows {
-		err := row.ToStruct(v)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, v)
-	}
-	return out, nil
+	return data, nil
 }
 
 // Returns a complete row as a map.
 func (row *Row) ToMap() (map[string]interface{}, error) {
 	out := make(map[string]interface{})
-	for i, cn := range row.DBF.ColumnNames() {
-		val, err := row.Value(i)
-		if err != nil {
-			return out, fmt.Errorf("dbase-table-to-map-1:FAILED:error on column %s (column %d): %w", cn, i, err)
-		}
-		colMod := row.DBF.table.columnMods[i]
-		if colMod != nil {
-			if row.DBF.table.trimSpaces && colMod.Trimspaces || colMod.Trimspaces {
+	var err error
+	for i, field := range row.fields {
+		val := field.Value()
+		mod := row.DBF.table.mods[i]
+		if mod != nil {
+			if row.DBF.table.trimSpaces && mod.TrimSpaces || mod.TrimSpaces {
 				if str, ok := val.(string); ok {
 					val = strings.TrimSpace(str)
 				}
 			}
-			if colMod.Convert != nil {
-				val = colMod.Convert(val)
+			if mod.Convert != nil {
+				val, err = mod.Convert(val)
+				if err != nil {
+					return nil, fmt.Errorf("dbase-table-to-map-1:FAILED:%w", err)
+				}
 			}
-			if len(colMod.ExternalKey) != 0 {
-				out[colMod.ExternalKey] = val
+			if len(mod.ExternalKey) != 0 {
+				out[mod.ExternalKey] = val
 				continue
 			}
 		}
-		out[cn] = val
+		out[field.Name()] = val
 	}
 	return out, nil
 }
 
 // Returns a complete row as a JSON object.
-// If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the row map are re-assigned)
 func (row *Row) ToJSON() ([]byte, error) {
 	m, err := row.ToMap()
 	if err != nil {
@@ -384,10 +374,8 @@ func (row *Row) ToJSON() ([]byte, error) {
 	return j, nil
 }
 
-// Parses the row from map to JSON-encoded data and stores the result in the value pointed to by v.
-// If v is nil or not a pointer, an InvalidUnmarshalError will be returned.
-// To convert the row into a struct, json.Unmarshal matches incoming object keys to either the struct column name or its tag,
-// preferring an exact match but also accepting a case-insensitive match.
+// Parses the row from map to JSON-encoded and from there to a struct and stores the result in the value pointed to by v.
+// Just a convenience function to avoid the intermediate JSON step.
 func (row *Row) ToStruct(v interface{}) error {
 	jsonRow, err := row.ToJSON()
 	if err != nil {
