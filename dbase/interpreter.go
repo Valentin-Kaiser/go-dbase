@@ -248,15 +248,6 @@ func (dbf *DBF) ValueToData(data interface{}, column *Column) ([]byte, error) {
 	}
 }
 
-func uint32ToBytes(x uint32) []byte {
-	var buf [4]byte
-	buf[0] = byte(x >> 0)
-	buf[1] = byte(x >> 8)
-	buf[2] = byte(x >> 16)
-	buf[3] = byte(x >> 24)
-	return buf[:]
-}
-
 func toBinary(data interface{}) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.LittleEndian, data)
