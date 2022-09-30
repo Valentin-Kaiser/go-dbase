@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
@@ -36,47 +37,64 @@ func main() {
 		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
 	}
 
-	// Read the complete first row.
+	// Read the first row (rowPointer start at the first row).
 	row, err := dbf.Row()
 	if err != nil {
 		panic(err)
 	}
 
-	// Print all the columns in their Go values as slice.
-	fmt.Printf("%+v", row.Values())
+	fmt.Println("\n\n\n")
 
-	// Go back to start.
-	dbf.Skip(0)
+	_, err = row.ToBytes()
+	if err != nil {
+		panic(err)
+	}
+
+	os.Exit(0)
+
+	// Print all the row fields as interface{} slice.
+	fmt.Printf("%+v \n", row.Values())
+
+	// Go back to start to read the file again.
+	err = dbf.GoTo(0)
+	if err != nil {
+		panic(err)
+	}
 
 	// Loop through all rows using rowPointer in DBF struct.
 	for !dbf.EOF() {
 		fmt.Printf("EOF: %v - Pointer: %v \n", dbf.EOF(), dbf.Pointer())
 
-		// This reads the complete row.
 		row, err := dbf.Row()
 		if err != nil {
 			panic(err)
 		}
 
-		// Increase the pointer.
+		// Increment the row pointer.
 		dbf.Skip(1)
-
 		// Skip deleted rows.
 		if row.Deleted {
+			fmt.Printf("Deleted row %v \n", row.Position)
 			continue
 		}
 
-		// Get value by column position
-		_, err = row.Value(0)
+		// Get the first field by column position
+		field, err := row.Field(0)
 		if err != nil {
 			panic(err)
 		}
 
+		// Print the field value.
+		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.Value())
+
 		// Get value by column name
-		_, err = row.Value(dbf.ColumnPos("COMP_NAME"))
+		field, err = row.Field(dbf.ColumnPos("COMP_NAME"))
 		if err != nil {
 			panic(err)
 		}
+
+		// Print the field value.
+		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.Value())
 
 		// Enable space trimming per default
 		dbf.SetTrimspacesDefault(true)
@@ -94,36 +112,5 @@ func main() {
 		}
 
 		fmt.Printf("Company: %v", t.CompanyName)
-	}
-
-	// Read only the third column of rows 1, 2 and 3
-	for _, row := range []uint32{1, 2, 3} {
-		err := dbf.GoTo(row)
-		if err != nil {
-			panic(err)
-		}
-
-		// Check if the row is deleted
-		deleted, err := dbf.Deleted()
-		if err != nil {
-			panic(err)
-		}
-		if deleted {
-			fmt.Printf("Row %v deleted \n", row)
-			continue
-		}
-
-		// Read the entire row
-		r, err := dbf.Row()
-		if err != nil {
-			panic(err)
-		}
-
-		// Read the seventh column
-		column, err := r.Value(7)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("Row %v column 7: %v \n", row, column)
 	}
 }
