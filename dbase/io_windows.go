@@ -27,6 +27,13 @@ type DBF struct {
 	table *Table
 }
 
+// NewDBF creates a new DBF instance
+func NewDBF(conv EncodingConverter) *DBF {
+	return &DBF{
+		convert: conv,
+	}
+}
+
 /**
  *	################################################################
  *	#					Stream and File handler
