@@ -139,10 +139,20 @@ func (dbf *DBF) ColumnNames() []string {
 	return names
 }
 
-// Returns the column position of a column name or -1 if not found.
-func (dbf *DBF) ColumnPos(colname string) int {
+// Returns the column position of a column by name or -1 if not found.
+func (dbf *DBF) ColumnPosByName(colname string) int {
 	for i := 0; i < len(dbf.table.columns); i++ {
 		if dbf.table.columns[i].Name() == colname {
+			return i
+		}
+	}
+	return -1
+}
+
+// Returns the column position of a column or -1 if not found.
+func (dbf *DBF) ColumnPos(column *Column) int {
+	for i := 0; i < len(dbf.table.columns); i++ {
+		if dbf.table.columns[i] == column {
 			return i
 		}
 	}
@@ -246,7 +256,6 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	offset := uint16(1)
 	for i := 0; i < len(rec.fields); i++ {
 		column := dbf.table.columns[i]
-		fmt.Printf("Field [%v]{%v}(%v) data: %x \n\n", column.Name(), column.Type(), column.Length, data[offset:offset+uint16(column.Length)])
 		val, err := dbf.dataToValue(data[offset:offset+uint16(column.Length)], dbf.table.columns[i])
 		if err != nil {
 			return rec, fmt.Errorf("dbase-table-bytestorow-3:FAILED:%w", err)
@@ -258,6 +267,25 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 		offset += uint16(column.Length)
 	}
 	return rec, nil
+}
+func (dbf *DBF) NewRow() *Row {
+	return &Row{
+		DBF:      dbf,
+		Position: dbf.header.RowsCount,
+		Deleted:  false,
+		fields:   make([]*Field, len(dbf.table.columns)),
+	}
+}
+
+// Writes the row to the file at the row pointer position
+func (row *Row) Write() error {
+	return row.writeRow()
+}
+
+// Add a row to the end of the file
+func (row *Row) Add() error {
+	row.Position = row.DBF.header.RowsCount + 1
+	return row.Write()
 }
 
 // Returns all fields of the current row
@@ -282,8 +310,24 @@ func (row *Row) Values() []interface{} {
 	return values
 }
 
+func (row *Row) ChangeField(field *Field) error {
+	if field.column == nil {
+		return fmt.Errorf("dbase-table-changefield-1:FAILED:Column missing")
+	}
+	pos := row.DBF.ColumnPos(field.column)
+	if pos < 0 || len(row.fields) < pos {
+		return fmt.Errorf("dbase-table-changefield-2:FAILED:%v", InvalidPosition)
+	}
+	row.fields[pos] = field
+	return nil
+}
+
+func (field *Field) SetValue(value interface{}) {
+	field.value = value
+}
+
 // Value returns the field value
-func (field *Field) Value() interface{} {
+func (field *Field) GetValue() interface{} {
 	return field.value
 }
 
@@ -324,7 +368,6 @@ func (row *Row) ToBytes() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("dbase-table-rowtobytes-1:FAILED:%w", err)
 		}
-		fmt.Printf("Field [%v]{%v}(%v) data: %x \n\n", field.Name(), field.Type(), field.column.Length, val)
 		copy(data[offset:offset+uint16(field.column.Length)], val)
 		offset += uint16(field.column.Length)
 	}
@@ -337,7 +380,7 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 	out := make(map[string]interface{})
 	var err error
 	for i, field := range row.fields {
-		val := field.Value()
+		val := field.GetValue()
 		mod := row.DBF.table.mods[i]
 		if mod != nil {
 			if row.DBF.table.trimSpaces && mod.TrimSpaces || mod.TrimSpaces {
@@ -386,4 +429,48 @@ func (row *Row) ToStruct(v interface{}) error {
 		return fmt.Errorf("dbase-table-to-struct-2:FAILED:%w", err)
 	}
 	return nil
+}
+
+func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
+	row := dbf.NewRow()
+	for i, field := range row.fields {
+		mod := dbf.table.mods[i]
+		if mod != nil {
+			if len(mod.ExternalKey) != 0 {
+				if val, ok := m[mod.ExternalKey]; ok {
+					field.value = val
+				}
+				continue
+			}
+		}
+		if val, ok := m[field.Name()]; ok {
+			field.value = val
+		}
+	}
+	return row, nil
+}
+
+func (dbf *DBF) RowFromJSON(j []byte) (*Row, error) {
+	m := make(map[string]interface{})
+	err := json.Unmarshal(j, &m)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-table-from-json-1:FAILED:%w", err)
+	}
+	row, err := dbf.RowFromMap(m)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-table-from-json-2:FAILED:%w", err)
+	}
+	return row, nil
+}
+
+func (dbf *DBF) RowFromStruct(v interface{}) (*Row, error) {
+	j, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-table-from-struct-1:FAILED:%w", err)
+	}
+	row, err := dbf.RowFromJSON(j)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-table-from-struct-2:FAILED:%w", err)
+	}
+	return row, nil
 }
