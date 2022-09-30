@@ -237,12 +237,12 @@ func readMemoHeader(fd windows.Handle) (*MemoHeader, error) {
 
 // Reads one or more blocks from the FPT file, called for each memo column.
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
-func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
+func (dbf *DBF) readMemo(address []byte) ([]byte, bool, error) {
 	if dbf.memoFileHandle == nil {
 		return nil, false, fmt.Errorf("dbase-io-readmemo-1:FAILED:%v", NoFPT)
 	}
 	// Determine the block number
-	block := binary.LittleEndian.Uint32(blockdata)
+	block := binary.LittleEndian.Uint32(address)
 	// The position in the file is blocknumber*blocksize
 	_, err := windows.Seek(*dbf.memoFileHandle, int64(dbf.memoHeader.BlockSize)*int64(block), 0)
 	if err != nil {
@@ -289,7 +289,7 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	return memo, isText, nil
 }
 
-func (dbf *DBF) writeMemo(raw []byte) ([]byte, error) {
+func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	dbf.memoMutex.Lock()
 	defer dbf.memoMutex.Unlock()
 
@@ -301,8 +301,20 @@ func (dbf *DBF) writeMemo(raw []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-writememo-2:FAILED:%w", err)
 	}
+	// Put the block data together
+	block := make([]byte, dbf.memoHeader.BlockSize)
+	// The first 4 bytes are the signature, 1 for text, 0 for binary(image)
+	if text {
+		binary.BigEndian.PutUint32(block[:4], 1)
+	} else {
+		binary.BigEndian.PutUint32(block[:4], 0)
+	}
+	// The next 4 bytes are the length of the data
+	binary.BigEndian.PutUint32(block[4:8], uint32(length))
+	// The rest is the data
+	copy(block[8:], raw)
 	// Seek to new the next free block
-	_, err = windows.Seek(*dbf.memoFileHandle, int64(dbf.memoHeader.NextFree-1)*int64(dbf.memoHeader.BlockSize), 0)
+	_, err = windows.Seek(*dbf.memoFileHandle, int64(dbf.memoHeader.NextFree-1)*int64(dbf.memoHeader.BlockSize)-8, 0)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-writememop-3:FAILED:%w", err)
 	}

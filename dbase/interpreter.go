@@ -119,24 +119,22 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 	case "M":
 		// M (string) values are stored in the FPT (memo) file and the address is stored in the DBF
 		memo := make([]byte, 0)
+		txt := false
 		s, sok := field.value.(string)
 		if sok {
 			memo = []byte(s)
+			txt = true
 		}
 		m, ok := field.value.([]byte)
 		if ok {
 			memo = m
+			txt = false
 		}
 		if !ok && !sok {
 			return nil, fmt.Errorf("dbase-interpreter-valuetodata-1:FAILED:Invalid type for memo field: %T", field.value)
 		}
-		// Ensure we write the correct amount of bytes (block size)
-		data := append(make([]byte, int(dbf.memoHeader.BlockSize)-len(memo)), memo...)
-		if len(data) != int(dbf.memoHeader.BlockSize) {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-2:FAILED:Invalid length for memo field: %v != %v", len(data), dbf.memoHeader.BlockSize)
-		}
 		// Write the memo to the memo file
-		address, err := dbf.writeMemo(data)
+		address, err := dbf.writeMemo(memo, txt, len(memo))
 		if err != nil {
 			return nil, fmt.Errorf("dbase-interpreter-valuetodata-2:FAILED:%w", err)
 		}
