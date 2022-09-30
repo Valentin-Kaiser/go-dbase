@@ -125,7 +125,7 @@ func (dbf *DBF) toUTF8String(raw []byte) (string, error) {
 func (dbf *DBF) fromUtf8String(raw []byte) ([]byte, error) {
 	utf8, err := dbf.convert.Encode(raw)
 	if err != nil {
-		return []byte(raw), fmt.Errorf("dbase-conversion-fromutf8string-1:FAILED:%w", err)
+		return raw, fmt.Errorf("dbase-conversion-fromutf8string-1:FAILED:%w", err)
 	}
 	return utf8, nil
 }
