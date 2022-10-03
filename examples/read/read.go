@@ -25,7 +25,7 @@ type Test struct {
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open("./test_data/TEST.DBF", new(dbase.Win1250Converter))
+	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter))
 	if err != nil {
 		panic(err)
 	}
@@ -36,54 +36,8 @@ func main() {
 		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
 	}
 
-	// Read the first row (rowPointer start at the first row).
-	row, err := dbf.Row()
-	if err != nil {
-		panic(err)
-	}
-
-	// Print all the row fields as interface{} slice.
-	fmt.Printf("%+v \n", row.Values())
-
-	compNameField, err := row.Field(dbf.ColumnPosByName("COMP_NAME"))
-	if err != nil {
-		panic(err)
-	}
-
-	compNameField.SetValue("TEST_VALUE")
-
-	err = row.ChangeField(compNameField)
-	if err != nil {
-		panic(err)
-	}
-
-	meldingField, err := row.Field(dbf.ColumnPosByName("MELDING"))
-	if err != nil {
-		panic(err)
-	}
-
-	meldingField.SetValue("TEST_VALUE")
-
-	err = row.ChangeField(meldingField)
-	if err != nil {
-		panic(err)
-	}
-
-	err = row.Add()
-	if err != nil {
-		panic(err)
-	}
-
-	// Go back to start to read the file again.
-	err = dbf.GoTo(0)
-	if err != nil {
-		panic(err)
-	}
-
 	// Loop through all rows using rowPointer in DBF struct.
 	for !dbf.EOF() {
-		fmt.Printf("EOF: %v - Pointer: %v \n", dbf.EOF(), dbf.Pointer())
-
 		row, err := dbf.Row()
 		if err != nil {
 			panic(err)
@@ -91,9 +45,10 @@ func main() {
 
 		// Increment the row pointer.
 		dbf.Skip(1)
+
 		// Skip deleted rows.
 		if row.Deleted {
-			fmt.Printf("Deleted row %v \n", row.Position)
+			fmt.Printf("Deleted row at position: %v \n", row.Position)
 			continue
 		}
 
@@ -115,6 +70,8 @@ func main() {
 		// Print the field value.
 		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.GetValue())
 
+		// === Modifications ===
+
 		// Enable space trimming per default
 		dbf.SetTrimspacesDefault(true)
 		// Disable space trimming for the company name
@@ -122,6 +79,8 @@ func main() {
 		// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
 		dbf.SetColumnModification(dbf.ColumnPosByName("NUMBER"), true, "FLOAT", nil)
 		dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "NUMBER", nil)
+
+		// === Struct Conversion ===
 
 		// Read the row into a struct.
 		t := &Test{}
