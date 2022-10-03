@@ -132,7 +132,11 @@ func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
 
 func appendSpaces(raw []byte, length int) []byte {
 	if len(raw) < length {
-		return append(raw, make([]byte, length-len(raw))...)
+		a := make([]byte, length-len(raw))
+		for i := range a {
+			a[i] = ' '
+		}
+		return append(raw, a...)
 	}
 	return raw
 }
