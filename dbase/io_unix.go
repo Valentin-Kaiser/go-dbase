@@ -123,7 +123,9 @@ func prepareDBF(dbaseFile *os.File, conv EncodingConverter) (*DBF, error) {
 			columns: columns,
 			mods:    make([]*Modification, len(columns)),
 		},
-		converter: conv,
+		dbaseMutex: &sync.Mutex{},
+		memoMutex:  &sync.Mutex{},
+		converter:  conv,
 	}
 	return dbf, nil
 }
