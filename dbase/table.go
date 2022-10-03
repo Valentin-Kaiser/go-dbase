@@ -47,7 +47,7 @@ type Table struct {
 }
 
 type Row struct {
-	DBF      *DBF // Pointer to the DBF object this row belongs to
+	dbf      *DBF // Pointer to the DBF object this row belongs to
 	Position uint32
 	Deleted  bool
 	fields   []*Field
@@ -241,9 +241,8 @@ func (dbf *DBF) Row() (*Row, error) {
 func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	rec := &Row{}
 	rec.Position = dbf.table.rowPointer
-	rec.DBF = dbf
+	rec.dbf = dbf
 	rec.fields = make([]*Field, dbf.ColumnsCount())
-
 	if len(data) < int(dbf.header.RowLength) {
 		return nil, fmt.Errorf("dbase-table-bytestorow-1:FAILED:invalid row data size %v Bytes < %v Bytes", len(data), int(dbf.header.RowLength))
 	}
@@ -268,10 +267,11 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	}
 	return rec, nil
 }
+
 func (dbf *DBF) NewRow() *Row {
 	return &Row{
-		DBF:      dbf,
-		Position: dbf.header.RowsCount,
+		dbf:      dbf,
+		Position: dbf.header.RowsCount + 1,
 		Deleted:  false,
 		fields:   make([]*Field, len(dbf.table.columns)),
 	}
@@ -282,9 +282,9 @@ func (row *Row) Write() error {
 	return row.writeRow()
 }
 
-// Add a row to the end of the file
+// Increments the pointer s row to the end of the file
 func (row *Row) Add() error {
-	row.Position = row.DBF.header.RowsCount + 1
+	row.Position = row.dbf.header.RowsCount + 1
 	return row.Write()
 }
 
@@ -314,7 +314,7 @@ func (row *Row) ChangeField(field *Field) error {
 	if field.column == nil {
 		return fmt.Errorf("dbase-table-changefield-1:FAILED:Column missing")
 	}
-	pos := row.DBF.ColumnPos(field.column)
+	pos := row.dbf.ColumnPos(field.column)
 	if pos < 0 || len(row.fields) < pos {
 		return fmt.Errorf("dbase-table-changefield-2:FAILED:%v", InvalidPosition)
 	}
@@ -354,7 +354,7 @@ func (field *Field) Column() *Column {
 
 // Converts the row back to raw dbase data
 func (row *Row) ToBytes() ([]byte, error) {
-	data := make([]byte, row.DBF.header.RowLength)
+	data := make([]byte, row.dbf.header.RowLength)
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 	if row.Deleted {
 		data[0] = Deleted
@@ -364,7 +364,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 	// deleted flag already read
 	offset := uint16(1)
 	for _, field := range row.fields {
-		val, err := row.DBF.valueToData(field)
+		val, err := row.dbf.valueToData(field)
 		if err != nil {
 			return nil, fmt.Errorf("dbase-table-rowtobytes-1:FAILED:%w", err)
 		}
@@ -381,9 +381,9 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 	var err error
 	for i, field := range row.fields {
 		val := field.GetValue()
-		mod := row.DBF.table.mods[i]
+		mod := row.dbf.table.mods[i]
 		if mod != nil {
-			if row.DBF.table.trimSpaces && mod.TrimSpaces || mod.TrimSpaces {
+			if row.dbf.table.trimSpaces && mod.TrimSpaces || mod.TrimSpaces {
 				if str, ok := val.(string); ok {
 					val = strings.TrimSpace(str)
 				}
@@ -434,6 +434,7 @@ func (row *Row) ToStruct(v interface{}) error {
 func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
 	row := dbf.NewRow()
 	for i, field := range row.fields {
+		field = &Field{column: dbf.table.columns[i]}
 		mod := dbf.table.mods[i]
 		if mod != nil {
 			if len(mod.ExternalKey) != 0 {
@@ -446,6 +447,7 @@ func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
 		if val, ok := m[field.Name()]; ok {
 			field.value = val
 		}
+		row.fields[i] = field
 	}
 	return row, nil
 }
