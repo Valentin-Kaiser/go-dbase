@@ -151,6 +151,7 @@ func readDBFHeader(fd windows.Handle) (*Header, error) {
 	return h, nil
 }
 
+// Check if the file version is supported
 func validateFileVersion(version byte) error {
 	switch version {
 	default:
@@ -289,6 +290,7 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	return memo, isText, nil
 }
 
+// writeMemo writes a memo to the memo file and returns the address of the memo.
 func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	dbf.memoMutex.Lock()
 	defer dbf.memoMutex.Unlock()
@@ -333,6 +335,7 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	return address, nil
 }
 
+// writeMemoHeader writes the memo header to the memo file.
 func (dbf *DBF) writeMemoHeader() error {
 	if dbf.memoFileHandle == nil {
 		return fmt.Errorf("dbase-io-writememoheader-1:FAILED:%v", NoFPT)
@@ -413,6 +416,7 @@ func (row *Row) writeRow() error {
 	return nil
 }
 
+// writeHeader writes the header to the dbase file
 func (dbf *DBF) writeHeader() error {
 	// Seek to the beginning of the file
 	_, err := windows.Seek(*dbf.dbaseFileHandle, 0, 0)

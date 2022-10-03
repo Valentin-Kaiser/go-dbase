@@ -50,6 +50,7 @@ linters:
     - paralleltest
     - gocognit
     - gocyclo
+    - maintidx
 
 linters-settings:
   wsl:

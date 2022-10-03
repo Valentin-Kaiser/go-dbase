@@ -122,6 +122,7 @@ func toUTF8String(raw []byte, converter EncodingConverter) (string, error) {
 	return string(utf8), nil
 }
 
+// fromUTF8String converts a UTF8 string to a byte slice using the given converter
 func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
 	utf8, err := converter.Encode(raw)
 	if err != nil {
@@ -130,6 +131,7 @@ func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
 	return utf8, nil
 }
 
+// appendSpaces appends spaces to a byte slice until it reaches the given length
 func appendSpaces(raw []byte, length int) []byte {
 	if len(raw) < length {
 		a := make([]byte, length-len(raw))
@@ -141,6 +143,7 @@ func appendSpaces(raw []byte, length int) []byte {
 	return raw
 }
 
+// prependSpaces prepends spaces to a byte slice until it reaches the given length
 func prependSpaces(raw []byte, length int) []byte {
 	if len(raw) < length {
 		result := make([]byte, 0)

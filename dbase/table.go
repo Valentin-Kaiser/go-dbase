@@ -23,6 +23,7 @@ type Header struct {
 	CodePage   byte     // Code page mark
 }
 
+// Column is a struct containing the column information
 type Column struct {
 	ColumnName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
 	DataType   byte     // Column type
@@ -35,6 +36,7 @@ type Column struct {
 	Reserved   [8]byte  // Reserved
 }
 
+// Table is a struct containing the table columns, modifications and the row pointer
 type Table struct {
 	// Columns defined in this table
 	columns []*Column
@@ -46,6 +48,7 @@ type Table struct {
 	trimSpaces bool
 }
 
+// Row is a struct containing the row Position, deleted flag and data fields
 type Row struct {
 	dbf      *DBF // Pointer to the DBF object this row belongs to
 	Position uint32
@@ -53,11 +56,13 @@ type Row struct {
 	fields   []*Field
 }
 
+// Field is a row data field
 type Field struct {
 	column *Column
 	value  interface{}
 }
 
+// Modification allows to change the column name or value type
 type Modification struct {
 	TrimSpaces  bool
 	Convert     func(interface{}) (interface{}, error)
@@ -165,6 +170,7 @@ func (dbf *DBF) ColumnPos(column *Column) int {
  *	################################################################
  */
 
+// SetColumnModification sets a modification for a column
 func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string, convert func(interface{}) (interface{}, error)) {
 	// Skip if position is out of range
 	if position < 0 || position >= len(dbf.table.columns) {
@@ -177,10 +183,12 @@ func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string,
 	}
 }
 
+// Set the default trimspaces value for all columns
 func (dbf *DBF) SetTrimspacesDefault(b bool) {
 	dbf.table.trimSpaces = b
 }
 
+// Returns the column modification for a column at the given position
 func (dbf *DBF) GetColumnModification(position int) *Modification {
 	return dbf.table.mods[position]
 }
@@ -268,6 +276,7 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	return rec, nil
 }
 
+// Returns a new Row struct with the same column structure as the dbf and the next row pointer
 func (dbf *DBF) NewRow() *Row {
 	return &Row{
 		dbf:      dbf,
@@ -310,6 +319,7 @@ func (row *Row) Values() []interface{} {
 	return values
 }
 
+// ChangeField applies a modificated field to the row
 func (row *Row) ChangeField(field *Field) error {
 	if field.column == nil {
 		return fmt.Errorf("dbase-table-changefield-1:FAILED:Column missing")
@@ -322,6 +332,7 @@ func (row *Row) ChangeField(field *Field) error {
 	return nil
 }
 
+// SetValue allows to change the field value
 func (field *Field) SetValue(value interface{}) {
 	field.value = value
 }
@@ -431,6 +442,7 @@ func (row *Row) ToStruct(v interface{}) error {
 	return nil
 }
 
+// Converts a map of interfaces into the row representation
 func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
 	row := dbf.NewRow()
 	for i := range row.fields {
@@ -452,6 +464,7 @@ func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
 	return row, nil
 }
 
+// Converts a JSON-encoded row into the row representation
 func (dbf *DBF) RowFromJSON(j []byte) (*Row, error) {
 	m := make(map[string]interface{})
 	err := json.Unmarshal(j, &m)
@@ -465,6 +478,7 @@ func (dbf *DBF) RowFromJSON(j []byte) (*Row, error) {
 	return row, nil
 }
 
+// Converts a struct into the row representation
 func (dbf *DBF) RowFromStruct(v interface{}) (*Row, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
