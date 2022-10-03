@@ -47,7 +47,7 @@ type MemoHeader struct {
 // To close the embedded file handle(s) call DBF.Close().
 func Open(filename string, conv EncodingConverter) (*DBF, error) {
 	filename = filepath.Clean(filename)
-	dbaseFile, err := os.Open(filename)
+	dbaseFile, err := os.OpenFile(filename, os.O_RDWR, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-open-1:FAILED:%w", err)
 	}
@@ -65,7 +65,7 @@ func Open(filename string, conv EncodingConverter) (*DBF, error) {
 		if strings.ToUpper(ext) == ext {
 			fptExt = ".FPT"
 		}
-		memoFile, err := os.Open(strings.TrimSuffix(filename, ext) + fptExt)
+		memoFile, err := os.OpenFile(strings.TrimSuffix(filename, ext)+fptExt, os.O_RDWR, 0600)
 		if err != nil {
 			return nil, fmt.Errorf("dbase-io-open-3:FAILED:%w", err)
 		}
