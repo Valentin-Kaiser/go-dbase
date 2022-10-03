@@ -1,5 +1,16 @@
 package dbase
 
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"math"
+	"time"
+)
+
+// Converts raw column data to the correct type for the given column
+// For C and M columns a charset conversion is done
+// For M columns the data is read from the memo file
 // At this moment not all FoxPro column types are supported.
 // When reading column values, the value returned by this package is always `interface{}`.
 //
@@ -20,20 +31,8 @@ package dbase
 //	T  >>  DateTime  >>  time.Time
 //	Y  >>  Currency  >>  float64
 //
-// This module contains the functions to convert a dbase database entry as byte array into a row struct
+// This package contains the functions to convert a dbase database entry as byte array into a row struct
 // with the columns converted into the corresponding data types.
-
-import (
-	"bytes"
-	"encoding/binary"
-	"fmt"
-	"math"
-	"time"
-)
-
-// Converts raw column data to the correct type for the given column
-// For C and M columns a charset conversion is done
-// For M columns the data is read from the memo file
 func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 	// Not all column types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed

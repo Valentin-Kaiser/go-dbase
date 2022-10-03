@@ -6,29 +6,33 @@
 [![CodeQL](https://github.com/Valentin-Kaiser/go-dbase/workflows/CodeQL/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
 [![goreport](https://goreportcard.com/badge/github.com/Valentin-Kaiser/go-dbase)](https://goreportcard.com/report/github.com/Valentin-Kaiser/go-dbase)
 
-Golang package for reading FoxPro dBase database files.
-This package provides a reader for reading FoxPro database files.
-
-Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
+Golang package for reading and writing FoxPro dBase database files.
 
 # Features 
 
-There are several similar packages like the [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) package but they are not suited for our use case, this package implemented:
+There are several similar packages but they are not suited for our use case, this package implements the following features:
 
-* Support for FPT (memo) files
-* Full support for Windows-1250 encoding to UTF8
-* File readers for scanning files (instead of reading the entire file to memory)
-* Conversion from and to map, json and struct
-* Non blocking IO operation with syscall under windows
-* Writing to dBase and memo files
+| Feature | go-dbase | [go-dbf](https://github.com/LindsayBradford/go-dbf) | [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) | 
+| --- | --- | --- | --- |
+| Windows-1250 to UTF8 encoding | ✅ | ✅ | ✅ |
+| Read | ✅ | ✅ | ✅ |
+| Write | ✅  | ✅ | ❌ |
+| FPT (memo) file support | ✅ | ❌ | ✅ |
+| Data type support | ✅ | ❌ | ✅ |
+| Struct, json, map conversion | ✅ | ❌ | ✅ |
+| IO efficiency | ✅ | ❌ | ✅ |
+| Non blocking IO (Windows) | ✅ | ❌ | ❌ |
 
-The focus is on performance while also trying to keep the code readable and easy to use.
+
+> IO efficiency is achieved by using one file handle for the DBF file and one file handle for the FPT file. This allows for non blocking IO and the ability to read files while other processes are accessing these. In addition, only the required positions in the file are read instead of keeping a copy of the entire file in memory.
+
+> Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
 
 # Supported column types
 
-At this moment not all FoxPro column types are supported.
+At this moment not all FoxPro column types are supported. 
 When reading column values, the value returned by this package is always `interface{}`. 
-If you need to cast this to the correct value helper functions are provided.
+If you need to cast this to the correct value, helper functions are provided.
 
 The supported column types with their return Go types are: 
 
@@ -47,7 +51,7 @@ The supported column types with their return Go types are:
 | T | DateTime | time.Time |
 | Y | Currency | float64 |
 
-If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
+> If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
 
 # Installation
 ``` 
