@@ -44,10 +44,10 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 	case "M":
 		// M values contain the address in the FPT file from where to read data
 		memo, isText, err := dbf.parseMemo(raw)
+		if err != nil {
+			return nil, fmt.Errorf("dbase-interpreter-datatovalue-2:FAILED:%w", err)
+		}
 		if isText {
-			if err != nil {
-				return string(memo), fmt.Errorf("dbase-interpreter-datatovalue-2:FAILED:%w", err)
-			}
 			return string(memo), nil
 		}
 		return memo, nil
