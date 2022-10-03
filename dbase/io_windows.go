@@ -296,6 +296,8 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	if dbf.memoFileHandle == nil {
 		return nil, fmt.Errorf("dbase-io-writememo-1:FAILED:%v", NoFPT)
 	}
+	// Get the block position
+	blockPosition := dbf.memoHeader.NextFree
 	// Write the memo header
 	err := dbf.writeMemoHeader()
 	if err != nil {
@@ -314,7 +316,7 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	// The rest is the data
 	copy(block[8:], raw)
 	// Seek to new the next free block
-	_, err = windows.Seek(*dbf.memoFileHandle, int64(dbf.memoHeader.NextFree-1)*int64(dbf.memoHeader.BlockSize)-8, 0)
+	_, err = windows.Seek(*dbf.memoFileHandle, int64(blockPosition)*int64(dbf.memoHeader.BlockSize)-8, 0)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-writememop-3:FAILED:%w", err)
 	}
@@ -324,7 +326,7 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 		return nil, fmt.Errorf("dbase-io-writememo-4:FAILED:%w", err)
 	}
 	// Convert the block number to []byte
-	address, err := toBinary(dbf.memoHeader.NextFree)
+	address, err := toBinary(blockPosition)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-writememo-5:FAILED:%w", err)
 	}
