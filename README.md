@@ -17,12 +17,9 @@ There are several similar packages like the [go-foxpro-dbf](https://github.com/S
 * Support for FPT (memo) files
 * Full support for Windows-1250 encoding to UTF8
 * File readers for scanning files (instead of reading the entire file to memory)
-* Conversion to map, json and struct
-* Non blocking IO operation with syscall
-
-We also aim to support the following features:
-
-* Writing to dBase database files
+* Conversion from and to map, json and struct
+* Non blocking IO operation with syscall under windows
+* Writing to dBase and memo files
 
 The focus is on performance while also trying to keep the code readable and easy to use.
 
@@ -56,7 +53,140 @@ If you need more information about dbase data types take a look here: [Microsoft
 go get github.com/Valentin-Kaiser/go-dbase/dbase
 ```
 
-# Example
+# Examples
+
+<details>
+  <summary>Read</summary>
+  
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/Valentin-Kaiser/go-dbase/dbase"
+)
+
+type Test struct {
+	ID          int32     `json:"ID"`
+	Niveau      int32     `json:"NIVEAU"`
+	Date        time.Time `json:"DATUM"`
+	TIJD        string    `json:"TIJD"`
+	SOORT       float64   `json:"SOORT"`
+	IDNR        int32     `json:"ID_NR"`
+	UserNR      int32     `json:"USERNR"`
+	CompanyName string    `json:"COMP_NAME"`
+	CompanyOS   string    `json:"COMP_OS"`
+	Melding     string    `json:"MELDING"`
+	Number      float64   `json:"NUMBER"`
+	Float       int64     `json:"FLOAT"`
+	Bool        bool      `json:"BOOL"`
+}
+
+func main() {
+	// Open the example database file.
+	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter))
+	if err != nil {
+		panic(err)
+	}
+	defer dbf.Close()
+
+	// Read the first row (rowPointer start at the first row).
+	row, err := dbf.Row()
+	if err != nil {
+		panic(err)
+	}
+
+	// Get the company name field by column name.
+	field, err := row.Field(dbf.ColumnPosByName("COMP_NAME"))
+	if err != nil {
+		panic(err)
+	}
+
+	// Change the field value
+	field.SetValue("CHANGED_COMPANY_NAME")
+
+	// Apply the changed field value to the row.
+	err = row.ChangeField(field)
+	if err != nil {
+		panic(err)
+	}
+
+	// Change a memo field value.
+	field, err = row.Field(dbf.ColumnPosByName("MELDING"))
+	if err != nil {
+		panic(err)
+	}
+
+	// Change the field value
+	field.SetValue("MEMO_TEST_VALUE")
+
+	// Apply the changed field value to the row.
+	err = row.ChangeField(field)
+	if err != nil {
+		panic(err)
+	}
+
+	// Write the changed row to the database file.
+	err = row.Write()
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a new row with the same structure as the database file.
+	t := Test{
+		ID:          99,
+		Niveau:      100,
+		Date:        time.Now(),
+		TIJD:        "00:00",
+		SOORT:       101.23,
+		IDNR:        102,
+		UserNR:      103,
+		CompanyName: "NEW_COMPANY_NAME",
+		CompanyOS:   "NEW_COMPANY_OS",
+		Melding:     "NEW_MEMO_TEST_VALUE",
+		Number:      104,
+		Float:       105,
+		Bool:        true,
+	}
+
+	row, err = dbf.RowFromStruct(t)
+	if err != nil {
+		panic(err)
+	}
+
+	// Add the new row to the database file.
+	err = row.Write()
+	if err != nil {
+		panic(err)
+	}
+
+	// Print all rows.
+	for !dbf.EOF() {
+		row, err := dbf.Row()
+		if err != nil {
+			panic(err)
+		}
+
+		// Increment the row pointer.
+		dbf.Skip(1)
+
+		// Skip deleted rows.
+		if row.Deleted {
+			fmt.Printf("Deleted row at position: %v \n", row.Position)
+			continue
+		}
+
+		// Get the first field by column position
+		fmt.Println(row.Values()...)
+	}
+}
+```
+</details>
+
+<details>
+  <summary>Write</summary>
 
 ```go
 package main
@@ -79,113 +209,108 @@ type Test struct {
 	CompanyName string    `json:"COMP_NAME"`
 	CompanyOS   string    `json:"COMP_OS"`
 	Melding     string    `json:"MELDING"`
-	Number      int64     `json:"NUMBER"`
-	Float       float64   `json:"FLOAT"`
+	Number      float64   `json:"NUMBER"`
+	Float       int64     `json:"FLOAT"`
 	Bool        bool      `json:"BOOL"`
 }
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open("./test_data/TEST.DBF", new(dbase.Win1250Converter))
+	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter))
 	if err != nil {
 		panic(err)
 	}
 	defer dbf.Close()
 
-	// Print all database column infos.
-	for _, column := range dbf.Columns() {
-		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
-	}
-
-	// Read the complete first row.
+	// Read the first row (rowPointer start at the first row).
 	row, err := dbf.Row()
 	if err != nil {
 		panic(err)
 	}
 
-	// Print all the columns in their Go values as slice.
-	fmt.Printf("%+v", row.Values())
+	// Get the company name field by column name.
+	field, err := row.Field(dbf.ColumnPosByName("COMP_NAME"))
+	if err != nil {
+		panic(err)
+	}
 
-	// Go back to start.
-	dbf.Skip(0)
+	// Change the field value
+	field.SetValue("CHANGED_COMPANY_NAME")
 
-	// Loop through all rows using rowPointer in DBF struct.
+	// Apply the changed field value to the row.
+	err = row.ChangeField(field)
+	if err != nil {
+		panic(err)
+	}
+
+	// Change a memo field value.
+	field, err = row.Field(dbf.ColumnPosByName("MELDING"))
+	if err != nil {
+		panic(err)
+	}
+
+	// Change the field value
+	field.SetValue("MEMO_TEST_VALUE")
+
+	// Apply the changed field value to the row.
+	err = row.ChangeField(field)
+	if err != nil {
+		panic(err)
+	}
+
+	// Write the changed row to the database file.
+	err = row.Write()
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a new row with the same structure as the database file.
+	t := Test{
+		ID:          99,
+		Niveau:      100,
+		Date:        time.Now(),
+		TIJD:        "00:00",
+		SOORT:       101.23,
+		IDNR:        102,
+		UserNR:      103,
+		CompanyName: "NEW_COMPANY_NAME",
+		CompanyOS:   "NEW_COMPANY_OS",
+		Melding:     "NEW_MEMO_TEST_VALUE",
+		Number:      104,
+		Float:       105,
+		Bool:        true,
+	}
+
+	row, err = dbf.RowFromStruct(t)
+	if err != nil {
+		panic(err)
+	}
+
+	// Add the new row to the database file.
+	err = row.Write()
+	if err != nil {
+		panic(err)
+	}
+
+	// Print all rows.
 	for !dbf.EOF() {
-		fmt.Printf("EOF: %v - Pointer: %v \n", dbf.EOF(), dbf.Pointer())
-
-		// This reads the complete row.
 		row, err := dbf.Row()
 		if err != nil {
 			panic(err)
 		}
 
-		// Increase the pointer.
+		// Increment the row pointer.
 		dbf.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {
+			fmt.Printf("Deleted row at position: %v \n", row.Position)
 			continue
 		}
 
-		// Get value by column position
-		_, err = row.Value(0)
-		if err != nil {
-			panic(err)
-		}
-
-		// Get value by column name
-		_, err = row.Value(dbf.ColumnPos("COMP_NAME"))
-		if err != nil {
-			panic(err)
-		}
-
-		// Enable space trimming per default
-		dbf.SetTrimspacesDefault(true)
-		// Disable space trimming for the company name
-		dbf.SetColumnModification(dbf.ColumnPos("COMP_NAME"), false, "", nil)
-		// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
-		dbf.SetColumnModification(dbf.ColumnPos("NUMBER"), true, "FLOAT", nil)
-		dbf.SetColumnModification(dbf.ColumnPos("FLOAT"), true, "NUMBER", nil)
-
-		// Read the row into a struct.
-		t := &Test{}
-		err = row.ToStruct(t)
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Printf("Company: %v", t.CompanyName)
-	}
-
-	// Read only the third column of rows 1, 2 and 3
-	for _, row := range []uint32{1, 2, 3} {
-		err := dbf.GoTo(row)
-		if err != nil {
-			panic(err)
-		}
-
-		// Check if the row is deleted
-		deleted, err := dbf.Deleted()
-		if err != nil {
-			panic(err)
-		}
-		if deleted {
-			fmt.Printf("Row %v deleted \n", row)
-			continue
-		}
-
-		// Read the entire row
-		r, err := dbf.Row()
-		if err != nil {
-			panic(err)
-		}
-
-		// Read the seventh column
-		column, err := r.Value(7)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("Row %v column 7: %v \n", row, column)
+		// Get the first field by column position
+		fmt.Println(row.Values()...)
 	}
 }
 ```
+</details>
