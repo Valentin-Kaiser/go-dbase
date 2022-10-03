@@ -164,6 +164,7 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 			if !ok {
 				return nil, fmt.Errorf("dbase-interpreter-valuetodata-6:FAILED:invalid data type %T, expected int32 at column field: %v", field.value, field.Name())
 			}
+			// check for lower and uppper bounds
 			if f > 0 && f <= math.MaxInt32 {
 				i = int32(f)
 			}

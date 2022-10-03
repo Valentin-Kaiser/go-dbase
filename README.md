@@ -1,4 +1,4 @@
-# go-dbase - Microsoft Visual FoxPro DBF 
+# Microsoft Visual FoxPro DBF for Go
 
 [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/Valentin-Kaiser/go-dbase)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,6 +10,7 @@ Golang package for reading FoxPro dBase database files.
 This package provides a reader for reading FoxPro database files.
 
 Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
+
 # Features 
 
 There are several similar packages like the [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) package but they are not suited for our use case, this package implemented:
