@@ -383,30 +383,32 @@ func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 
 // writeRow writes raw row data to the given row position
 func (row *Row) writeRow() error {
-	row.DBF.dbaseMutex.Lock()
-	defer row.DBF.dbaseMutex.Unlock()
+	row.dbf.dbaseMutex.Lock()
+	defer row.dbf.dbaseMutex.Unlock()
 	// Convert the row to raw bytes
 	r, err := row.ToBytes()
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-row-2:FAILED:%w", err)
-	}
-	// Update the header
-	if row.Position >= row.DBF.header.RowsCount {
-		row.DBF.header.RowsCount++
-	}
-	err = row.DBF.writeHeader()
-	if err != nil {
-		return fmt.Errorf("dbase-table-write-row-4:FAILED:%w", err)
-	}
-	// Seek to the correct position
-	_, err = windows.Seek(*row.DBF.dbaseFileHandle, int64(row.DBF.header.FirstRow)+(int64(row.Position-1)*int64(row.DBF.header.RowLength)), 0)
-	if err != nil {
 		return fmt.Errorf("dbase-table-write-row-1:FAILED:%w", err)
 	}
-	// Write the row
-	_, err = windows.Write(*row.DBF.dbaseFileHandle, r)
+	// Update the header
+	position := int64(row.dbf.header.FirstRow) + (int64(row.Position) * int64(row.dbf.header.RowLength))
+	if row.Position >= row.dbf.header.RowsCount {
+		position = int64(row.dbf.header.FirstRow) + (int64(row.Position-1) * int64(row.dbf.header.RowLength))
+		row.dbf.header.RowsCount++
+	}
+	err = row.dbf.writeHeader()
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-row-2:FAILED:%w", err)
+	}
+	// Seek to the correct position
+	_, err = windows.Seek(*row.dbf.dbaseFileHandle, position, 0)
 	if err != nil {
 		return fmt.Errorf("dbase-table-write-row-3:FAILED:%w", err)
+	}
+	// Write the row
+	_, err = windows.Write(*row.dbf.dbaseFileHandle, r)
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-row-4:FAILED:%w", err)
 	}
 	return nil
 }
