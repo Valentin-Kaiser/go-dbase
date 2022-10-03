@@ -433,8 +433,8 @@ func (row *Row) ToStruct(v interface{}) error {
 
 func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
 	row := dbf.NewRow()
-	for i, field := range row.fields {
-		field = &Field{column: dbf.table.columns[i]}
+	for i := range row.fields {
+		field := &Field{column: dbf.table.columns[i]}
 		mod := dbf.table.mods[i]
 		if mod != nil {
 			if len(mod.ExternalKey) != 0 {
