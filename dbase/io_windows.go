@@ -316,12 +316,12 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	// The rest is the data
 	copy(block[8:], raw)
 	// Seek to new the next free block
-	_, err = windows.Seek(*dbf.memoFileHandle, int64(blockPosition)*int64(dbf.memoHeader.BlockSize)-8, 0)
+	_, err = windows.Seek(*dbf.memoFileHandle, int64(blockPosition)*int64(dbf.memoHeader.BlockSize), 0)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-writememop-3:FAILED:%w", err)
 	}
 	// Write the memo data
-	_, err = windows.Write(*dbf.memoFileHandle, raw)
+	_, err = windows.Write(*dbf.memoFileHandle, block)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-writememo-4:FAILED:%w", err)
 	}
@@ -385,11 +385,16 @@ func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 func (row *Row) writeRow() error {
 	row.DBF.dbaseMutex.Lock()
 	defer row.DBF.dbaseMutex.Unlock()
+	// Convert the row to raw bytes
+	r, err := row.ToBytes()
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-row-2:FAILED:%w", err)
+	}
 	// Update the header
 	if row.Position >= row.DBF.header.RowsCount {
 		row.DBF.header.RowsCount++
 	}
-	err := row.DBF.writeHeader()
+	err = row.DBF.writeHeader()
 	if err != nil {
 		return fmt.Errorf("dbase-table-write-row-4:FAILED:%w", err)
 	}
@@ -397,11 +402,6 @@ func (row *Row) writeRow() error {
 	_, err = windows.Seek(*row.DBF.dbaseFileHandle, int64(row.DBF.header.FirstRow)+(int64(row.Position-1)*int64(row.DBF.header.RowLength)), 0)
 	if err != nil {
 		return fmt.Errorf("dbase-table-write-row-1:FAILED:%w", err)
-	}
-	// Convert the row to raw bytes
-	r, err := row.ToBytes()
-	if err != nil {
-		return fmt.Errorf("dbase-table-write-row-2:FAILED:%w", err)
 	}
 	// Write the row
 	_, err = windows.Write(*row.DBF.dbaseFileHandle, r)
