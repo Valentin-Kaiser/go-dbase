@@ -350,7 +350,7 @@ func (dbf *DBF) writeMemoHeader() error {
 	binary.BigEndian.PutUint16(buf[6:8], dbf.memoHeader.BlockSize)
 	_, err = windows.Write(*dbf.memoFileHandle, buf)
 	if err != nil {
-		return fmt.Errorf("dbase-io-writememoheader-4:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writememoheader-3:FAILED:%w", err)
 	}
 	return nil
 }
