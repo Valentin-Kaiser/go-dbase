@@ -45,6 +45,35 @@ func main() {
 	// Print all the row fields as interface{} slice.
 	fmt.Printf("%+v \n", row.Values())
 
+	compNameField, err := row.Field(dbf.ColumnPosByName("COMP_NAME"))
+	if err != nil {
+		panic(err)
+	}
+
+	compNameField.SetValue("TEST_VALUE")
+
+	err = row.ChangeField(compNameField)
+	if err != nil {
+		panic(err)
+	}
+
+	meldingField, err := row.Field(dbf.ColumnPosByName("MELDING"))
+	if err != nil {
+		panic(err)
+	}
+
+	meldingField.SetValue("TEST_VALUE")
+
+	err = row.ChangeField(meldingField)
+	if err != nil {
+		panic(err)
+	}
+
+	err = row.Add()
+	if err != nil {
+		panic(err)
+	}
+
 	// Go back to start to read the file again.
 	err = dbf.GoTo(0)
 	if err != nil {
@@ -75,24 +104,24 @@ func main() {
 		}
 
 		// Print the field value.
-		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.Value())
+		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.GetValue())
 
 		// Get value by column name
-		field, err = row.Field(dbf.ColumnPos("COMP_NAME"))
+		field, err = row.Field(dbf.ColumnPosByName("COMP_NAME"))
 		if err != nil {
 			panic(err)
 		}
 
 		// Print the field value.
-		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.Value())
+		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.GetValue())
 
 		// Enable space trimming per default
 		dbf.SetTrimspacesDefault(true)
 		// Disable space trimming for the company name
-		dbf.SetColumnModification(dbf.ColumnPos("COMP_NAME"), false, "", nil)
+		dbf.SetColumnModification(dbf.ColumnPosByName("COMP_NAME"), false, "", nil)
 		// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
-		dbf.SetColumnModification(dbf.ColumnPos("NUMBER"), true, "FLOAT", nil)
-		dbf.SetColumnModification(dbf.ColumnPos("FLOAT"), true, "NUMBER", nil)
+		dbf.SetColumnModification(dbf.ColumnPosByName("NUMBER"), true, "FLOAT", nil)
+		dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "NUMBER", nil)
 
 		// Read the row into a struct.
 		t := &Test{}
