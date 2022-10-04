@@ -228,7 +228,15 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
 		t, ok := field.value.(time.Time)
 		if !ok {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-13:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
+			s, ok := field.value.(string)
+			if !ok {
+				return nil, fmt.Errorf("dbase-interpreter-valuetodata-13:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
+			}
+			parsedTime, err := time.Parse(time.RFC3339, s)
+			if err != nil {
+				return nil, fmt.Errorf("dbase-interpreter-valuetodata-11:FAILED:parsing time failed at column field: %v failed with error: %w", field.Name(), err)
+			}
+			t = parsedTime
 		}
 		raw := make([]byte, 8)
 		i := YMD2JD(t.Year(), int(t.Month()), t.Day())

@@ -7,20 +7,19 @@ import (
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
 
-type Test struct {
-	ID          int32     `json:"ID"`
-	Niveau      int32     `json:"NIVEAU"`
-	Date        time.Time `json:"DATUM"`
-	TIJD        string    `json:"TIJD"`
-	SOORT       float64   `json:"SOORT"`
-	IDNR        int32     `json:"ID_NR"`
-	UserNR      int32     `json:"USERNR"`
-	CompanyName string    `json:"COMP_NAME"`
-	CompanyOS   string    `json:"COMP_OS"`
-	Melding     string    `json:"MELDING"`
-	Number      int64     `json:"NUMBER"`
+type Product struct {
+	ID          int32     `json:"PRODUCTID"`
+	Name        string    `json:"PRODNAME"`
+	Price       float64   `json:"PRICE"`
+	Tax         float64   `json:"TAX"`
+	Stock       int64     `json:"INSTOCK"`
+	Date        time.Time `json:"DATE"`
+	DateTime    time.Time `json:"DATETIME"`
+	Description string    `json:"DESC"`
+	Active      bool      `json:"ACTIVE"`
 	Float       float64   `json:"FLOAT"`
-	Bool        bool      `json:"BOOL"`
+	Integer     int64     `json:"INTEGER"`
+	Double      float64   `json:"DOUBLE"`
 }
 
 func main() {
@@ -46,13 +45,13 @@ func main() {
 	}
 
 	// Get the company name field by column name.
-	field, err := row.Field(dbf.ColumnPosByName("COMP_NAME"))
+	field, err := row.Field(dbf.ColumnPosByName("PRODNAME"))
 	if err != nil {
 		panic(err)
 	}
 
 	// Change the field value
-	field.SetValue("CHANGED_COMPANY_NAME")
+	field.SetValue("CHANGED_PRODUCT_NAME")
 
 	// Apply the changed field value to the row.
 	err = row.ChangeField(field)
@@ -61,7 +60,7 @@ func main() {
 	}
 
 	// Change a memo field value.
-	field, err = row.Field(dbf.ColumnPosByName("MELDING"))
+	field, err = row.Field(dbf.ColumnPosByName("DESC"))
 	if err != nil {
 		panic(err)
 	}
@@ -85,33 +84,30 @@ func main() {
 
 	// Enable space trimming per default
 	dbf.SetTrimspacesDefault(true)
-	// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
-	dbf.SetColumnModification(dbf.ColumnPosByName("NUMBER"), true, "FLOAT", nil)
-	dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "NUMBER", nil)
+	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
+	dbf.SetColumnModification(dbf.ColumnPosByName("INTEGER"), true, "FLOAT", nil)
+	dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "INTEGER", nil)
 
 	// Create a new row with the same structure as the database file.
-	t := Test{
+	t := Product{
 		ID:          99,
-		Niveau:      100,
+		Name:        "NEW_PRODUCT",
+		Price:       99.99,
+		Tax:         19.99,
+		Stock:       999,
 		Date:        time.Now(),
-		TIJD:        "00:00",
-		SOORT:       101.23,
-		IDNR:        102,
-		UserNR:      103,
-		CompanyName: "NEW_COMPANY_NAME",
-		CompanyOS:   "NEW_COMPANY_OS",
-		Melding:     "NEW_MEMO_TEST_VALUE",
-		Number:      104,
+		DateTime:    time.Now(),
+		Description: "NEW_PRODUCT_DESCRIPTION",
+		Active:      true,
 		Float:       105.67,
-		Bool:        true,
+		Integer:     104,
+		Double:      103.45,
 	}
 
 	row, err = dbf.RowFromStruct(t)
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Printf("New row: %+v", row)
 
 	// Add the new row to the database file.
 	err = row.Write()

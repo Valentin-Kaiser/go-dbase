@@ -7,20 +7,19 @@ import (
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
 
-type Test struct {
-	ID          int32     `json:"ID"`
-	Niveau      int32     `json:"NIVEAU"`
-	Date        time.Time `json:"DATUM"`
-	TIJD        string    `json:"TIJD"`
-	SOORT       float64   `json:"SOORT"`
-	IDNR        int32     `json:"ID_NR"`
-	UserNR      int32     `json:"USERNR"`
-	CompanyName string    `json:"COMP_NAME"`
-	CompanyOS   string    `json:"COMP_OS"`
-	Melding     string    `json:"MELDING"`
-	Number      int64     `json:"NUMBER"`
+type Product struct {
+	ID          int32     `json:"PRODUCTID"`
+	Name        string    `json:"PRODNAME"`
+	Price       float64   `json:"PRICE"`
+	Tax         float64   `json:"TAX"`
+	Stock       int64     `json:"STOCK"`
+	Date        time.Time `json:"DATE"`
+	DateTime    time.Time `json:"DATETIME"`
+	Description string    `json:"DESCRIPTION"`
+	Active      bool      `json:"ACTIVE"`
 	Float       float64   `json:"FLOAT"`
-	Bool        bool      `json:"BOOL"`
+	Integer     int64     `json:"INTEGER"`
+	Double      float64   `json:"DOUBLE"`
 }
 
 func main() {
@@ -70,7 +69,7 @@ func main() {
 		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.GetValue())
 
 		// Get value by column name
-		field, err = row.Field(dbf.ColumnPosByName("COMP_NAME"))
+		field, err = row.Field(dbf.ColumnPosByName("PRODNAME"))
 		if err != nil {
 			panic(err)
 		}
@@ -83,20 +82,20 @@ func main() {
 		// Enable space trimming per default
 		dbf.SetTrimspacesDefault(true)
 		// Disable space trimming for the company name
-		dbf.SetColumnModification(dbf.ColumnPosByName("COMP_NAME"), false, "", nil)
-		// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
-		dbf.SetColumnModification(dbf.ColumnPosByName("NUMBER"), true, "FLOAT", nil)
-		dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "NUMBER", nil)
+		dbf.SetColumnModification(dbf.ColumnPosByName("PRODNAME"), false, "", nil)
+		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
+		dbf.SetColumnModification(dbf.ColumnPosByName("INTEGER"), true, "FLOAT", nil)
+		dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "INTEGER", nil)
 
 		// === Struct Conversion ===
 
 		// Read the row into a struct.
-		t := &Test{}
+		t := &Product{}
 		err = row.ToStruct(t)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Printf("Company: %v", t.CompanyName)
+		fmt.Printf("Product: %v", t.Name)
 	}
 }
