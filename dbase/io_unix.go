@@ -31,13 +31,6 @@ type DBF struct {
 	table *Table
 }
 
-// The raw header of the Memo file.
-type MemoHeader struct {
-	NextFree  uint32  // Location of next free block
-	Unused    [2]byte // Unused
-	BlockSize uint16  // Block size (bytes per block)
-}
-
 /**
  *	################################################################
  *	#					IO Functions
@@ -320,7 +313,6 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	dbf.memoMutex.Lock()
 	defer dbf.memoMutex.Unlock()
-
 	if dbf.memoFile == nil {
 		return nil, fmt.Errorf("dbase-io-writememo-1:FAILED:%v", NoFPT)
 	}

@@ -23,17 +23,11 @@ type Header struct {
 	CodePage   byte     // Code page mark
 }
 
-// Column is a struct containing the column information
-type Column struct {
-	ColumnName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
-	DataType   byte     // Column type
-	Position   uint32   // Displacement of column in row
-	Length     uint8    // Length of column (in bytes)
-	Decimals   uint8    // Number of decimal places
-	Flags      byte     // Column flags
-	Next       uint32   // Value of autoincrement Next value
-	Step       uint16   // Value of autoincrement Step value
-	Reserved   [8]byte  // Reserved
+// The raw header of the Memo file.
+type MemoHeader struct {
+	NextFree  uint32  // Location of next free block
+	Unused    [2]byte // Unused
+	BlockSize uint16  // Block size (bytes per block)
 }
 
 // Table is a struct containing the table columns, modifications and the row pointer
@@ -46,6 +40,19 @@ type Table struct {
 	rowPointer uint32
 	// Trimspaces default value
 	trimSpaces bool
+}
+
+// Column is a struct containing the column information
+type Column struct {
+	ColumnName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
+	DataType   byte     // Column type
+	Position   uint32   // Displacement of column in row
+	Length     uint8    // Length of column (in bytes)
+	Decimals   uint8    // Number of decimal places
+	Flags      byte     // Column flags
+	Next       uint32   // Value of autoincrement Next value
+	Step       uint16   // Value of autoincrement Step value
+	Reserved   [8]byte  // Reserved
 }
 
 // Row is a struct containing the row Position, deleted flag and data fields
