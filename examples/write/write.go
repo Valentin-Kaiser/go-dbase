@@ -131,7 +131,7 @@ func main() {
 			continue
 		}
 
-		// Get the first field by column position
+		// Print the current row values.
 		fmt.Println(row.Values()...)
 	}
 }

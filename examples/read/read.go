@@ -96,6 +96,6 @@ func main() {
 			panic(err)
 		}
 
-		fmt.Printf("Product: %v", t.Name)
+		fmt.Printf("Product: %v \n", t.Name)
 	}
 }
