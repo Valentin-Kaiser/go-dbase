@@ -18,8 +18,8 @@ type Test struct {
 	CompanyName string    `json:"COMP_NAME"`
 	CompanyOS   string    `json:"COMP_OS"`
 	Melding     string    `json:"MELDING"`
-	Number      float64   `json:"NUMBER"`
-	Float       int64     `json:"FLOAT"`
+	Number      int64     `json:"NUMBER"`
+	Float       float64   `json:"FLOAT"`
 	Bool        bool      `json:"BOOL"`
 }
 
@@ -81,6 +81,14 @@ func main() {
 		panic(err)
 	}
 
+	// === Modifications ===
+
+	// Enable space trimming per default
+	dbf.SetTrimspacesDefault(true)
+	// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
+	dbf.SetColumnModification(dbf.ColumnPosByName("NUMBER"), true, "FLOAT", nil)
+	dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "NUMBER", nil)
+
 	// Create a new row with the same structure as the database file.
 	t := Test{
 		ID:          99,
@@ -94,7 +102,7 @@ func main() {
 		CompanyOS:   "NEW_COMPANY_OS",
 		Melding:     "NEW_MEMO_TEST_VALUE",
 		Number:      104,
-		Float:       105,
+		Float:       105.67,
 		Bool:        true,
 	}
 
@@ -102,6 +110,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("New row: %+v", row)
 
 	// Add the new row to the database file.
 	err = row.Write()

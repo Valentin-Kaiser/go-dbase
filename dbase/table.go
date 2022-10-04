@@ -456,8 +456,9 @@ func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
 			if len(mod.ExternalKey) != 0 {
 				if val, ok := m[mod.ExternalKey]; ok {
 					field.value = val
+					row.fields[i] = field
+					continue
 				}
-				continue
 			}
 		}
 		if val, ok := m[field.Name()]; ok {
