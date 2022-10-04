@@ -25,11 +25,19 @@ type Test struct {
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter))
+	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter), false)
 	if err != nil {
 		panic(err)
 	}
 	defer dbf.Close()
+
+	fmt.Printf(
+		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
+		dbf.Header().Modified(),
+		dbf.Header().ColumnsCount(),
+		dbf.Header().RecordsCount(),
+		dbf.Header().FileSize(),
+	)
 
 	// Read the first row (rowPointer start at the first row).
 	row, err := dbf.Row()
