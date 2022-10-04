@@ -88,6 +88,10 @@ func (h *Header) ColumnsCount() uint16 {
 	return (h.FirstRow - 296) / 32
 }
 
+func (h *Header) RecordsCount() uint32 {
+	return h.RowsCount
+}
+
 // Returns the calculated file size based on the header info
 func (h *Header) FileSize() int64 {
 	return 296 + int64(h.ColumnsCount()*32) + int64(h.RowsCount*uint32(h.RowLength))
