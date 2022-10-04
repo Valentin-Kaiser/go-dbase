@@ -11,10 +11,7 @@ import (
 // Convert year, month and day to a julian day number
 // Julian day number -> days since 01-01-4712 BC
 func YMD2JD(y, m, d int) int {
-	return d - 32075 +
-		1461*(y+4800+(m-14)/12)/4 +
-		367*(m-2-(m-14)/12*12)/12 -
-		3*((y+4900+(m-14)/12)/100)/4
+	return int(float64(2-(y/100)+y/100/4) + float64(d) + (float64(365.25) * float64(y+4716)) + (float64(30.6001) * float64(m+1)) - 1524.5)
 }
 
 // Convert julian day number to year, month and day
@@ -60,7 +57,7 @@ func JDToDate(number int) (time.Time, error) {
  */
 
 // parseDate parses a date string from a byte slice and returns a time.Time
-func (dbf *DBF) parseDate(raw []byte) (time.Time, error) {
+func parseDate(raw []byte) (time.Time, error) {
 	if string(raw) == strings.Repeat(" ", 8) {
 		return time.Time{}, nil
 	}
@@ -72,7 +69,7 @@ func (dbf *DBF) parseDate(raw []byte) (time.Time, error) {
 }
 
 // parseDateTIme parses a date and time string from a byte slice and returns a time.Time
-func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
+func parseDateTime(raw []byte) (time.Time, error) {
 	if len(raw) != 8 {
 		return time.Time{}, fmt.Errorf("dbase-conversion-parsedate-1:FAILED:%v", InvalidPosition)
 	}
@@ -91,7 +88,7 @@ func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
 }
 
 // parseNumericInt parses a string as byte array to int64
-func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
+func parseNumericInt(raw []byte) (int64, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if len(trimmed) == 0 {
 		return int64(0), nil
@@ -104,7 +101,7 @@ func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
 }
 
 // parseFloat parses a string as byte array to float64
-func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
+func parseFloat(raw []byte) (float64, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if len(trimmed) == 0 {
 		return float64(0), nil
@@ -117,10 +114,43 @@ func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
 }
 
 // toUTF8String converts a byte slice to a UTF8 string using the converter
-func (dbf *DBF) toUTF8String(raw []byte) (string, error) {
-	utf8, err := dbf.convert.Decode(raw)
+func toUTF8String(raw []byte, converter EncodingConverter) (string, error) {
+	utf8, err := converter.Decode(raw)
 	if err != nil {
 		return string(raw), fmt.Errorf("dbase-conversion-toutf8string-1:FAILED:%w", err)
 	}
 	return string(utf8), nil
+}
+
+// fromUTF8String converts a UTF8 string to a byte slice using the given converter
+func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
+	utf8, err := converter.Encode(raw)
+	if err != nil {
+		return raw, fmt.Errorf("dbase-conversion-fromutf8string-1:FAILED:%w", err)
+	}
+	return utf8, nil
+}
+
+// appendSpaces appends spaces to a byte slice until it reaches the given length
+func appendSpaces(raw []byte, length int) []byte {
+	if len(raw) < length {
+		a := make([]byte, length-len(raw))
+		for i := range a {
+			a[i] = ' '
+		}
+		return append(raw, a...)
+	}
+	return raw
+}
+
+// prependSpaces prepends spaces to a byte slice until it reaches the given length
+func prependSpaces(raw []byte, length int) []byte {
+	if len(raw) < length {
+		result := make([]byte, 0)
+		for i := 0; i < length-len(raw); i++ {
+			result = append(result, ' ')
+		}
+		return append(result, raw...)
+	}
+	return raw
 }

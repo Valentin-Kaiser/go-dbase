@@ -16,7 +16,8 @@ const (
 	InvalidPosition Error = "INVALID_Position"
 	InvalidEncoding Error = "INVALID_ENCODING"
 
-	// Supported file types
+	// Supported and testet file types - other file types may work but are not tested
+	// The file type check has to be bypassed when opening, if the file type is not supported
 	FoxPro              byte = 0x30
 	FoxProAutoincrement byte = 0x31
 

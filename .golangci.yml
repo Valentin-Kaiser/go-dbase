@@ -46,6 +46,12 @@ linters:
     - structcheck
     - wastedassign
 
+    # review later before merging to master
+    - paralleltest
+    - gocognit
+    - gocyclo
+    - maintidx
+
 linters-settings:
   wsl:
     allow-cuddle-declarations: true
