@@ -386,7 +386,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 	// deleted flag already read
 	offset := uint16(1)
 	for _, field := range row.fields {
-		val, err := row.dbf.valueToData(field)
+		val, err := row.dbf.valueToByteRepresentation(field)
 		if err != nil {
 			return nil, fmt.Errorf("dbase-table-rowtobytes-1:FAILED:%w", err)
 		}
