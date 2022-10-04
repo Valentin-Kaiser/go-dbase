@@ -1,12 +1,24 @@
-# Microsoft Visual FoxPro DBF for Go
-
-[![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/Valentin-Kaiser/go-dbase)
-[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://github.com/Valentin-Kaiser/go-dbase/blob/main/LICENSE)
-[![golangci-lint](https://github.com/Valentin-Kaiser/go-dbase/workflows/golangci-lint/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
-[![CodeQL](https://github.com/Valentin-Kaiser/go-dbase/workflows/CodeQL/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
-[![goreport](https://goreportcard.com/badge/github.com/Valentin-Kaiser/go-dbase)](https://goreportcard.com/report/github.com/Valentin-Kaiser/go-dbase)
-
-Golang package for reading and writing FoxPro dBase database files.
+<h1 align="center">Microsoft Visual FoxPro DBF for Go</h1>
+<h3 align="center">Golang package for reading and writing FoxPro dBase database files.</h3>
+<p align="center">
+  <br>
+  <a href="http://godoc.org/github.com/Valentin-Kaiser/go-dbase">
+  <img src="https://godoc.org/github.com/golang/gddo?status.svg" alt="GoDoc">
+  </a>
+  <a href="https://github.com/Valentin-Kaiser/go-dbase/blob/main/LICENSE">
+  <img src="https://img.shields.io/badge/License-BSD_3--Clause-blue.svg" alt="License">
+  </a>
+  <br>
+  <a href="https://github.com/Valentin-Kaiser/go-dbase">
+  <img src="https://github.com/Valentin-Kaiser/go-dbase/workflows/golangci-lint/badge.svg" alt="golangci-lint">
+  </a>
+  <a href="https://github.com/Valentin-Kaiser/go-dbase">
+  <img src="https://github.com/Valentin-Kaiser/go-dbase/workflows/CodeQL/badge.svg" alt="CodeQL">
+  </a>
+  <a href="https://goreportcard.com/report/github.com/Valentin-Kaiser/go-dbase">
+  <img src="https://goreportcard.com/badge/github.com/Valentin-Kaiser/go-dbase" alt="goreport">
+  </a>
+</p>
 
 # Features 
 
