@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/sys/windows"
 )
@@ -46,14 +47,14 @@ type MemoHeader struct {
 
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the file handle(s) call DBF.Close().
-func Open(filename string, conv EncodingConverter) (*DBF, error) {
+func Open(filename string, conv EncodingConverter, useUntested bool) (*DBF, error) {
 	filename = filepath.Clean(filename)
 	// Open file in non blocking mode with windows
 	fd, err := windows.Open(filename, windows.O_RDWR|windows.O_CLOEXEC|windows.O_NONBLOCK, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-open-1:FAILED:%w", err)
 	}
-	dbf, err := prepareDBF(fd, conv)
+	dbf, err := prepareDBF(fd, conv, useUntested)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-open-2:FAILED:%w", err)
 	}
@@ -105,13 +106,13 @@ func (dbf *DBF) Close() error {
 
 // Returns a DBF object pointer
 // Reads the DBF Header, the column infos and validates file version.
-func prepareDBF(fd windows.Handle, conv EncodingConverter) (*DBF, error) {
-	header, err := readDBFHeader(fd)
+func prepareDBF(fd windows.Handle, conv EncodingConverter, useUntested bool) (*DBF, error) {
+	header, err := readHeader(fd)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-1:FAILED:%w", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(header.FileType); err != nil {
+	if err := validateFileVersion(header.FileType, useUntested); err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-2:FAILED:%w", err)
 	}
 	columns, err := readColumns(fd)
@@ -133,7 +134,7 @@ func prepareDBF(fd windows.Handle, conv EncodingConverter) (*DBF, error) {
 }
 
 // Reads the DBF header from the file handle.
-func readDBFHeader(fd windows.Handle) (*Header, error) {
+func readHeader(fd windows.Handle) (*Header, error) {
 	h := &Header{}
 	if _, err := windows.Seek(fd, 0, 0); err != nil {
 		return nil, fmt.Errorf("dbase-io-readdbfheader-1:FAILED:%w", err)
@@ -151,10 +152,37 @@ func readDBFHeader(fd windows.Handle) (*Header, error) {
 	return h, nil
 }
 
+// writeHeader writes the header to the dbase file
+func (dbf *DBF) writeHeader() error {
+	// Seek to the beginning of the file
+	_, err := windows.Seek(*dbf.dbaseFileHandle, 0, 0)
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-header-1:FAILED:%w", err)
+	}
+	// Change the last modification date to the current date
+	dbf.header.Year = uint8(time.Now().Year() - 2000)
+	dbf.header.Month = uint8(time.Now().Month())
+	dbf.header.Day = uint8(time.Now().Day())
+	// Write the header
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, dbf.header)
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-header-2:FAILED:%w", err)
+	}
+	_, err = windows.Write(*dbf.dbaseFileHandle, buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("dbase-table-write-header-3:FAILED:%w", err)
+	}
+	return nil
+}
+
 // Check if the file version is supported
-func validateFileVersion(version byte) error {
+func validateFileVersion(version byte, useUntested bool) error {
 	switch version {
 	default:
+		if useUntested {
+			return nil
+		}
 		return fmt.Errorf("dbase-io-validatefileversion-1:FAILED:untested DBF file version: %d (%x hex)", version, version)
 	case FoxPro, FoxProAutoincrement:
 		return nil
@@ -412,26 +440,6 @@ func (row *Row) writeRow() error {
 	_, err = windows.Write(*row.dbf.dbaseFileHandle, r)
 	if err != nil {
 		return fmt.Errorf("dbase-table-write-row-4:FAILED:%w", err)
-	}
-	return nil
-}
-
-// writeHeader writes the header to the dbase file
-func (dbf *DBF) writeHeader() error {
-	// Seek to the beginning of the file
-	_, err := windows.Seek(*dbf.dbaseFileHandle, 0, 0)
-	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-1:FAILED:%w", err)
-	}
-	// Write the header
-	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.LittleEndian, dbf.header)
-	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-2:FAILED:%w", err)
-	}
-	_, err = windows.Write(*dbf.dbaseFileHandle, buf.Bytes())
-	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-3:FAILED:%w", err)
 	}
 	return nil
 }
