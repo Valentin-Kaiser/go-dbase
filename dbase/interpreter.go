@@ -283,7 +283,6 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 		if iok {
 			bin = []byte(fmt.Sprintf("%d", field.value))
 		}
-
 		if !iok && !fok {
 			return nil, fmt.Errorf("dbase-interpreter-valuetodata-19:FAILED:invalid data type %T, expected int64 or float64 at column field: %v", field.value, field.Name())
 		}
