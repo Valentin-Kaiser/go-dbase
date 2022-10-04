@@ -180,12 +180,24 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 		return raw, nil
 	case "Y":
 		// Y (currency)
-		fallthrough // same as "B"
+		f, ok := field.value.(float64)
+		if !ok {
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-9:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
+		}
+		// Cast to int64 and multiply by 10000
+		i := int64(f * 10000)
+		raw := make([]byte, field.column.Length)
+		bin, err := toBinary(i)
+		if err != nil {
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-10:FAILED:converting to binary at column field: %v failed with error: %w", field.Name(), err)
+		}
+		copy(raw, bin)
+		if len(raw) != int(field.column.Length) {
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-11:FAILED:invalid length %v Bytes != %v Bytes at column field: %v", len(raw), field.column.Length, field.Name())
+		}
+		return raw, nil
 	case "F":
 		// F (Float)
-		fallthrough // same as "B"
-	case "B":
-		// B (double)
 		b, ok := field.value.(float64)
 		if !ok {
 			return nil, fmt.Errorf("dbase-interpreter-valuetodata-9:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
@@ -200,17 +212,33 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 			bin = []byte(fmt.Sprintf(expression, field.value))
 		}
 		return prependSpaces(bin, int(field.column.Length)), nil
+	case "B":
+		// B (double)
+		b, ok := field.value.(float64)
+		if !ok {
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-9:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
+		}
+		raw := make([]byte, field.column.Length)
+		bin, err := toBinary(b)
+		if err != nil {
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-10:FAILED:converting to binary at column field: %v failed with error: %w", field.Name(), err)
+		}
+		copy(raw, bin)
+		if len(raw) != int(field.column.Length) {
+			return nil, fmt.Errorf("dbase-interpreter-datatovalue-11:FAILED:invalid length %v Bytes != %v Bytes at column field: %v", len(raw), field.column.Length, field.Name())
+		}
+		return raw, nil
 	case "D":
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
 		d, ok := field.value.(time.Time)
 		if !ok {
 			s, ok := field.value.(string)
 			if !ok {
-				return nil, fmt.Errorf("dbase-interpreter-valuetodata-10:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
+				return nil, fmt.Errorf("dbase-interpreter-valuetodata-12:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
 			}
 			t, err := time.Parse(time.RFC3339, s)
 			if err != nil {
-				return nil, fmt.Errorf("dbase-interpreter-valuetodata-11:FAILED:parsing time failed at column field: %v failed with error: %w", field.Name(), err)
+				return nil, fmt.Errorf("dbase-interpreter-valuetodata-13:FAILED:parsing time failed at column field: %v failed with error: %w", field.Name(), err)
 			}
 			d = t
 		}
@@ -218,7 +246,7 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 		bin := []byte(d.Format("20060102"))
 		copy(raw, bin)
 		if len(raw) != int(field.column.Length) {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-12:FAILED:invalid length %v Bytes != %v Bytes at column field: %v", len(raw), field.column.Length, field.Name())
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-14:FAILED:invalid length %v Bytes != %v Bytes at column field: %v", len(raw), field.column.Length, field.Name())
 		}
 		return raw, nil
 	case "T":
@@ -230,11 +258,11 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 		if !ok {
 			s, ok := field.value.(string)
 			if !ok {
-				return nil, fmt.Errorf("dbase-interpreter-valuetodata-13:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
+				return nil, fmt.Errorf("dbase-interpreter-valuetodata-15:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
 			}
 			parsedTime, err := time.Parse(time.RFC3339, s)
 			if err != nil {
-				return nil, fmt.Errorf("dbase-interpreter-valuetodata-11:FAILED:parsing time failed at column field: %v failed with error: %w", field.Name(), err)
+				return nil, fmt.Errorf("dbase-interpreter-valuetodata-16:FAILED:parsing time failed at column field: %v failed with error: %w", field.Name(), err)
 			}
 			t = parsedTime
 		}
@@ -242,24 +270,24 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 		i := YMD2JD(t.Year(), int(t.Month()), t.Day())
 		date, err := toBinary(uint64(i))
 		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-14:FAILED:Time conversion at column field: %v failed with error: %w", field.Name(), err)
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-17:FAILED:Time conversion at column field: %v failed with error: %w", field.Name(), err)
 		}
 		copy(raw[:4], date)
 		millis := t.Hour()*3600000 + t.Minute()*60000 + t.Second()*1000 + t.Nanosecond()/1000000
 		time, err := toBinary(uint64(millis))
 		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-15:FAILED:Binary conversion at column field: %v failed with error: %w", field.Name(), err)
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-18:FAILED:Binary conversion at column field: %v failed with error: %w", field.Name(), err)
 		}
 		copy(raw[4:], time)
 		if len(raw) != int(field.column.Length) {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-16:FAILED:invalid length %v Bytes != %v Bytes at column field: %v", len(raw), field.column.Length, field.Name())
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-19:FAILED:invalid length %v Bytes != %v Bytes at column field: %v", len(raw), field.column.Length, field.Name())
 		}
 		return raw, nil
 	case "L":
 		// L (bool) values are stored as strings T or F, we only check for T, the rest is false...
 		l, ok := field.value.(bool)
 		if !ok {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-17:FAILED:invalid data type %T, expected bool at column field: %v", field.value, field.Name())
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-20:FAILED:invalid data type %T, expected bool at column field: %v", field.value, field.Name())
 		}
 		raw := []byte("F")
 		if l {
@@ -270,7 +298,7 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 		// V values just return the raw value
 		raw, ok := field.value.([]byte)
 		if !ok {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-18:FAILED:invalid data type %T, expected []byte at column field: %v", field.value, field.Name())
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-21:FAILED:invalid data type %T, expected []byte at column field: %v", field.value, field.Name())
 		}
 		return raw, nil
 	case "N":
@@ -292,11 +320,11 @@ func (dbf *DBF) valueToData(field *Field) ([]byte, error) {
 			bin = []byte(fmt.Sprintf("%d", field.value))
 		}
 		if !iok && !fok {
-			return nil, fmt.Errorf("dbase-interpreter-valuetodata-19:FAILED:invalid data type %T, expected int64 or float64 at column field: %v", field.value, field.Name())
+			return nil, fmt.Errorf("dbase-interpreter-valuetodata-22:FAILED:invalid data type %T, expected int64 or float64 at column field: %v", field.value, field.Name())
 		}
 		return prependSpaces(bin, int(field.column.Length)), nil
 	default:
-		return nil, fmt.Errorf("dbase-interpreter-valuetodata-20:FAILED:Unsupported column data type: %s at column field: %v", field.column.Type(), field.Name())
+		return nil, fmt.Errorf("dbase-interpreter-valuetodata-23:FAILED:Unsupported column data type: %s at column field: %v", field.column.Type(), field.Name())
 	}
 }
 
