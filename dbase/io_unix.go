@@ -350,7 +350,7 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) (address []byte, er
 			break
 		}
 
-		if err != unix.EAGAIN {
+		if !errors.Is(err, unix.EAGAIN) {
 			return nil, fmt.Errorf("dbase-io-writememo-3:FAILED:%w", err)
 		}
 
@@ -399,7 +399,7 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 			break
 		}
 
-		if err != unix.EAGAIN {
+		if !errors.Is(err, unix.EAGAIN) {
 			return fmt.Errorf("dbase-io-writememoheader-2:FAILED:%w", err)
 		}
 
@@ -489,7 +489,7 @@ func (row *Row) writeRow() (err error) {
 			break
 		}
 
-		if err != unix.EAGAIN {
+		if !errors.Is(err, unix.EAGAIN) {
 			return fmt.Errorf("dbase-io-writerow-3:FAILED:%w", err)
 		}
 

@@ -453,6 +453,7 @@ func (row *Row) writeRow() (err error) {
 	if err != nil {
 		return fmt.Errorf("dbase-io-writerow-2:FAILED:%w", err)
 	}
+	// Lock the block we are writing to
 	o := &windows.Overlapped{
 		Offset:     uint32(position),
 		OffsetHigh: uint32(position + int64(row.dbf.header.RowLength)),
