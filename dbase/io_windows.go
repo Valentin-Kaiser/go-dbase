@@ -172,7 +172,7 @@ func (dbf *DBF) writeHeader() (err error) {
 	// Seek to the beginning of the file
 	_, err = windows.Seek(*dbf.dbaseFileHandle, 0, 0)
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-1:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writeheader-1:FAILED:%w", err)
 	}
 	// Change the last modification date to the current date
 	dbf.header.Year = uint8(time.Now().Year() - 2000)
@@ -182,11 +182,11 @@ func (dbf *DBF) writeHeader() (err error) {
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.LittleEndian, dbf.header)
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-2:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writeheader-2:FAILED:%w", err)
 	}
 	_, err = windows.Write(*dbf.dbaseFileHandle, buf.Bytes())
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-3:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writeheader-3:FAILED:%w", err)
 	}
 	return nil
 }
@@ -254,7 +254,7 @@ func readColumns(fd windows.Handle) ([]*Column, error) {
 func (dbf *DBF) prepareMemo(fd windows.Handle) error {
 	memoHeader, err := readMemoHeader(fd)
 	if err != nil {
-		return fmt.Errorf("dbase-table-prepare-memo-1:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-prepare-memo-1:FAILED:%w", err)
 	}
 	dbf.memoFileHandle = &fd
 	dbf.memoHeader = memoHeader
@@ -265,16 +265,16 @@ func (dbf *DBF) prepareMemo(fd windows.Handle) error {
 func readMemoHeader(fd windows.Handle) (*MemoHeader, error) {
 	h := &MemoHeader{}
 	if _, err := windows.Seek(fd, 0, 0); err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-1:FAILED:%w", err)
+		return nil, fmt.Errorf("dbase-io-read-memo-header-1:FAILED:%w", err)
 	}
 	b := make([]byte, 1024)
 	n, err := windows.Read(fd, b)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-2:FAILED:%w", err)
+		return nil, fmt.Errorf("dbase-io-read-memo-header-2:FAILED:%w", err)
 	}
 	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-3:FAILED:%w", err)
+		return nil, fmt.Errorf("dbase-io-read-memo-header-3:FAILED:%w", err)
 	}
 	return h, nil
 }
@@ -322,12 +322,12 @@ func (dbf *DBF) readMemo(address []byte) ([]byte, bool, error) {
 func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	memo, isText, err := dbf.readMemo(raw)
 	if err != nil {
-		return []byte{}, false, fmt.Errorf("dbase-table-parse-memo-1:FAILED:%w", err)
+		return []byte{}, false, fmt.Errorf("dbase-io-parse-memo-1:FAILED:%w", err)
 	}
 	if isText {
 		memo, err = dbf.converter.Decode(memo)
 		if err != nil {
-			return []byte{}, false, fmt.Errorf("dbase-table-parse-memo-2:FAILED:%w", err)
+			return []byte{}, false, fmt.Errorf("dbase-io-parse-memo-2:FAILED:%w", err)
 		}
 	}
 	return memo, isText, nil
@@ -443,19 +443,19 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 // Reads raw row data of one row at rowPosition
 func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 	if rowPosition >= dbf.header.RowsCount {
-		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", EOF)
+		return nil, fmt.Errorf("dbase-io-read-row-1:FAILED:%v", EOF)
 	}
 	buf := make([]byte, dbf.header.RowLength)
 	_, err := windows.Seek(*dbf.dbaseFileHandle, int64(dbf.header.FirstRow)+(int64(rowPosition)*int64(dbf.header.RowLength)), 0)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%w", err)
+		return buf, fmt.Errorf("dbase-io-read-row-2:FAILED:%w", err)
 	}
 	read, err := windows.Read(*dbf.dbaseFileHandle, buf)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%w", err)
+		return buf, fmt.Errorf("dbase-io-read-row-3:FAILED:%w", err)
 	}
 	if read != int(dbf.header.RowLength) {
-		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", Incomplete)
+		return buf, fmt.Errorf("dbase-io-read-row-1:FAILED:%v", Incomplete)
 	}
 	return buf, nil
 }
