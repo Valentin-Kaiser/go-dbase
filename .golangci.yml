@@ -46,6 +46,9 @@ linters:
     - structcheck
     - wastedassign
 
+    # should not block
+    - nonamedreturns
+
 linters-settings:
   wsl:
     allow-cuddle-declarations: true
