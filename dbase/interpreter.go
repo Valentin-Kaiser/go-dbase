@@ -42,70 +42,40 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 	switch column.Type() {
 	case "M":
 		// M values contain the address in the FPT file from where to read data
-		memo, isText, err := dbf.parseMemo(raw)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-datatovalue-2:FAILED:parsing memo failed at column field: %v failed with error: %w", column.Name(), err)
-		}
-		if isText {
-			return string(memo), nil
-		}
-		return memo, nil
+		return dbf.parseMValue(raw, column)
 	case "C":
 		// C values are stored as strings, the returned string is not trimmed
-		str, err := toUTF8String(raw, dbf.converter)
-		if err != nil {
-			return str, fmt.Errorf("dbase-interpreter-datatovalue-4:FAILED:parsing to utf8 string failed at column field: %v failed with error: %w", column.Name(), err)
-		}
-		return str, nil
+		return dbf.parseCValue(raw, column)
 	case "I":
 		// I values are stored as numeric values
-		return int32(binary.LittleEndian.Uint32(raw)), nil
+		return dbf.parseIValue(raw)
 	case "B":
 		// B (double) values are stored as numeric values
-		return math.Float64frombits(binary.LittleEndian.Uint64(raw)), nil
+		return dbf.parseBValue(raw)
 	case "D":
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
-		date, err := parseDate(raw)
-		if err != nil {
-			return date, fmt.Errorf("dbase-interpreter-datatovalue-5:FAILED:parsing to date at column field: %v failed with error: %w", column.Name(), err)
-		}
-		return date, nil
+		return dbf.parseDValue(raw, column)
 	case "T":
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
-		dateTime, err := parseDateTime(raw)
-		if err != nil {
-			return dateTime, fmt.Errorf("dbase-interpreter-datatovalue-6:FAILED:parsing date time at column field: %v failed with error: %w", column.Name(), err)
-		}
-		return dateTime, nil
+		return dbf.parseTValue(raw, column)
 	case "L":
 		// L values are stored as strings T or F, we only check for T, the rest is false...
-		return string(raw) == "T", nil
+		return dbf.parseLValue(raw)
 	case "V":
 		// V values just return the raw value
-		return raw, nil
+		return dbf.parseVValue(raw, column)
 	case "Y":
 		// Y values are currency values stored as ints with 4 decimal places
-		return float64(binary.LittleEndian.Uint64(raw)) / 10000, nil
+		return dbf.parseYValue(raw)
 	case "N":
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
-		if column.Decimals == 0 {
-			i, err := parseNumericInt(raw)
-			if err != nil {
-				return i, fmt.Errorf("dbase-interpreter-datatovalue-7:FAILED:parsing numeric int at column field: %v failed with error: %w", column.Name(), err)
-			}
-			return i, nil
-		}
-		fallthrough // same as "F"
+		return dbf.parseNValue(raw, column)
 	case "F":
 		// F values are stored as string values
-		f, err := parseFloat(raw)
-		if err != nil {
-			return f, fmt.Errorf("dbase-interpreter-datatovalue-8:FAILED:parsing float at column field: %v failed with error: %w", column.Name(), err)
-		}
-		return f, nil
+		return dbf.parseFValue(raw, column)
 	default:
 		return nil, fmt.Errorf("dbase-interpreter-datatovalue-9:FAILED:Unsupported column data type: %s", column.Type())
 	}
@@ -116,87 +86,55 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 func (dbf *DBF) valueToByteRepresentation(field *Field) ([]byte, error) {
 	switch field.Type() {
 	case "M":
-		address, err := dbf.getMRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-1:FAILED:%w", err)
-		}
-		return address, nil
+		return dbf.getMRepresentation(field)
 	case "C":
 		// C values are stored as strings, the returned string is not trimmed
-		raw, err := dbf.getCRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-2:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getCRepresentation(field)
 	case "I":
 		// I values (int32)
-		raw, err := dbf.getIRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-3:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getIRepresentation(field)
 	case "Y":
 		// Y (currency)
-		raw, err := dbf.getYRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-4:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getYRepresentation(field)
 	case "F":
 		// F (Float)
-		raw, err := dbf.getFRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-5:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getFRepresentation(field)
 	case "B":
 		// B (double)
-		raw, err := dbf.getBRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-6:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getBRepresentation(field)
 	case "D":
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
-		raw, err := dbf.getDRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-7:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getDRepresentation(field)
 	case "T":
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
-		raw, err := dbf.getTRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-8:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getTRepresentation(field)
 	case "L":
 		// L (bool) values are stored as strings T or F, we only check for T, the rest is false...
-		raw, err := dbf.getLRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-9:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getLRepresentation(field)
 	case "V":
 		// V values just return the raw value
-		raw, ok := field.value.([]byte)
-		if !ok {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-10:FAILED:invalid data type %T, expected []byte at column field: %v", field.value, field.Name())
-		}
-		return raw, nil
+		return dbf.getVRepresentation(field)
 	case "N":
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
-		raw, err := dbf.getNRepresentation(field)
-		if err != nil {
-			return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-11:FAILED:%w", err)
-		}
-		return raw, nil
+		return dbf.getNRepresentation(field)
 	default:
 		return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-12:FAILED:Unsupported column data type: %s at column field: %v", field.column.Type(), field.Name())
 	}
+}
+
+func (dbf *DBF) parseMValue(raw []byte, column *Column) (interface{}, error) {
+	// M values contain the address in the FPT file from where to read data
+	memo, isText, err := dbf.parseMemo(raw)
+	if err != nil {
+		return nil, fmt.Errorf("dbase-interpreter-datatovalue-2:FAILED:parsing memo failed at column field: %v failed with error: %w", column.Name(), err)
+	}
+	if isText {
+		return string(memo), nil
+	}
+	return memo, nil
 }
 
 func (dbf *DBF) getMRepresentation(field *Field) ([]byte, error) {
@@ -213,7 +151,7 @@ func (dbf *DBF) getMRepresentation(field *Field) ([]byte, error) {
 		txt = false
 	}
 	if !ok && !sok {
-		return nil, fmt.Errorf("dbase-interpreter-getmrepresentation-1:FAILED:invalid type for memo field: %T", field.value)
+		return nil, fmt.Errorf("dbase-interpreter-parsemrepresentation-1:FAILED:invalid type for memo field: %T", field.value)
 	}
 	// Write the memo to the memo file
 	address, err := dbf.writeMemo(memo, txt, len(memo))
@@ -223,11 +161,20 @@ func (dbf *DBF) getMRepresentation(field *Field) ([]byte, error) {
 	return address, nil
 }
 
+func (dbf *DBF) parseCValue(raw []byte, column *Column) (interface{}, error) {
+	// C values are stored as strings, the returned string is not trimmed
+	str, err := toUTF8String(raw, dbf.converter)
+	if err != nil {
+		return str, fmt.Errorf("dbase-interpreter-datatovalue-4:FAILED:parsing to utf8 string failed at column field: %v failed with error: %w", column.Name(), err)
+	}
+	return str, nil
+}
+
 func (dbf *DBF) getCRepresentation(field *Field) ([]byte, error) {
 	// C values are stored as strings, the returned string is not trimmed
 	c, ok := field.value.(string)
 	if !ok {
-		return nil, fmt.Errorf("dbase-interpreter-getcrepresentation-1:FAILED:invalid data type %T, expected string on column field: %v", field.value, field.Name())
+		return nil, fmt.Errorf("dbase-interpreter-parsecrepresentation-1:FAILED:invalid data type %T, expected string on column field: %v", field.value, field.Name())
 	}
 	raw := make([]byte, field.column.Length)
 	bin, err := fromUtf8String([]byte(c), dbf.converter)
@@ -242,13 +189,17 @@ func (dbf *DBF) getCRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+func (dbf *DBF) parseIValue(raw []byte) (interface{}, error) {
+	return int32(binary.LittleEndian.Uint32(raw)), nil
+}
+
 func (dbf *DBF) getIRepresentation(field *Field) ([]byte, error) {
 	// I values (int32)
 	i, ok := field.value.(int32)
 	if !ok {
 		f, ok := field.value.(float64)
 		if !ok {
-			return nil, fmt.Errorf("dbase-interpreter-getirepresentation-1:FAILED:invalid data type %T, expected int32 at column field: %v", field.value, field.Name())
+			return nil, fmt.Errorf("dbase-interpreter-parseirepresentation-1:FAILED:invalid data type %T, expected int32 at column field: %v", field.value, field.Name())
 		}
 		// check for lower and uppper bounds
 		if f > 0 && f <= math.MaxInt32 {
@@ -267,10 +218,14 @@ func (dbf *DBF) getIRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+func (dbf *DBF) parseYValue(raw []byte) (interface{}, error) {
+	return float64(binary.LittleEndian.Uint64(raw)) / 10000, nil
+}
+
 func (dbf *DBF) getYRepresentation(field *Field) ([]byte, error) {
 	f, ok := field.value.(float64)
 	if !ok {
-		return nil, fmt.Errorf("dbase-interpreter-getyrepresentation-1:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
+		return nil, fmt.Errorf("dbase-interpreter-parseyrepresentation-1:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
 	}
 	// Cast to int64 and multiply by 10000
 	i := int64(f * 10000)
@@ -286,10 +241,18 @@ func (dbf *DBF) getYRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+func (dbf *DBF) parseFValue(raw []byte, column *Column) (interface{}, error) {
+	f, err := parseFloat(raw)
+	if err != nil {
+		return f, fmt.Errorf("dbase-interpreter-datatovalue-8:FAILED:parsing float at column field: %v failed with error: %w", column.Name(), err)
+	}
+	return f, nil
+}
+
 func (dbf *DBF) getFRepresentation(field *Field) ([]byte, error) {
 	b, ok := field.value.(float64)
 	if !ok {
-		return nil, fmt.Errorf("dbase-interpreter-getfrepresentation-1:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
+		return nil, fmt.Errorf("dbase-interpreter-parsefrepresentation-1:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
 	}
 	var bin []byte
 	if b == float64(int64(b)) {
@@ -303,10 +266,14 @@ func (dbf *DBF) getFRepresentation(field *Field) ([]byte, error) {
 	return prependSpaces(bin, int(field.column.Length)), nil
 }
 
+func (dbf *DBF) parseBValue(raw []byte) (interface{}, error) {
+	return math.Float64frombits(binary.LittleEndian.Uint64(raw)), nil
+}
+
 func (dbf *DBF) getBRepresentation(field *Field) ([]byte, error) {
 	b, ok := field.value.(float64)
 	if !ok {
-		return nil, fmt.Errorf("dbase-interpreter-getbrepresentation-1:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
+		return nil, fmt.Errorf("dbase-interpreter-parsebrepresentation-1:FAILED:invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
 	}
 	raw := make([]byte, field.column.Length)
 	bin, err := toBinary(b)
@@ -320,12 +287,21 @@ func (dbf *DBF) getBRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+func (dbf *DBF) parseDValue(raw []byte, column *Column) (interface{}, error) {
+	// D values are stored as string in format YYYYMMDD, convert to time.Time
+	date, err := parseDate(raw)
+	if err != nil {
+		return date, fmt.Errorf("dbase-interpreter-datatovalue-5:FAILED:parsing to date at column field: %v failed with error: %w", column.Name(), err)
+	}
+	return date, nil
+}
+
 func (dbf *DBF) getDRepresentation(field *Field) ([]byte, error) {
 	d, ok := field.value.(time.Time)
 	if !ok {
 		s, ok := field.value.(string)
 		if !ok {
-			return nil, fmt.Errorf("dbase-interpreter-getdrepresentation-1:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
+			return nil, fmt.Errorf("dbase-interpreter-parsedrepresentation-1:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
 		}
 		t, err := time.Parse(time.RFC3339, s)
 		if err != nil {
@@ -342,12 +318,20 @@ func (dbf *DBF) getDRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+func (dbf *DBF) parseTValue(raw []byte, column *Column) (interface{}, error) {
+	dateTime, err := parseDateTime(raw)
+	if err != nil {
+		return dateTime, fmt.Errorf("dbase-interpreter-datatovalue-6:FAILED:parsing date time at column field: %v failed with error: %w", column.Name(), err)
+	}
+	return dateTime, nil
+}
+
 func (dbf *DBF) getTRepresentation(field *Field) ([]byte, error) {
 	t, ok := field.value.(time.Time)
 	if !ok {
 		s, ok := field.value.(string)
 		if !ok {
-			return nil, fmt.Errorf("dbase-interpreter-gettrepresentation-1:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
+			return nil, fmt.Errorf("dbase-interpreter-parsetrepresentation-1:FAILED:invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
 		}
 		parsedTime, err := time.Parse(time.RFC3339, s)
 		if err != nil {
@@ -374,16 +358,44 @@ func (dbf *DBF) getTRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+func (dbf *DBF) parseLValue(raw []byte) (interface{}, error) {
+	return string(raw) == "T", nil
+}
+
 func (dbf *DBF) getLRepresentation(field *Field) ([]byte, error) {
 	l, ok := field.value.(bool)
 	if !ok {
-		return nil, fmt.Errorf("dbase-interpreter-getlrepresentation-1:FAILED:invalid data type %T, expected bool at column field: %v", field.value, field.Name())
+		return nil, fmt.Errorf("dbase-interpreter-parselrepresentation-1:FAILED:invalid data type %T, expected bool at column field: %v", field.value, field.Name())
 	}
 	raw := []byte("F")
 	if l {
 		return []byte("T"), nil
 	}
 	return raw, nil
+}
+
+func (dbf *DBF) parseVValue(raw []byte, column *Column) (interface{}, error) {
+	return raw, nil
+}
+
+func (dbf *DBF) getVRepresentation(field *Field) ([]byte, error) {
+	raw, ok := field.value.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("dbase-interpreter-valuetobyterepresentation-10:FAILED:invalid data type %T, expected []byte at column field: %v", field.value, field.Name())
+	}
+	return raw, nil
+}
+
+func (dbf *DBF) parseNValue(raw []byte, column *Column) (interface{}, error) {
+	if column.Decimals == 0 {
+		i, err := parseNumericInt(raw)
+		if err != nil {
+			return i, fmt.Errorf("dbase-interpreter-datatovalue-7:FAILED:parsing numeric int at column field: %v failed with error: %w", column.Name(), err)
+		}
+		return i, nil
+	}
+
+	return dbf.parseFValue(raw, column)
 }
 
 func (dbf *DBF) getNRepresentation(field *Field) ([]byte, error) {
@@ -405,7 +417,7 @@ func (dbf *DBF) getNRepresentation(field *Field) ([]byte, error) {
 		bin = []byte(fmt.Sprintf("%d", field.value))
 	}
 	if !iok && !fok {
-		return nil, fmt.Errorf("dbase-interpreter-getnrepresentation-1:FAILED:invalid data type %T, expected int64 or float64 at column field: %v", field.value, field.Name())
+		return nil, fmt.Errorf("dbase-interpreter-parsenrepresentation-1:FAILED:invalid data type %T, expected int64 or float64 at column field: %v", field.value, field.Name())
 	}
 	return prependSpaces(bin, int(field.column.Length)), nil
 }
