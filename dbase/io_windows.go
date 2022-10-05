@@ -28,6 +28,8 @@ type DBF struct {
 	// Mutex locks
 	dbaseMutex *sync.Mutex
 	memoMutex  *sync.Mutex
+	// File data lock at writing
+	writeLock bool
 	// Containing the columns and internal row pointer
 	table *Table
 }
@@ -40,14 +42,14 @@ type DBF struct {
 
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the file handle(s) call DBF.Close().
-func Open(filename string, conv EncodingConverter, useUntested bool) (*DBF, error) {
+func Open(filename string, conv EncodingConverter, openUntested bool) (*DBF, error) {
 	filename = filepath.Clean(filename)
 	// Open file in non blocking mode with windows
 	fd, err := windows.Open(filename, windows.O_RDWR|windows.O_CLOEXEC|windows.O_NONBLOCK, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-open-1:FAILED:%w", err)
 	}
-	dbf, err := prepareDBF(fd, conv, useUntested)
+	dbf, err := prepareDBF(fd, conv, openUntested)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-open-2:FAILED:%w", err)
 	}
@@ -99,13 +101,13 @@ func (dbf *DBF) Close() error {
 
 // Returns a DBF object pointer
 // Reads the DBF Header, the column infos and validates file version.
-func prepareDBF(fd windows.Handle, conv EncodingConverter, useUntested bool) (*DBF, error) {
+func prepareDBF(fd windows.Handle, conv EncodingConverter, openUntested bool) (*DBF, error) {
 	header, err := readHeader(fd)
 	if err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-1:FAILED:%w", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(header.FileType, useUntested); err != nil {
+	if err := validateFileVersion(header.FileType, openUntested); err != nil {
 		return nil, fmt.Errorf("dbase-io-preparedbf-2:FAILED:%w", err)
 	}
 	columns, err := readColumns(fd)
@@ -122,6 +124,7 @@ func prepareDBF(fd windows.Handle, conv EncodingConverter, useUntested bool) (*D
 		dbaseMutex: &sync.Mutex{},
 		memoMutex:  &sync.Mutex{},
 		converter:  conv,
+		writeLock:  true,
 	}
 	return dbf, nil
 }
@@ -146,11 +149,30 @@ func readHeader(fd windows.Handle) (*Header, error) {
 }
 
 // writeHeader writes the header to the dbase file
-func (dbf *DBF) writeHeader() error {
+func (dbf *DBF) writeHeader() (err error) {
+	// Lock the block we are writing to
+	position := uint32(0)
+	o := &windows.Overlapped{
+		Offset:     position,
+		OffsetHigh: position + uint32(dbf.header.FirstRow),
+	}
+	// Lock the block we are writing to
+	if dbf.writeLock {
+		err = windows.LockFileEx(*dbf.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, position, position+uint32(dbf.header.FirstRow), o)
+		if err != nil {
+			return fmt.Errorf("dbase-io-writeheader-1:FAILED:%w", err)
+		}
+		defer func() {
+			ulockErr := windows.UnlockFileEx(*dbf.memoFileHandle, 0, position, position+uint32(dbf.header.FirstRow), o)
+			if err != nil {
+				err = fmt.Errorf("%w:dbase-io-writeheader-3:FAILED:%v", err, ulockErr)
+			}
+		}()
+	}
 	// Seek to the beginning of the file
-	_, err := windows.Seek(*dbf.dbaseFileHandle, 0, 0)
+	_, err = windows.Seek(*dbf.dbaseFileHandle, 0, 0)
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-1:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writeheader-1:FAILED:%w", err)
 	}
 	// Change the last modification date to the current date
 	dbf.header.Year = uint8(time.Now().Year() - 2000)
@@ -160,20 +182,20 @@ func (dbf *DBF) writeHeader() error {
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.LittleEndian, dbf.header)
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-2:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writeheader-2:FAILED:%w", err)
 	}
 	_, err = windows.Write(*dbf.dbaseFileHandle, buf.Bytes())
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-header-3:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writeheader-3:FAILED:%w", err)
 	}
 	return nil
 }
 
 // Check if the file version is supported
-func validateFileVersion(version byte, useUntested bool) error {
+func validateFileVersion(version byte, openUntested bool) error {
 	switch version {
 	default:
-		if useUntested {
+		if openUntested {
 			return nil
 		}
 		return fmt.Errorf("dbase-io-validatefileversion-1:FAILED:untested DBF file version: %d (%x hex)", version, version)
@@ -232,7 +254,7 @@ func readColumns(fd windows.Handle) ([]*Column, error) {
 func (dbf *DBF) prepareMemo(fd windows.Handle) error {
 	memoHeader, err := readMemoHeader(fd)
 	if err != nil {
-		return fmt.Errorf("dbase-table-prepare-memo-1:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-prepare-memo-1:FAILED:%w", err)
 	}
 	dbf.memoFileHandle = &fd
 	dbf.memoHeader = memoHeader
@@ -243,16 +265,16 @@ func (dbf *DBF) prepareMemo(fd windows.Handle) error {
 func readMemoHeader(fd windows.Handle) (*MemoHeader, error) {
 	h := &MemoHeader{}
 	if _, err := windows.Seek(fd, 0, 0); err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-1:FAILED:%w", err)
+		return nil, fmt.Errorf("dbase-io-read-memo-header-1:FAILED:%w", err)
 	}
 	b := make([]byte, 1024)
 	n, err := windows.Read(fd, b)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-2:FAILED:%w", err)
+		return nil, fmt.Errorf("dbase-io-read-memo-header-2:FAILED:%w", err)
 	}
 	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-read-memo-header-3:FAILED:%w", err)
+		return nil, fmt.Errorf("dbase-io-read-memo-header-3:FAILED:%w", err)
 	}
 	return h, nil
 }
@@ -300,12 +322,12 @@ func (dbf *DBF) readMemo(address []byte) ([]byte, bool, error) {
 func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	memo, isText, err := dbf.readMemo(raw)
 	if err != nil {
-		return []byte{}, false, fmt.Errorf("dbase-table-parse-memo-1:FAILED:%w", err)
+		return []byte{}, false, fmt.Errorf("dbase-io-parse-memo-1:FAILED:%w", err)
 	}
 	if isText {
 		memo, err = dbf.converter.Decode(memo)
 		if err != nil {
-			return []byte{}, false, fmt.Errorf("dbase-table-parse-memo-2:FAILED:%w", err)
+			return []byte{}, false, fmt.Errorf("dbase-io-parse-memo-2:FAILED:%w", err)
 		}
 	}
 	return memo, isText, nil
@@ -338,20 +360,22 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) (address []byte, er
 	// The rest is the data
 	copy(block[8:], raw)
 	// Lock the block we are writing to
-	o := &windows.Overlapped{
-		Offset:     blockPosition,
-		OffsetHigh: blockPosition + uint32(dbf.memoHeader.BlockSize),
-	}
-	err = windows.LockFileEx(*dbf.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, blockPosition, blockPosition+uint32(dbf.memoHeader.BlockSize), o)
-	if err != nil {
-		return nil, fmt.Errorf("dbase-io-writememo-3:FAILED:%w", err)
-	}
-	defer func() {
-		ulockErr := windows.UnlockFileEx(*dbf.memoFileHandle, 0, blockPosition, blockPosition+uint32(dbf.memoHeader.BlockSize), o)
-		if err != nil {
-			err = fmt.Errorf("%w:dbase-io-writememoheader-3:FAILED:%v", err, ulockErr)
+	if dbf.writeLock {
+		o := &windows.Overlapped{
+			Offset:     blockPosition,
+			OffsetHigh: blockPosition + uint32(dbf.memoHeader.BlockSize),
 		}
-	}()
+		err = windows.LockFileEx(*dbf.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, blockPosition, blockPosition+uint32(dbf.memoHeader.BlockSize), o)
+		if err != nil {
+			return nil, fmt.Errorf("dbase-io-writememo-3:FAILED:%w", err)
+		}
+		defer func() {
+			ulockErr := windows.UnlockFileEx(*dbf.memoFileHandle, 0, blockPosition, blockPosition+uint32(dbf.memoHeader.BlockSize), o)
+			if err != nil {
+				err = fmt.Errorf("%w:dbase-io-writememoheader-3:FAILED:%v", err, ulockErr)
+			}
+		}()
+	}
 	// Seek to new the next free block
 	_, err = windows.Seek(*dbf.memoFileHandle, int64(blockPosition)*int64(dbf.memoHeader.BlockSize), 0)
 	if err != nil {
@@ -380,16 +404,18 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 		Offset:     0,
 		OffsetHigh: uint32(dbf.header.FirstRow),
 	}
-	err = windows.LockFileEx(*dbf.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 0, uint32(dbf.header.FirstRow), o)
-	if err != nil {
-		return fmt.Errorf("dbase-io-writememoheader-2:FAILED:%w", err)
-	}
-	defer func() {
-		ulockErr := windows.UnlockFileEx(*dbf.memoFileHandle, 0, 0, uint32(dbf.header.FirstRow), o)
+	if dbf.writeLock {
+		err = windows.LockFileEx(*dbf.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 0, uint32(dbf.header.FirstRow), o)
 		if err != nil {
-			err = fmt.Errorf("%w:dbase-io-writememoheader-3:FAILED:%v", err, ulockErr)
+			return fmt.Errorf("dbase-io-writememoheader-2:FAILED:%w", err)
 		}
-	}()
+		defer func() {
+			ulockErr := windows.UnlockFileEx(*dbf.memoFileHandle, 0, 0, uint32(dbf.header.FirstRow), o)
+			if err != nil {
+				err = fmt.Errorf("%w:dbase-io-writememoheader-3:FAILED:%v", err, ulockErr)
+			}
+		}()
+	}
 	// Seek to the beginning of the file
 	_, err = windows.Seek(*dbf.memoFileHandle, 0, 0)
 	if err != nil {
@@ -417,19 +443,19 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 // Reads raw row data of one row at rowPosition
 func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 	if rowPosition >= dbf.header.RowsCount {
-		return nil, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", EOF)
+		return nil, fmt.Errorf("dbase-io-read-row-1:FAILED:%v", EOF)
 	}
 	buf := make([]byte, dbf.header.RowLength)
 	_, err := windows.Seek(*dbf.dbaseFileHandle, int64(dbf.header.FirstRow)+(int64(rowPosition)*int64(dbf.header.RowLength)), 0)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-2:FAILED:%w", err)
+		return buf, fmt.Errorf("dbase-io-read-row-2:FAILED:%w", err)
 	}
 	read, err := windows.Read(*dbf.dbaseFileHandle, buf)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-table-read-row-3:FAILED:%w", err)
+		return buf, fmt.Errorf("dbase-io-read-row-3:FAILED:%w", err)
 	}
 	if read != int(dbf.header.RowLength) {
-		return buf, fmt.Errorf("dbase-table-read-row-1:FAILED:%v", Incomplete)
+		return buf, fmt.Errorf("dbase-io-read-row-1:FAILED:%v", Incomplete)
 	}
 	return buf, nil
 }
@@ -454,20 +480,22 @@ func (row *Row) writeRow() (err error) {
 		return fmt.Errorf("dbase-io-writerow-2:FAILED:%w", err)
 	}
 	// Lock the block we are writing to
-	o := &windows.Overlapped{
-		Offset:     uint32(position),
-		OffsetHigh: uint32(position + int64(row.dbf.header.RowLength)),
-	}
-	err = windows.LockFileEx(*row.dbf.dbaseFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, uint32(position), uint32(position+int64(row.dbf.header.RowLength)), o)
-	if err != nil {
-		return fmt.Errorf("dbase-io-writerow-3:FAILED:%w", err)
-	}
-	defer func() {
-		ulockErr := windows.UnlockFileEx(*row.dbf.dbaseFileHandle, 0, uint32(position), uint32(position+int64(row.dbf.header.RowLength)), o)
-		if err != nil {
-			err = fmt.Errorf("%w:dbase--io-writerow-3:FAILED:%v", err, ulockErr)
+	if row.dbf.writeLock {
+		o := &windows.Overlapped{
+			Offset:     uint32(position),
+			OffsetHigh: uint32(position + int64(row.dbf.header.RowLength)),
 		}
-	}()
+		err = windows.LockFileEx(*row.dbf.dbaseFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, uint32(position), uint32(position+int64(row.dbf.header.RowLength)), o)
+		if err != nil {
+			return fmt.Errorf("dbase-io-writerow-3:FAILED:%w", err)
+		}
+		defer func() {
+			ulockErr := windows.UnlockFileEx(*row.dbf.dbaseFileHandle, 0, uint32(position), uint32(position+int64(row.dbf.header.RowLength)), o)
+			if err != nil {
+				err = fmt.Errorf("%w:dbase--io-writerow-3:FAILED:%v", err, ulockErr)
+			}
+		}()
+	}
 	// Seek to the correct position
 	_, err = windows.Seek(*row.dbf.dbaseFileHandle, position, 0)
 	if err != nil {
@@ -511,6 +539,10 @@ func (dbf *DBF) Skip(offset int64) {
 		dbf.table.rowPointer = 0
 	}
 	dbf.table.rowPointer = uint32(newval)
+}
+
+func (dbf *DBF) WriteLock(enabled bool) {
+	dbf.writeLock = enabled
 }
 
 // Returns if the row at internal row pointer is deleted
