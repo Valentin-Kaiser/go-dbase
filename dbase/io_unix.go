@@ -535,7 +535,6 @@ func (row *Row) writeRow() (err error) {
 				err = fmt.Errorf("%w:dbase-io-writerow-4:FAILED:%v", err, ulockErr)
 			}
 		}()
-
 	}
 	// Seek to the correct position
 	_, err = row.dbf.dbaseFile.Seek(position, 0)
