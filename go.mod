@@ -1,4 +1,4 @@
-module github.com/Valentin-Kaiser/go-dbase/v2
+module github.com/Valentin-Kaiser/go-dbase
 
 go 1.19
 
