@@ -441,7 +441,7 @@ func (row *Row) writeRow() (err error) {
 	// Convert the row to raw bytes
 	r, err := row.ToBytes()
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-row-1:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writerow-1:FAILED:%w", err)
 	}
 	// Update the header
 	position := int64(row.dbf.header.FirstRow) + (int64(row.Position) * int64(row.dbf.header.RowLength))
@@ -451,7 +451,7 @@ func (row *Row) writeRow() (err error) {
 	}
 	err = row.dbf.writeHeader()
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-row-2:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writerow-2:FAILED:%w", err)
 	}
 	o := &windows.Overlapped{
 		Offset:     uint32(position),
@@ -459,23 +459,23 @@ func (row *Row) writeRow() (err error) {
 	}
 	err = windows.LockFileEx(*row.dbf.dbaseFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, uint32(position), uint32(position+int64(row.dbf.header.RowLength)), o)
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-row-3:FAILED:%w", err)
+		return fmt.Errorf("dbase-io-writerow-3:FAILED:%w", err)
 	}
 	defer func() {
 		ulockErr := windows.UnlockFileEx(*row.dbf.dbaseFileHandle, 0, uint32(position), uint32(position+int64(row.dbf.header.RowLength)), o)
 		if err != nil {
-			err = fmt.Errorf("%w:dbase-io-writememoheader-3:FAILED:%v", err, ulockErr)
+			err = fmt.Errorf("%w:dbase--io-writerow-3:FAILED:%v", err, ulockErr)
 		}
 	}()
 	// Seek to the correct position
 	_, err = windows.Seek(*row.dbf.dbaseFileHandle, position, 0)
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-row-4:FAILED:%w", err)
+		return fmt.Errorf("dbase--io-writerow-4:FAILED:%w", err)
 	}
 	// Write the row
 	_, err = windows.Write(*row.dbf.dbaseFileHandle, r)
 	if err != nil {
-		return fmt.Errorf("dbase-table-write-row-5:FAILED:%w", err)
+		return fmt.Errorf("dbase--io-writerow-5:FAILED:%w", err)
 	}
 	return nil
 }
