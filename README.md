@@ -14,21 +14,21 @@ There are several similar packages but they are not suited for our use case, thi
 
 | Feature | go-dbase | [go-dbf](https://github.com/LindsayBradford/go-dbf) | [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) | 
 | --- | --- | --- | --- |
-| Windows-1250 to UTF8 encoding | ✅ | ✅ | ✅ |
+| Windows-1250 to UTF8 encoding ¹ | ✅ | ✅ | ✅ |
 | Read | ✅ | ✅ | ✅ |
 | Write | ✅  | ✅ | ❌ |
 | FPT (memo) file support | ✅ | ❌ | ✅ |
 | Data type support | ✅ | ❌ | ✅ |
 | Struct, json, map conversion | ✅ | ❌ | ✅ |
-| IO efficiency | ✅ | ❌ | ✅ |
-| Non full blocking IO[^1] | ✅ | ❌ | ❌ |
+| IO efficiency ² | ✅ | ❌ | ✅ |
+| Non full blocking IO³ | ✅ | ❌ | ❌ |
+
+> ¹ Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
 
 
-> IO efficiency is achieved by using one file handle for the DBF file and one file handle for the FPT file. This allows for non blocking IO and the ability to read files while other processes are accessing these. In addition, only the required positions in the file are read instead of keeping a copy of the entire file in memory.
+> ² IO efficiency is achieved by using one file handle for the DBF file and one file handle for the FPT file. This allows for non blocking IO and the ability to read files while other processes are accessing these. In addition, only the required positions in the file are read instead of keeping a copy of the entire file in memory.
 
-> Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
-
-[^1]: When reading or writing a file, not the complete file is locked. But while writing, the data block to be written is locked during the operation. This is done to prevent other processes from writing the same block of data. This is not a problem when reading since the data is not changed.
+> ³ When reading or writing a file, not the complete file is locked. But while writing, the data block to be written is locked during the operation. This is done to prevent other processes from writing the same block of data. This is not a problem when reading since the data is not changed.
 
 # Supported column types
 
