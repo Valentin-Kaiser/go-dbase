@@ -2,7 +2,6 @@ package dbase
 
 import (
 	"encoding/binary"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -45,7 +44,7 @@ func JDToDate(number int) (time.Time, error) {
 	}
 	t, err := time.Parse("2006-01-02", ys+"-"+ms+"-"+ds)
 	if err != nil {
-		return t, fmt.Errorf("dbase-conversion-jdtodate-1:FAILED:%w", err)
+		return t, newError("dbase-conversion-jdtodate-1", err)
 	}
 	return t, nil
 }
@@ -63,7 +62,7 @@ func parseDate(raw []byte) (time.Time, error) {
 	}
 	t, err := time.Parse("20060102", string(raw))
 	if err != nil {
-		return t, fmt.Errorf("dbase-interpreter-parsedate-1:FAILED:%w", err)
+		return t, newError("dbase-interpreter-parsedate-1", err)
 	}
 	return t, nil
 }
@@ -71,7 +70,7 @@ func parseDate(raw []byte) (time.Time, error) {
 // parseDateTIme parses a date and time string from a byte slice and returns a time.Time
 func parseDateTime(raw []byte) (time.Time, error) {
 	if len(raw) != 8 {
-		return time.Time{}, fmt.Errorf("dbase-conversion-parsedate-1:FAILED:%v", InvalidPosition)
+		return time.Time{}, newError("dbase-conversion-parsedate-1", ErrInvalidPosition)
 	}
 	julDat := int(binary.LittleEndian.Uint32(raw[:4]))
 	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
@@ -95,7 +94,7 @@ func parseNumericInt(raw []byte) (int64, error) {
 	}
 	i, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil {
-		return i, fmt.Errorf("dbase-conversion-parseint-1:FAILED:%w", err)
+		return i, newError("dbase-conversion-parseint-1", err)
 	}
 	return i, nil
 }
@@ -108,7 +107,7 @@ func parseFloat(raw []byte) (float64, error) {
 	}
 	f, err := strconv.ParseFloat(strings.TrimSpace(trimmed), 64)
 	if err != nil {
-		return f, fmt.Errorf("dbase-conversion-parsefloat-1:FAILED:%w", err)
+		return f, newError("dbase-conversion-parsefloat-1", err)
 	}
 	return f, nil
 }
@@ -117,7 +116,7 @@ func parseFloat(raw []byte) (float64, error) {
 func toUTF8String(raw []byte, converter EncodingConverter) (string, error) {
 	utf8, err := converter.Decode(raw)
 	if err != nil {
-		return string(raw), fmt.Errorf("dbase-conversion-toutf8string-1:FAILED:%w", err)
+		return string(raw), newError("dbase-conversion-toutf8string-1", err)
 	}
 	return string(utf8), nil
 }
@@ -126,7 +125,7 @@ func toUTF8String(raw []byte, converter EncodingConverter) (string, error) {
 func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
 	utf8, err := converter.Encode(raw)
 	if err != nil {
-		return raw, fmt.Errorf("dbase-conversion-fromutf8string-1:FAILED:%w", err)
+		return raw, newError("dbase-conversion-fromutf8string-1", err)
 	}
 	return utf8, nil
 }
