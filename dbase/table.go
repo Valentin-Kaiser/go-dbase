@@ -233,7 +233,7 @@ func (dbf *DBF) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 		// This reads the complete row
 		row, err := dbf.Row()
 		if err != nil && !skipInvalid {
-			return nil, fmt.Errorf("dbase-table-rows-1:FAILED:%w", err)
+			return nil, newError("dbase-table-rows-1", err)
 		}
 		// Increment the row pointer
 		dbf.Skip(1)
@@ -250,7 +250,7 @@ func (dbf *DBF) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 func (dbf *DBF) Row() (*Row, error) {
 	data, err := dbf.readRow(dbf.table.rowPointer)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-get-row-1:FAILED:%w", err)
+		return nil, newError("dbase-table-row-1", err)
 	}
 	return dbf.BytesToRow(data)
 }
@@ -263,12 +263,12 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	rec.dbf = dbf
 	rec.fields = make([]*Field, dbf.ColumnsCount())
 	if len(data) < int(dbf.header.RowLength) {
-		return nil, fmt.Errorf("dbase-table-bytestorow-1:FAILED:invalid row data size %v Bytes < %v Bytes", len(data), int(dbf.header.RowLength))
+		return nil, newError("dbase-table-bytestorow-1", fmt.Errorf("invalid row data size %v Bytes < %v Bytes", len(data), int(dbf.header.RowLength)))
 	}
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 	rec.Deleted = data[0] == Deleted
 	if !rec.Deleted && data[0] != Active {
-		return nil, fmt.Errorf("dbase-table-bytestorow-2:FAILED:invalid row data, no delete flag found at beginning of row")
+		return nil, newError("dbase-table-bytestorow-2", fmt.Errorf("invalid row data, no delete flag found at beginning of row"))
 	}
 	// deleted flag already read
 	offset := uint16(1)
@@ -276,7 +276,7 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 		column := dbf.table.columns[i]
 		val, err := dbf.dataToValue(data[offset:offset+uint16(column.Length)], dbf.table.columns[i])
 		if err != nil {
-			return rec, fmt.Errorf("dbase-table-bytestorow-3:FAILED:%w", err)
+			return rec, newError("dbase-table-bytestorow-3", err)
 		}
 		rec.fields[i] = &Field{
 			column: column,
@@ -316,7 +316,7 @@ func (row *Row) Fields() []*Field {
 // Returns the field of a row by position
 func (row *Row) Field(pos int) (*Field, error) {
 	if pos < 0 || len(row.fields) < pos {
-		return nil, fmt.Errorf("dbase-table-field-1:FAILED:%v", InvalidPosition)
+		return nil, newError("dbase-table-field-1", ErrInvalidPosition)
 	}
 	return row.fields[pos], nil
 }
@@ -333,11 +333,11 @@ func (row *Row) Values() []interface{} {
 // ChangeField applies a modificated field to the row
 func (row *Row) ChangeField(field *Field) error {
 	if field.column == nil {
-		return fmt.Errorf("dbase-table-changefield-1:FAILED:Column missing")
+		return newError("dbase-table-changefield-1", fmt.Errorf("column missing"))
 	}
 	pos := row.dbf.ColumnPos(field.column)
 	if pos < 0 || len(row.fields) < pos {
-		return fmt.Errorf("dbase-table-changefield-2:FAILED:%v", InvalidPosition)
+		return newError("dbase-table-changefield-2", ErrInvalidPosition)
 	}
 	row.fields[pos] = field
 	return nil
@@ -388,7 +388,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 	for _, field := range row.fields {
 		val, err := row.dbf.valueToByteRepresentation(field)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-table-rowtobytes-1:FAILED:%w", err)
+			return nil, newError("dbase-table-rowtobytes-1", err)
 		}
 		copy(data[offset:offset+uint16(field.column.Length)], val)
 		offset += uint16(field.column.Length)
@@ -413,7 +413,7 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 			if mod.Convert != nil {
 				val, err = mod.Convert(val)
 				if err != nil {
-					return nil, fmt.Errorf("dbase-table-to-map-1:FAILED:%w", err)
+					return nil, newError("dbase-table-tomap-1", err)
 				}
 			}
 			if len(mod.ExternalKey) != 0 {
@@ -430,11 +430,11 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 func (row *Row) ToJSON() ([]byte, error) {
 	m, err := row.ToMap()
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-row-to-json-1:FAILED:%w", err)
+		return nil, newError("dbase-table-tojson-1", err)
 	}
 	j, err := json.Marshal(m)
 	if err != nil {
-		return j, fmt.Errorf("dbase-table-row-to-json-2:FAILED:%w", err)
+		return j, newError("dbase-table-tojson-2", err)
 	}
 	return j, nil
 }
@@ -444,11 +444,11 @@ func (row *Row) ToJSON() ([]byte, error) {
 func (row *Row) ToStruct(v interface{}) error {
 	jsonRow, err := row.ToJSON()
 	if err != nil {
-		return fmt.Errorf("dbase-table-to-struct-1:FAILED:%w", err)
+		return newError("dbase-table-tostruct-1", err)
 	}
 	err = json.Unmarshal(jsonRow, v)
 	if err != nil {
-		return fmt.Errorf("dbase-table-to-struct-2:FAILED:%w", err)
+		return newError("dbase-table-tostruct-2", err)
 	}
 	return nil
 }
@@ -481,11 +481,11 @@ func (dbf *DBF) RowFromJSON(j []byte) (*Row, error) {
 	m := make(map[string]interface{})
 	err := json.Unmarshal(j, &m)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-from-json-1:FAILED:%w", err)
+		return nil, newError("dbase-table-fromjson-1", err)
 	}
 	row, err := dbf.RowFromMap(m)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-from-json-2:FAILED:%w", err)
+		return nil, newError("dbase-table-fromjson-2", err)
 	}
 	return row, nil
 }
@@ -494,11 +494,11 @@ func (dbf *DBF) RowFromJSON(j []byte) (*Row, error) {
 func (dbf *DBF) RowFromStruct(v interface{}) (*Row, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-from-struct-1:FAILED:%w", err)
+		return nil, newError("dbase-table-fromstruct-1", err)
 	}
 	row, err := dbf.RowFromJSON(j)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-table-from-struct-2:FAILED:%w", err)
+		return nil, newError("dbase-table-fromstruct-2", err)
 	}
 	return row, nil
 }
