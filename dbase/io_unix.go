@@ -48,11 +48,11 @@ func Open(filename string, conv EncodingConverter, useUntested bool) (*DBF, erro
 	filename = filepath.Clean(filename)
 	dbaseFile, err := os.OpenFile(filename, os.O_RDWR, 0600)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-open-1:FAILED:%w", err)
+		return nil, newError("dbase-io-open-1", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
 	dbf, err := prepareDBF(dbaseFile, conv, useUntested)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-open-2:FAILED:%w", err)
+		return nil, newError("dbase-io-open-2", err)
 	}
 	dbf.dbaseFile = dbaseFile
 	// Check if there is an FPT according to the header.
@@ -66,11 +66,11 @@ func Open(filename string, conv EncodingConverter, useUntested bool) (*DBF, erro
 		}
 		memoFile, err := os.OpenFile(strings.TrimSuffix(filename, ext)+fptExt, os.O_RDWR, 0600)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-io-open-3:FAILED:%w", err)
+			return nil, newError("dbase-io-open-3", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
 		err = dbf.prepareMemo(memoFile)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-io-open-4:FAILED:%w", err)
+			return nil, newError("dbase-io-open-4", err)
 		}
 		dbf.memoFile = memoFile
 	}
@@ -82,13 +82,13 @@ func (dbf *DBF) Close() error {
 	if dbf.dbaseFile != nil {
 		err := dbf.dbaseFile.Close()
 		if err != nil {
-			return fmt.Errorf("dbase-io-close-1:FAILED:Closing DBF failed with error: %w", err)
+			return newError("dbase-io-close-1", fmt.Errorf("closing DBF failed with error: %w", err))
 		}
 	}
 	if dbf.memoFile != nil {
 		err := dbf.memoFile.Close()
 		if err != nil {
-			return fmt.Errorf("dbase-io-close-2:FAILED:Closing FPT failed with error: %w", err)
+			return newError("dbase-io-close-2", fmt.Errorf("closing FPT failed with error: %w", err))
 		}
 	}
 	return nil
@@ -105,15 +105,15 @@ func (dbf *DBF) Close() error {
 func prepareDBF(dbaseFile *os.File, conv EncodingConverter, useUntested bool) (*DBF, error) {
 	header, err := readHeader(dbaseFile)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-preparedbf-1:FAILED:%w", err)
+		return nil, newError("dbase-io-preparedbf-1", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
 	if err := validateFileVersion(header.FileType, useUntested); err != nil {
-		return nil, fmt.Errorf("dbase-io-preparedbf-2:FAILED:%w", err)
+		return nil, newError("dbase-io-preparedbf-2", err)
 	}
 	columns, err := readColumns(dbaseFile)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-preparedbf-3:FAILED:%w", err)
+		return nil, newError("dbase-io-preparedbf-3", err)
 	}
 	dbf := &DBF{
 		header:    header,
@@ -133,17 +133,17 @@ func prepareDBF(dbaseFile *os.File, conv EncodingConverter, useUntested bool) (*
 func readHeader(dbaseFile *os.File) (*Header, error) {
 	h := &Header{}
 	if _, err := dbaseFile.Seek(0, 0); err != nil {
-		return nil, fmt.Errorf("dbase-io-readdbfheader-1:FAILED:%w", err)
+		return nil, newError("dbase-io-readdbfheader-1", err)
 	}
 	b := make([]byte, 1024)
 	n, err := dbaseFile.Read(b)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-readdbfheader-2:FAILED:%w", err)
+		return nil, newError("dbase-io-readdbfheader-2", err)
 	}
 	// LittleEndian - Integers in table files are stored with the least significant byte first.
 	err = binary.Read(bytes.NewReader(b[:n]), binary.LittleEndian, h)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-readdbfheader-3:FAILED:%w", err)
+		return nil, newError("dbase-io-readdbfheader-3", err)
 	}
 	return h, nil
 }
@@ -164,7 +164,7 @@ func (dbf *DBF) writeHeader() (err error) {
 				break
 			}
 			if !errors.Is(err, unix.EAGAIN) {
-				return fmt.Errorf("dbase-io-writeheader-1:FAILED:%w", err)
+				return newError("dbase-io-writeheader-1", err)
 			}
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -172,14 +172,14 @@ func (dbf *DBF) writeHeader() (err error) {
 			flock.Type = unix.F_ULOCK
 			ulockErr := unix.FcntlFlock(dbf.dbaseFile.Fd(), unix.F_ULOCK, flock)
 			if ulockErr != nil {
-				err = fmt.Errorf("%w:dbase-io-writeheader-2:FAILED:%v", err, ulockErr)
+				err = newError("dbase-io-writeheader-2", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
 	_, err = dbf.dbaseFile.Seek(0, 0)
 	if err != nil {
-		return fmt.Errorf("dbase-io-writeheader-3:FAILED:%w", err)
+		return newError("dbase-io-writeheader-3", err)
 	}
 	// Change the last modification date to the current date
 	dbf.header.Year = uint8(time.Now().Year() - 2000)
@@ -189,11 +189,11 @@ func (dbf *DBF) writeHeader() (err error) {
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.LittleEndian, dbf.header)
 	if err != nil {
-		return fmt.Errorf("dbase-io-writeheader-4:FAILED:%w", err)
+		return newError("dbase-io-writeheader-4", err)
 	}
 	_, err = dbf.dbaseFile.Write(buf.Bytes())
 	if err != nil {
-		return fmt.Errorf("dbase-io-writeheader-5:FAILED:%w", err)
+		return newError("dbase-io-writeheader-5", err)
 	}
 	return nil
 }
@@ -205,7 +205,7 @@ func validateFileVersion(version byte, useUntested bool) error {
 		if useUntested {
 			return nil
 		}
-		return fmt.Errorf("dbase-io-validatefileversion-1:FAILED:untested DBF file version: %d (%x hex)", version, version)
+		return newError("dbase-io-validatefileversion-1", fmt.Errorf("untested DBF file version: %d (0x%x)", version, version))
 	case FoxPro, FoxProAutoincrement:
 		return nil
 	}
@@ -219,27 +219,27 @@ func readColumns(dbaseFile *os.File) ([]*Column, error) {
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
 		if _, err := dbaseFile.Seek(offset, 0); err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumns-1:FAILED:%w", err)
+			return nil, newError("dbase-io-readcolumninfos-1", err)
 		}
 		if _, err := dbaseFile.Read(b); err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumns-2:FAILED:%w", err)
+			return nil, newError("dbase-io-readcolumninfos-2", err)
 		}
 		if b[0] == ColumnEnd {
 			break
 		}
 		// Position back one byte and read the column
 		if _, err := dbaseFile.Seek(-1, 1); err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumns-3:FAILED:%w", err)
+			return nil, newError("dbase-io-readcolumninfos-3", err)
 		}
 		buf := make([]byte, 2048)
 		n, err := dbaseFile.Read(buf)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumns-4:FAILED:%w", err)
+			return nil, newError("dbase-io-readcolumninfos-4", err)
 		}
 		column := &Column{}
 		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
-			return nil, fmt.Errorf("dbase-io-readcolumns-5:FAILED:%w", err)
+			return nil, newError("dbase-io-readcolumninfos-5", err)
 		}
 		if column.Name() == "_NullFlags" {
 			offset += 32
@@ -261,7 +261,7 @@ func readColumns(dbaseFile *os.File) ([]*Column, error) {
 func (dbf *DBF) prepareMemo(memoFile *os.File) error {
 	memoHeader, err := readMemoHeader(memoFile)
 	if err != nil {
-		return fmt.Errorf("dbase-io-prepare-memo-1:FAILED:%w", err)
+		return newError("dbase-io-prepare-memo-1", err)
 	}
 	dbf.memoFile = memoFile
 	dbf.memoHeader = memoHeader
@@ -272,16 +272,16 @@ func (dbf *DBF) prepareMemo(memoFile *os.File) error {
 func readMemoHeader(memoFile *os.File) (*MemoHeader, error) {
 	h := &MemoHeader{}
 	if _, err := memoFile.Seek(0, 0); err != nil {
-		return nil, fmt.Errorf("dbase-io-read-memo-header-1:FAILED:%w", err)
+		return nil, newError("dbase-io-read-memo-header-1", err)
 	}
 	b := make([]byte, 1024)
 	n, err := memoFile.Read(b)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-read-memo-header-2:FAILED:%w", err)
+		return nil, newError("dbase-io-read-memo-header-2", err)
 	}
 	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-read-memo-header-3:FAILED:%w", err)
+		return nil, newError("dbase-io-read-memo-header-3", err)
 	}
 	return h, nil
 }
@@ -290,14 +290,14 @@ func readMemoHeader(memoFile *os.File) (*MemoHeader, error) {
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	if dbf.memoFile == nil {
-		return nil, false, fmt.Errorf("dbase-io-readmemo-1:FAILED:%v", NoFPT)
+		return nil, false, newError("dbase-io-readmemo-1", ErrNoFPT)
 	}
 	// Determine the block number
 	block := binary.LittleEndian.Uint32(blockdata)
 	// The position in the file is blocknumber*blocksize
 	_, err := dbf.memoFile.Seek(int64(dbf.memoHeader.BlockSize)*int64(block), 0)
 	if err != nil {
-		return nil, false, fmt.Errorf("dbase-io-readmemo-2:FAILED:%w", err)
+		return nil, false, newError("dbase-io-readmemo-2", err)
 	}
 	// Read the memo block header, instead of reading into a struct using binary.Read we just read the two
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
@@ -305,7 +305,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	hbuf := make([]byte, 8)
 	_, err = dbf.memoFile.Read(hbuf)
 	if err != nil {
-		return nil, false, fmt.Errorf("dbase-io-readmemo-3:FAILED:%w", err)
+		return nil, false, newError("dbase-io-readmemo-3", err)
 	}
 	sign := binary.BigEndian.Uint32(hbuf[:4])
 	leng := binary.BigEndian.Uint32(hbuf[4:])
@@ -317,10 +317,10 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 	buf := make([]byte, leng)
 	read, err := dbf.memoFile.Read(buf)
 	if err != nil {
-		return buf, false, fmt.Errorf("dbase-io-readmemo-4:FAILED:%w", err)
+		return buf, false, newError("dbase-io-readmemo-4", err)
 	}
 	if read != int(leng) {
-		return buf, sign == 1, fmt.Errorf("dbase-io-readmemo-5:FAILED:%v", Incomplete)
+		return buf, sign == 1, newError("dbase-io-readmemo-5", ErrIncomplete)
 	}
 	return buf, sign == 1, nil
 }
@@ -329,12 +329,12 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 	memo, isText, err := dbf.readMemo(raw)
 	if err != nil {
-		return []byte{}, false, fmt.Errorf("dbase-io-parse-memo-1:FAILED:%w", err)
+		return []byte{}, false, newError("dbase-io-parse-memo-1", err)
 	}
 	if isText {
 		memo, err = dbf.converter.Decode(memo)
 		if err != nil {
-			return []byte{}, false, fmt.Errorf("dbase-io-parse-memo-2:FAILED:%w", err)
+			return []byte{}, false, newError("dbase-io-parse-memo-2", err)
 		}
 	}
 	return memo, isText, nil
@@ -345,14 +345,14 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) (address []byte, er
 	dbf.memoMutex.Lock()
 	defer dbf.memoMutex.Unlock()
 	if dbf.memoFile == nil {
-		return nil, fmt.Errorf("dbase-io-writememo-1:FAILED:%v", NoFPT)
+		return nil, newError("dbase-io-writememo-1", ErrNoFPT)
 	}
 	// Get the block position
 	blockPosition := dbf.memoHeader.NextFree
 	// Write the memo header
 	err = dbf.writeMemoHeader()
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-writememo-2:FAILED:%w", err)
+		return nil, newError("dbase-io-writememo-2", err)
 	}
 	// Put the block data together
 	block := make([]byte, dbf.memoHeader.BlockSize)
@@ -379,35 +379,33 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) (address []byte, er
 			if err == nil {
 				break
 			}
-
 			if !errors.Is(err, unix.EAGAIN) {
-				return nil, fmt.Errorf("dbase-io-writememo-3:FAILED:%w", err)
+				return nil, newError("dbase-io-writememo-3", err)
 			}
-
 			time.Sleep(10 * time.Millisecond)
 		}
 		defer func() {
 			flock.Type = unix.F_ULOCK
 			ulockErr := unix.FcntlFlock(dbf.dbaseFile.Fd(), unix.F_ULOCK, flock)
 			if ulockErr != nil {
-				err = fmt.Errorf("%w:dbase-io-writememo-4:FAILED:%v", err, ulockErr)
+				err = newError("dbase-io-writememoheader-4", ulockErr)
 			}
 		}()
 	}
 	// Seek to new the next free block
 	_, err = dbf.memoFile.Seek(int64(blockPosition)*int64(dbf.memoHeader.BlockSize), 0)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-writememo-5:FAILED:%w", err)
+		return nil, newError("dbase-io-writememo-5", err)
 	}
 	// Write the memo data
 	_, err = dbf.memoFile.Write(block)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-writememo-6:FAILED:%w", err)
+		return nil, newError("dbase-io-writememo-6", err)
 	}
 	// Convert the block number to []byte
 	address, err = toBinary(blockPosition)
 	if err != nil {
-		return nil, fmt.Errorf("dbase-io-writememo-7:FAILED:%w", err)
+		return nil, newError("dbase-io-writememo-7", err)
 	}
 	return address, nil
 }
@@ -415,7 +413,7 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) (address []byte, er
 // writeMemoHeader writes the memo header to the memo file.
 func (dbf *DBF) writeMemoHeader() (err error) {
 	if dbf.memoFile == nil {
-		return fmt.Errorf("dbase-io-writememoheader-1:FAILED:%v", NoFPT)
+		return newError("dbase-io-writememoheader-1", ErrNoFPT)
 	}
 	// Lock the block we are writing to
 	if dbf.writeLock {
@@ -432,7 +430,7 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 			}
 
 			if !errors.Is(err, unix.EAGAIN) {
-				return fmt.Errorf("dbase-io-writememoheader-2:FAILED:%w", err)
+				return newError("dbase-io-writememoheader-2", err)
 			}
 
 			time.Sleep(10 * time.Millisecond)
@@ -441,14 +439,14 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 			flock.Type = unix.F_ULOCK
 			ulockErr := unix.FcntlFlock(dbf.dbaseFile.Fd(), unix.F_ULOCK, flock)
 			if ulockErr != nil {
-				err = fmt.Errorf("%w:dbase-io-writememoheader-3:FAILED:%v", err, ulockErr)
+				err = newError("dbase-io-writememoheader-3", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
 	_, err = dbf.memoFile.Seek(0, 0)
 	if err != nil {
-		return fmt.Errorf("dbase-io-writememoheader-4:FAILED:%w", err)
+		return newError("dbase-io-writememoheader-4", err)
 	}
 	// Calculate the next free block
 	dbf.memoHeader.NextFree++
@@ -458,7 +456,7 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 	binary.BigEndian.PutUint16(buf[6:8], dbf.memoHeader.BlockSize)
 	_, err = dbf.memoFile.Write(buf)
 	if err != nil {
-		return fmt.Errorf("dbase-io-writememoheader-5:FAILED:%w", err)
+		return newError("dbase-io-writememoheader-5", err)
 	}
 	return nil
 }
@@ -472,19 +470,19 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 // Reads raw row data of one row at rowPosition
 func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 	if rowPosition >= dbf.header.RowsCount {
-		return nil, fmt.Errorf("dbase-io-read-row-1:FAILED:%v", EOF)
+		return nil, newError("dbase-io-readrow-1", ErrEOF)
 	}
 	buf := make([]byte, dbf.header.RowLength)
 	_, err := dbf.dbaseFile.Seek(int64(dbf.header.FirstRow)+(int64(rowPosition)*int64(dbf.header.RowLength)), 0)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-io-read-row-2:FAILED:%w", err)
+		return buf, newError("dbase-io-readrow-2", err)
 	}
 	read, err := dbf.dbaseFile.Read(buf)
 	if err != nil {
-		return buf, fmt.Errorf("dbase-io-read-row-3:FAILED:%w", err)
+		return buf, newError("dbase-io-readrow-3", err)
 	}
 	if read != int(dbf.header.RowLength) {
-		return buf, fmt.Errorf("dbase-io-read-row-1:FAILED:%v", Incomplete)
+		return buf, newError("dbase-io-readrow-4", ErrIncomplete)
 	}
 	return buf, nil
 }
@@ -496,7 +494,7 @@ func (row *Row) writeRow() (err error) {
 	// Convert the row to raw bytes
 	r, err := row.ToBytes()
 	if err != nil {
-		return fmt.Errorf("dbase-io-writerow-1:FAILED:%w", err)
+		return newError("dbase-io-writerow-1", err)
 	}
 	// Update the header
 	position := int64(row.dbf.header.FirstRow) + (int64(row.Position) * int64(row.dbf.header.RowLength))
@@ -506,7 +504,7 @@ func (row *Row) writeRow() (err error) {
 	}
 	err = row.dbf.writeHeader()
 	if err != nil {
-		return fmt.Errorf("dbase--io-writerow-2:FAILED:%w", err)
+		return newError("dbase-io-writerow-2", err)
 	}
 	// Lock the block we are writing to
 	if row.dbf.writeLock {
@@ -523,7 +521,7 @@ func (row *Row) writeRow() (err error) {
 			}
 
 			if !errors.Is(err, unix.EAGAIN) {
-				return fmt.Errorf("dbase-io-writerow-3:FAILED:%w", err)
+				return newError("dbase-io-writerow-3", err)
 			}
 
 			time.Sleep(10 * time.Millisecond)
@@ -532,19 +530,19 @@ func (row *Row) writeRow() (err error) {
 			flock.Type = unix.F_ULOCK
 			ulockErr := unix.FcntlFlock(row.dbf.dbaseFile.Fd(), unix.F_ULOCK, flock)
 			if ulockErr != nil {
-				err = fmt.Errorf("%w:dbase-io-writerow-4:FAILED:%v", err, ulockErr)
+				err = newError("dbase-io-writerow-4", ulockErr)
 			}
 		}()
 	}
 	// Seek to the correct position
 	_, err = row.dbf.dbaseFile.Seek(position, 0)
 	if err != nil {
-		return fmt.Errorf("dbase-io-writerow-5:FAILED:%w", err)
+		return newError("dbase-io-writerow-5", err)
 	}
 	// Write the row
 	_, err = row.dbf.dbaseFile.Write(r)
 	if err != nil {
-		return fmt.Errorf("dbase-io-writerow-6:FAILED:%w", err)
+		return newError("dbase-io-writerow-6", err)
 	}
 	return nil
 }
@@ -560,7 +558,7 @@ func (row *Row) writeRow() (err error) {
 func (dbf *DBF) GoTo(rowNumber uint32) error {
 	if rowNumber > dbf.header.RowsCount {
 		dbf.table.rowPointer = dbf.header.RowsCount
-		return fmt.Errorf("dbase-io-goto-1:FAILED:go to %v > %v:%v", rowNumber, dbf.header.RowsCount, EOF)
+		return newError("dbase-io-goto-1", fmt.Errorf("%w, go to %v > %v", ErrEOF, rowNumber, dbf.header.RowsCount))
 	}
 	dbf.table.rowPointer = rowNumber
 	return nil
@@ -588,19 +586,19 @@ func (dbf *DBF) WriteLock(enabled bool) {
 // Returns if the row at internal row pointer is deleted
 func (dbf *DBF) Deleted() (bool, error) {
 	if dbf.table.rowPointer >= dbf.header.RowsCount {
-		return false, fmt.Errorf("dbase-interpreter-deleted-1:FAILED:%v", EOF)
+		return false, newError("dbase-io-deleted-1", ErrEOF)
 	}
 	_, err := dbf.dbaseFile.Seek(int64(dbf.header.FirstRow)+(int64(dbf.table.rowPointer)*int64(dbf.header.RowLength)), 0)
 	if err != nil {
-		return false, fmt.Errorf("dbase-interpreter-deleted-2:FAILED:%w", err)
+		return false, newError("dbase-io-deleted-2", err)
 	}
 	buf := make([]byte, 1)
 	read, err := dbf.dbaseFile.Read(buf)
 	if err != nil {
-		return false, fmt.Errorf("dbase-interpreter-deleted-3:FAILED:%w", err)
+		return false, newError("dbase-io-deleted-3", err)
 	}
 	if read != 1 {
-		return false, fmt.Errorf("dbase-interpreter-deleted-4:FAILED:%v", Incomplete)
+		return false, newError("dbase-io-deleted-4", ErrIncomplete)
 	}
 	return buf[0] == Deleted, nil
 }
