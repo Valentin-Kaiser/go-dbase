@@ -516,26 +516,26 @@ func (row *Row) writeRow() (err error) {
  */
 
 // Search searches for a row with the given value in the given field
-func (dbf *DBF) Search(field *Field) ([]*Row, error) {
+func (dbf *DBF) Search(field *Field, exactMatch bool) ([]*Row, error) {
 	if field.column.DataType == 'M' {
-		return nil, newError("dbase-search-1", fmt.Errorf("searching memo fields is not supported"))
+		return nil, newError("dbase-io-search-1", fmt.Errorf("searching memo fields is not supported"))
 	}
 	// convert the value to a string
-	val, err := dbf.valueToByteRepresentation(field, true)
+	val, err := dbf.valueToByteRepresentation(field, !exactMatch)
 	if err != nil {
-		return nil, newError("dbase-table-rowtobytes-1", err)
+		return nil, newError("dbase-io-search-1", err)
 	}
 	// Search for the value
 	rows := make([]*Row, 0)
 	position := dbf.header.FirstRow
-	offset := field.column.Position
 	for i := uint32(0); i < dbf.header.RowsCount; i++ {
 		// Read the field value
-		buf := make([]byte, field.column.Length)
-		_, err := windows.Seek(*dbf.dbaseFileHandle, int64(position)+int64(offset), 0)
+		_, err := windows.Seek(*dbf.dbaseFileHandle, int64(position)+int64(field.column.Position), 0)
+		position += dbf.header.RowLength
 		if err != nil {
 			continue
 		}
+		buf := make([]byte, field.column.Length)
 		read, err := windows.Read(*dbf.dbaseFileHandle, buf)
 		if err != nil {
 			continue
@@ -555,7 +555,6 @@ func (dbf *DBF) Search(field *Field) ([]*Row, error) {
 			}
 			rows = append(rows, row)
 		}
-		position += dbf.header.RowLength
 	}
 	return rows, nil
 }
