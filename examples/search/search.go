@@ -78,5 +78,4 @@ func main() {
 
 		fmt.Printf("%v \n", field.GetValue())
 	}
-
 }
