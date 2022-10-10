@@ -22,6 +22,7 @@ There are several similar packages but they are not suited for our use case, thi
 | Struct, json, map conversion | ✅ | ❌ | ✅ |
 | IO efficiency ² | ✅ | ❌ | ✅ |
 | Non full blocking IO³ | ✅ | ❌ | ❌ |
+| Search by value | ✅ | ❌ | ❌ |
 
 > ¹ Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
 
