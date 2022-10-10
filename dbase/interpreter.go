@@ -83,13 +83,13 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 
 // Converts column data to the byte representation
 // For M values the data has to be written to the memo file
-func (dbf *DBF) valueToByteRepresentation(field *Field) ([]byte, error) {
+func (dbf *DBF) valueToByteRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
 	switch field.Type() {
 	case "M":
 		return dbf.getMRepresentation(field)
 	case "C":
 		// C values are stored as strings, the returned string is not trimmed
-		return dbf.getCRepresentation(field)
+		return dbf.getCRepresentation(field, skipSpacing)
 	case "I":
 		// I values (int32)
 		return dbf.getIRepresentation(field)
@@ -98,7 +98,7 @@ func (dbf *DBF) valueToByteRepresentation(field *Field) ([]byte, error) {
 		return dbf.getYRepresentation(field)
 	case "F":
 		// F (Float)
-		return dbf.getFRepresentation(field)
+		return dbf.getFRepresentation(field, skipSpacing)
 	case "B":
 		// B (double)
 		return dbf.getBRepresentation(field)
@@ -119,7 +119,7 @@ func (dbf *DBF) valueToByteRepresentation(field *Field) ([]byte, error) {
 		return dbf.getVRepresentation(field)
 	case "N":
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
-		return dbf.getNRepresentation(field)
+		return dbf.getNRepresentation(field, skipSpacing)
 	default:
 		return nil, newError("dbase-interpreter-valuetobyterepresentation-1", fmt.Errorf("unsupported column data type: %s at column field: %v", field.column.Type(), field.Name()))
 	}
@@ -174,7 +174,7 @@ func (dbf *DBF) parseCValue(raw []byte, column *Column) (interface{}, error) {
 }
 
 // Returns the string value as byte representation
-func (dbf *DBF) getCRepresentation(field *Field) ([]byte, error) {
+func (dbf *DBF) getCRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
 	// C values are stored as strings, the returned string is not trimmed
 	c, ok := field.value.(string)
 	if !ok {
@@ -184,6 +184,9 @@ func (dbf *DBF) getCRepresentation(field *Field) ([]byte, error) {
 	bin, err := fromUtf8String([]byte(c), dbf.converter)
 	if err != nil {
 		return nil, newError("dbase-interpreter-getcrepresentation-2", fmt.Errorf("parsing from utf8 string at column field: %v failed with error %w", field.Name(), err))
+	}
+	if skipSpacing {
+		return bin, nil
 	}
 	bin = appendSpaces(bin, int(field.column.Length))
 	copy(raw, bin)
@@ -259,7 +262,7 @@ func (dbf *DBF) parseFValue(raw []byte, column *Column) (interface{}, error) {
 }
 
 // Returns the float64 value as byte representation
-func (dbf *DBF) getFRepresentation(field *Field) ([]byte, error) {
+func (dbf *DBF) getFRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
 	b, ok := field.value.(float64)
 	if !ok {
 		return nil, newError("dbase-interpreter-getfrepresentation-1", fmt.Errorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name()))
@@ -272,6 +275,9 @@ func (dbf *DBF) getFRepresentation(field *Field) ([]byte, error) {
 		// if the value is a float, store as float
 		expression := fmt.Sprintf("%%.%df", field.column.Decimals)
 		bin = []byte(fmt.Sprintf(expression, field.value))
+	}
+	if skipSpacing {
+		return bin, nil
 	}
 	return prependSpaces(bin, int(field.column.Length)), nil
 }
@@ -420,7 +426,7 @@ func (dbf *DBF) parseNValue(raw []byte, column *Column) (interface{}, error) {
 }
 
 // Get the integer or float64 value as byte representation
-func (dbf *DBF) getNRepresentation(field *Field) ([]byte, error) {
+func (dbf *DBF) getNRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
 	// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
 	bin := make([]byte, 0)
 	f, fok := field.value.(float64)
@@ -440,6 +446,9 @@ func (dbf *DBF) getNRepresentation(field *Field) ([]byte, error) {
 	}
 	if !iok && !fok {
 		return nil, newError("dbase-interpreter-parsenrepresentation-1", fmt.Errorf("invalid data type %T, expected int64 or float64 at column field: %v", field.value, field.Name()))
+	}
+	if skipSpacing {
+		return bin, nil
 	}
 	return prependSpaces(bin, int(field.column.Length)), nil
 }
