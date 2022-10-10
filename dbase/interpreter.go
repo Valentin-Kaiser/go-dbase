@@ -125,6 +125,7 @@ func (dbf *DBF) valueToByteRepresentation(field *Field) ([]byte, error) {
 	}
 }
 
+// Returns the value from the memo file as string or []byte
 func (dbf *DBF) parseMValue(raw []byte, column *Column) (interface{}, error) {
 	// M values contain the address in the FPT file from where to read data
 	memo, isText, err := dbf.parseMemo(raw)
@@ -137,6 +138,7 @@ func (dbf *DBF) parseMValue(raw []byte, column *Column) (interface{}, error) {
 	return memo, nil
 }
 
+// Saves the value to the memo file and returns the address in the FPT file
 func (dbf *DBF) getMRepresentation(field *Field) ([]byte, error) {
 	memo := make([]byte, 0)
 	txt := false
@@ -161,6 +163,7 @@ func (dbf *DBF) getMRepresentation(field *Field) ([]byte, error) {
 	return address, nil
 }
 
+// Returns the value as string
 func (dbf *DBF) parseCValue(raw []byte, column *Column) (interface{}, error) {
 	// C values are stored as strings, the returned string is not trimmed
 	str, err := toUTF8String(raw, dbf.converter)
@@ -170,6 +173,7 @@ func (dbf *DBF) parseCValue(raw []byte, column *Column) (interface{}, error) {
 	return str, nil
 }
 
+// Returns the string value as byte representation
 func (dbf *DBF) getCRepresentation(field *Field) ([]byte, error) {
 	// C values are stored as strings, the returned string is not trimmed
 	c, ok := field.value.(string)
@@ -189,10 +193,12 @@ func (dbf *DBF) getCRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+// Returns the value as int32
 func (dbf *DBF) parseIValue(raw []byte) (interface{}, error) {
 	return int32(binary.LittleEndian.Uint32(raw)), nil
 }
 
+// Returns the int32 value as byte representation
 func (dbf *DBF) getIRepresentation(field *Field) ([]byte, error) {
 	// I values (int32)
 	i, ok := field.value.(int32)
@@ -218,10 +224,12 @@ func (dbf *DBF) getIRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+// Returns the value as float64
 func (dbf *DBF) parseYValue(raw []byte) (interface{}, error) {
 	return float64(binary.LittleEndian.Uint64(raw)) / 10000, nil
 }
 
+// Returns the float64 value as byte representation
 func (dbf *DBF) getYRepresentation(field *Field) ([]byte, error) {
 	f, ok := field.value.(float64)
 	if !ok {
@@ -241,6 +249,7 @@ func (dbf *DBF) getYRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+// Returns the value as float64
 func (dbf *DBF) parseFValue(raw []byte, column *Column) (interface{}, error) {
 	f, err := parseFloat(raw)
 	if err != nil {
@@ -249,6 +258,7 @@ func (dbf *DBF) parseFValue(raw []byte, column *Column) (interface{}, error) {
 	return f, nil
 }
 
+// Returns the float64 value as byte representation
 func (dbf *DBF) getFRepresentation(field *Field) ([]byte, error) {
 	b, ok := field.value.(float64)
 	if !ok {
@@ -266,10 +276,12 @@ func (dbf *DBF) getFRepresentation(field *Field) ([]byte, error) {
 	return prependSpaces(bin, int(field.column.Length)), nil
 }
 
+// Returns the value as float64
 func (dbf *DBF) parseBValue(raw []byte) (interface{}, error) {
 	return math.Float64frombits(binary.LittleEndian.Uint64(raw)), nil
 }
 
+// Returns the float64 value as byte representation
 func (dbf *DBF) getBRepresentation(field *Field) ([]byte, error) {
 	b, ok := field.value.(float64)
 	if !ok {
@@ -287,6 +299,7 @@ func (dbf *DBF) getBRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+// Returns the value as time.Time
 func (dbf *DBF) parseDValue(raw []byte, column *Column) (interface{}, error) {
 	// D values are stored as string in format YYYYMMDD, convert to time.Time
 	date, err := parseDate(raw)
@@ -296,6 +309,7 @@ func (dbf *DBF) parseDValue(raw []byte, column *Column) (interface{}, error) {
 	return date, nil
 }
 
+// Get the time.Time value as byte representation
 func (dbf *DBF) getDRepresentation(field *Field) ([]byte, error) {
 	d, ok := field.value.(time.Time)
 	if !ok {
@@ -318,6 +332,7 @@ func (dbf *DBF) getDRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+// Returns the value as time.Time
 func (dbf *DBF) parseTValue(raw []byte, column *Column) (interface{}, error) {
 	dateTime, err := parseDateTime(raw)
 	if err != nil {
@@ -326,6 +341,7 @@ func (dbf *DBF) parseTValue(raw []byte, column *Column) (interface{}, error) {
 	return dateTime, nil
 }
 
+// Get the time.Time value as byte representation consisting of 4 bytes for julian date and 4 bytes for time
 func (dbf *DBF) getTRepresentation(field *Field) ([]byte, error) {
 	t, ok := field.value.(time.Time)
 	if !ok {
@@ -358,10 +374,12 @@ func (dbf *DBF) getTRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+// Return the value (T or F) as bool
 func (dbf *DBF) parseLValue(raw []byte) (interface{}, error) {
 	return string(raw) == "T", nil
 }
 
+// Get the bool value as byte representation (T or F)
 func (dbf *DBF) getLRepresentation(field *Field) ([]byte, error) {
 	l, ok := field.value.(bool)
 	if !ok {
@@ -374,10 +392,12 @@ func (dbf *DBF) getLRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+// Get the raw value as byte representation
 func (dbf *DBF) parseVValue(raw []byte, column *Column) (interface{}, error) {
 	return raw, nil
 }
 
+// Get the raw value as byte representation (only type check for []byte is performed)
 func (dbf *DBF) getVRepresentation(field *Field) ([]byte, error) {
 	raw, ok := field.value.([]byte)
 	if !ok {
@@ -386,6 +406,7 @@ func (dbf *DBF) getVRepresentation(field *Field) ([]byte, error) {
 	return raw, nil
 }
 
+// Returns the value as integer or float64
 func (dbf *DBF) parseNValue(raw []byte, column *Column) (interface{}, error) {
 	if column.Decimals == 0 {
 		i, err := parseNumericInt(raw)
@@ -398,6 +419,7 @@ func (dbf *DBF) parseNValue(raw []byte, column *Column) (interface{}, error) {
 	return dbf.parseFValue(raw, column)
 }
 
+// Get the integer or float64 value as byte representation
 func (dbf *DBF) getNRepresentation(field *Field) ([]byte, error) {
 	// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
 	bin := make([]byte, 0)
@@ -422,6 +444,7 @@ func (dbf *DBF) getNRepresentation(field *Field) ([]byte, error) {
 	return prependSpaces(bin, int(field.column.Length)), nil
 }
 
+// Convert data to binary representation
 func toBinary(data interface{}) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.LittleEndian, data)

@@ -32,14 +32,10 @@ type MemoHeader struct {
 
 // Table is a struct containing the table columns, modifications and the row pointer
 type Table struct {
-	// Columns defined in this table
-	columns []*Column
-	// Modification to change values or name of fields
-	mods []*Modification
-	// Internal row pointer, can be moved
-	rowPointer uint32
-	// Trimspaces default value
-	trimSpaces bool
+	columns    []*Column       // Columns defined in this table
+	mods       []*Modification // Modification to change values or name of fields
+	rowPointer uint32          // Internal row pointer, can be moved
+	trimSpaces bool            // Trimspaces default value
 }
 
 // Column is a struct containing the column information
@@ -57,23 +53,24 @@ type Column struct {
 
 // Row is a struct containing the row Position, deleted flag and data fields
 type Row struct {
-	dbf      *DBF // Pointer to the DBF object this row belongs to
-	Position uint32
-	Deleted  bool
-	fields   []*Field
+	dbf        *DBF     // Pointer to the DBF object this row belongs to
+	Position   uint32   // Position of the row in the file
+	ByteOffset int64    // Byte offset of the row in the file
+	Deleted    bool     // Deleted flag
+	fields     []*Field // Fields in this row
 }
 
 // Field is a row data field
 type Field struct {
-	column *Column
-	value  interface{}
+	column *Column     // Pointer to the column this field belongs to
+	value  interface{} // Value of the field
 }
 
 // Modification allows to change the column name or value type
 type Modification struct {
-	TrimSpaces  bool
-	Convert     func(interface{}) (interface{}, error)
-	ExternalKey string
+	TrimSpaces  bool                                   // Trim spaces from string values
+	Convert     func(interface{}) (interface{}, error) // Conversion function to convert the value
+	ExternalKey string                                 // External key to use for the column
 }
 
 /**
@@ -95,6 +92,7 @@ func (h *Header) ColumnsCount() uint16 {
 	return (h.FirstRow - 296) / 32
 }
 
+// Returns the amount of records in the table
 func (h *Header) RecordsCount() uint32 {
 	return h.RowsCount
 }

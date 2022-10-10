@@ -541,6 +541,7 @@ func (dbf *DBF) Skip(offset int64) {
 	dbf.table.rowPointer = uint32(newval)
 }
 
+// Whether or not the write operations should lock the record
 func (dbf *DBF) WriteLock(enabled bool) {
 	dbf.writeLock = enabled
 }
