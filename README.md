@@ -62,7 +62,7 @@ go get github.com/Valentin-Kaiser/go-dbase/dbase
 
 # Examples
 
-<details>
+<details open>
   <summary>Read</summary>
   
 ```go
@@ -169,7 +169,7 @@ func main() {
 	}
 }
 ```
-</details>
+</details open>
 
 <details>
   <summary>Write</summary>
