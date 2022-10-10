@@ -517,6 +517,9 @@ func (row *Row) writeRow() (err error) {
 
 // Search searches for a row with the given value in the given field
 func (dbf *DBF) Search(field *Field) ([]*Row, error) {
+	if field.column.DataType == 'M' {
+		return nil, newError("dbase-search-1", fmt.Errorf("searching memo fields is not supported"))
+	}
 	// convert the value to a string
 	val, err := dbf.valueToByteRepresentation(field, true)
 	if err != nil {
