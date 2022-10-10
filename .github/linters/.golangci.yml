@@ -1,0 +1,54 @@
+run:
+  timeout: 60s
+
+linters:
+  # start with everything
+  enable-all: true
+
+  disable:
+    # deprecated
+    - golint
+    - interfacer
+    - maligned
+    - scopelint
+    - deadcode
+    - varcheck
+    - structcheck
+
+    # too annoying
+    - cyclop
+    - exhaustive
+    - exhaustivestruct
+    - exhaustruct
+    - forbidigo
+    - funlen
+    - gochecknoglobals
+    - godot
+    - goerr113
+    - gofumpt
+    - gomnd
+    - lll
+    - nakedret
+    - nestif
+    - nlreturn
+    - tagliatelle
+    - varnamelen
+    - wsl
+    - nosnakecase
+    - ifshort
+    - gci
+    - gofmt
+    - goimports
+
+    # disabled because of generics
+    - rowserrcheck
+    - sqlclosecheck
+    - structcheck
+    - wastedassign
+
+    # should not block
+    - nonamedreturns
+
+linters-settings:
+  wsl:
+    allow-cuddle-declarations: true
