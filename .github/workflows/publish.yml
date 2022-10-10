@@ -1,12 +1,15 @@
+---
+
 on:
   release:
     types:
       - published
 
-name: Update Go Module Index
+name: Publish
 
 jobs:
   bump-index:
+    name: Update Go Module Index
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
