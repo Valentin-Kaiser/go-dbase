@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-// Convert year, month and day to a julian day number
-// Julian day number -> days since 01-01-4712 BC
+// Convert year, month and day to a julian day number.
+// (Julian day number -> days since 01-01-4712 BC)
 func YMD2JD(y, m, d int) int {
 	return int(float64(2-(y/100)+y/100/4) + float64(d) + (float64(365.25) * float64(y+4716)) + (float64(30.6001) * float64(m+1)) - 1524.5)
 }
 
-// Convert julian day number to year, month and day
-// Julian day number -> days since 01-01-4712 BC
+// Convert julian day number to year, month and day.
+// (Julian day number -> days since 01-01-4712 BC)
 func JD2YMD(date int) (int, int, int) {
 	l := date + 68569
 	n := 4 * l / 146097
@@ -29,8 +29,8 @@ func JD2YMD(date int) (int, int, int) {
 	return y, m, d
 }
 
-// Convert julian day number to golang time.Time
-// Julian day number -> days since 01-01-4712 BC
+// Convert julian day number to golang time.Time.
+// (Julian day number -> days since 01-01-4712 BC)
 func JDToDate(number int) (time.Time, error) {
 	y, m, d := JD2YMD(number)
 	ys := strconv.Itoa(y)
@@ -48,12 +48,6 @@ func JDToDate(number int) (time.Time, error) {
 	}
 	return t, nil
 }
-
-/**
- *	################################################################
- *	#				Internal Column data type helper
- *	################################################################
- */
 
 // parseDate parses a date string from a byte slice and returns a time.Time
 func parseDate(raw []byte) (time.Time, error) {
