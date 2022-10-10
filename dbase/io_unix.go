@@ -341,7 +341,7 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 }
 
 // writeMemo writes a memo to the memo file and returns the address of the memo.
-func (dbf *DBF) writeMemo(raw []byte, text bool, length int) (address []byte, err error) {
+func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	dbf.memoMutex.Lock()
 	defer dbf.memoMutex.Unlock()
 	if dbf.memoFile == nil {
@@ -350,7 +350,7 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) (address []byte, er
 	// Get the block position
 	blockPosition := dbf.memoHeader.NextFree
 	// Write the memo header
-	err = dbf.writeMemoHeader()
+	err := dbf.writeMemoHeader()
 	if err != nil {
 		return nil, newError("dbase-io-writememo-2", err)
 	}
@@ -403,7 +403,7 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) (address []byte, er
 		return nil, newError("dbase-io-writememo-6", err)
 	}
 	// Convert the block number to []byte
-	address, err = toBinary(blockPosition)
+	address, err := toBinary(blockPosition)
 	if err != nil {
 		return nil, newError("dbase-io-writememo-7", err)
 	}
