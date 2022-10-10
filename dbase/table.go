@@ -138,6 +138,14 @@ func (dbf *DBF) Columns() []*Column {
 	return dbf.table.columns
 }
 
+// Returns the requested column
+func (dbf *DBF) Column(pos int) *Column {
+	if pos < 0 || pos >= len(dbf.table.columns) {
+		return nil
+	}
+	return dbf.table.columns[pos]
+}
+
 // Returns the number of columns
 func (dbf *DBF) ColumnsCount() uint16 {
 	return uint16(len(dbf.table.columns))
@@ -295,6 +303,18 @@ func (dbf *DBF) NewRow() *Row {
 	}
 }
 
+// Creates a new field with the given value and column
+func (dbf *DBF) NewField(pos int, value interface{}) (*Field, error) {
+	column := dbf.Column(pos)
+	if column == nil {
+		return nil, newError("dbase-table-newfield-1", fmt.Errorf("column at position %v not found", pos))
+	}
+	return &Field{
+		column: column,
+		value:  value,
+	}, nil
+}
+
 // Writes the row to the file at the row pointer position
 func (row *Row) Write() error {
 	return row.writeRow()
@@ -384,7 +404,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 	// deleted flag already read
 	offset := uint16(1)
 	for _, field := range row.fields {
-		val, err := row.dbf.valueToByteRepresentation(field)
+		val, err := row.dbf.valueToByteRepresentation(field, false)
 		if err != nil {
 			return nil, newError("dbase-table-rowtobytes-1", err)
 		}
