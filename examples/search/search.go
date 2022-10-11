@@ -24,7 +24,7 @@ type Product struct {
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter), false)
+	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter), false, false)
 	if err != nil {
 		panic(err)
 	}
