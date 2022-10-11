@@ -43,7 +43,7 @@ func main() {
 
 	// Init the field we want to search for.
 	// Search for a product containing the word "test" in the name.
-	field, err := dbf.NewField(dbf.ColumnPosByName("PRODNAME"), "TEST")
+	field, err := dbf.NewFieldByName("PRODNAME", "TEST")
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +57,7 @@ func main() {
 	// Print all found records.
 	fmt.Println("Found records with match:")
 	for _, record := range records {
-		field, err := record.Field(dbf.ColumnPosByName("PRODNAME"))
+		field, err := record.FieldByName("PRODNAME")
 		if err != nil {
 			panic(err)
 		}
@@ -74,7 +74,7 @@ func main() {
 	// Print all found records.
 	fmt.Println("Found records with exact match:")
 	for _, record := range records {
-		field, err := record.Field(dbf.ColumnPosByName("PRODNAME"))
+		field, err := record.FieldByName("PRODNAME")
 		if err != nil {
 			panic(err)
 		}

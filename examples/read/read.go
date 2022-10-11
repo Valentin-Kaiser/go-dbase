@@ -73,7 +73,7 @@ func main() {
 		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.GetValue())
 
 		// Get value by column name
-		field, err = row.Field(dbf.ColumnPosByName("PRODNAME"))
+		field, err = row.FieldByName("PRODNAME")
 		if err != nil {
 			panic(err)
 		}
@@ -84,10 +84,10 @@ func main() {
 		// === Modifications ===
 
 		// Disable space trimming for the company name
-		dbf.SetColumnModification(dbf.ColumnPosByName("PRODNAME"), false, "", nil)
+		dbf.SetColumnModificationByName("PRODNAME", false, "", nil)
 		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-		dbf.SetColumnModification(dbf.ColumnPosByName("INTEGER"), true, "FLOAT", nil)
-		dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "INTEGER", nil)
+		dbf.SetColumnModificationByName("INTEGER", true, "FLOAT", nil)
+		dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
 
 		// === Struct Conversion ===
 

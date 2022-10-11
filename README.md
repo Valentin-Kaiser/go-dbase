@@ -82,25 +82,28 @@ import (
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
 
-type Test struct {
-	ID          int32     `json:"ID"`
-	Niveau      int32     `json:"NIVEAU"`
-	Date        time.Time `json:"DATUM"`
-	TIJD        string    `json:"TIJD"`
-	SOORT       float64   `json:"SOORT"`
-	IDNR        int32     `json:"ID_NR"`
-	UserNR      int32     `json:"USERNR"`
-	CompanyName string    `json:"COMP_NAME"`
-	CompanyOS   string    `json:"COMP_OS"`
-	Melding     string    `json:"MELDING"`
-	Number      int64     `json:"NUMBER"`
+type Product struct {
+	ID          int32     `json:"PRODUCTID"`
+	Name        string    `json:"PRODNAME"`
+	Price       float64   `json:"PRICE"`
+	Tax         float64   `json:"TAX"`
+	Stock       int64     `json:"STOCK"`
+	Date        time.Time `json:"DATE"`
+	DateTime    time.Time `json:"DATETIME"`
+	Description string    `json:"DESCRIPTION"`
+	Active      bool      `json:"ACTIVE"`
 	Float       float64   `json:"FLOAT"`
-	Bool        bool      `json:"BOOL"`
+	Integer     int64     `json:"INTEGER"`
+	Double      float64   `json:"DOUBLE"`
 }
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter), false)
+	dbf, err := dbase.Open(&dbase.Config{
+		Filename:   "../test_data/TEST.DBF",
+		Converter:  new(dbase.Win1250Converter),
+		TrimSpaces: true,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -145,7 +148,7 @@ func main() {
 		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.GetValue())
 
 		// Get value by column name
-		field, err = row.Field(dbf.ColumnPosByName("COMP_NAME"))
+		field, err = row.FieldByName("PRODNAME")
 		if err != nil {
 			panic(err)
 		}
@@ -155,24 +158,22 @@ func main() {
 
 		// === Modifications ===
 
-		// Enable space trimming per default
-		dbf.SetTrimspacesDefault(true)
 		// Disable space trimming for the company name
-		dbf.SetColumnModification(dbf.ColumnPosByName("COMP_NAME"), false, "", nil)
-		// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
-		dbf.SetColumnModification(dbf.ColumnPosByName("NUMBER"), true, "FLOAT", nil)
-		dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "NUMBER", nil)
+		dbf.SetColumnModificationByName("PRODNAME", false, "", nil)
+		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
+		dbf.SetColumnModificationByName("INTEGER", true, "FLOAT", nil)
+		dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
 
 		// === Struct Conversion ===
 
 		// Read the row into a struct.
-		t := &Test{}
+		t := &Product{}
 		err = row.ToStruct(t)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Printf("Company: %v", t.CompanyName)
+		fmt.Printf("Product: %v \n", t.Name)
 	}
 }
 ```
@@ -191,25 +192,29 @@ import (
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
 
-type Test struct {
-	ID          int32     `json:"ID"`
-	Niveau      int32     `json:"NIVEAU"`
-	Date        time.Time `json:"DATUM"`
-	TIJD        string    `json:"TIJD"`
-	SOORT       float64   `json:"SOORT"`
-	IDNR        int32     `json:"ID_NR"`
-	UserNR      int32     `json:"USERNR"`
-	CompanyName string    `json:"COMP_NAME"`
-	CompanyOS   string    `json:"COMP_OS"`
-	Melding     string    `json:"MELDING"`
-	Number      int64     `json:"NUMBER"`
+type Product struct {
+	ID          int32     `json:"PRODUCTID"`
+	Name        string    `json:"PRODNAME"`
+	Price       float64   `json:"PRICE"`
+	Tax         float64   `json:"TAX"`
+	Stock       int64     `json:"INSTOCK"`
+	Date        time.Time `json:"DATE"`
+	DateTime    time.Time `json:"DATETIME"`
+	Description string    `json:"DESC"`
+	Active      bool      `json:"ACTIVE"`
 	Float       float64   `json:"FLOAT"`
-	Bool        bool      `json:"BOOL"`
+	Integer     int64     `json:"INTEGER"`
+	Double      float64   `json:"DOUBLE"`
 }
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter), false)
+	dbf, err := dbase.Open(&dbase.Config{
+		Filename:   "../test_data/TEST.DBF",
+		Converter:  new(dbase.Win1250Converter),
+		TrimSpaces: true,
+		WriteLock:  true,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -230,13 +235,13 @@ func main() {
 	}
 
 	// Get the company name field by column name.
-	field, err := row.Field(dbf.ColumnPosByName("COMP_NAME"))
+	field, err := row.FieldByName("PRODNAME")
 	if err != nil {
 		panic(err)
 	}
 
 	// Change the field value
-	field.SetValue("CHANGED_COMPANY_NAME")
+	field.SetValue("CHANGED_PRODUCT_NAME")
 
 	// Apply the changed field value to the row.
 	err = row.ChangeField(field)
@@ -245,7 +250,7 @@ func main() {
 	}
 
 	// Change a memo field value.
-	field, err = row.Field(dbf.ColumnPosByName("MELDING"))
+	field, err = row.FieldByName("DESC")
 	if err != nil {
 		panic(err)
 	}
@@ -267,35 +272,30 @@ func main() {
 
 	// === Modifications ===
 
-	// Enable space trimming per default
-	dbf.SetTrimspacesDefault(true)
-	// Add a column modification to switch the names of "NUMBER" and "Float" to match the data types
-	dbf.SetColumnModification(dbf.ColumnPosByName("NUMBER"), true, "FLOAT", nil)
-	dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "NUMBER", nil)
+	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
+	dbf.SetColumnModificationByName("INTEGER", true, "FLOAT", nil)
+	dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
 
 	// Create a new row with the same structure as the database file.
-	t := Test{
+	t := Product{
 		ID:          99,
-		Niveau:      100,
+		Name:        "NEW_PRODUCT",
+		Price:       99.99,
+		Tax:         19.99,
+		Stock:       999,
 		Date:        time.Now(),
-		TIJD:        "00:00",
-		SOORT:       101.23,
-		IDNR:        102,
-		UserNR:      103,
-		CompanyName: "NEW_COMPANY_NAME",
-		CompanyOS:   "NEW_COMPANY_OS",
-		Melding:     "NEW_MEMO_TEST_VALUE",
-		Number:      104,
+		DateTime:    time.Now(),
+		Description: "NEW_PRODUCT_DESCRIPTION",
+		Active:      true,
 		Float:       105.67,
-		Bool:        true,
+		Integer:     104,
+		Double:      103.45,
 	}
 
 	row, err = dbf.RowFromStruct(t)
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Printf("New row: %+v", row)
 
 	// Add the new row to the database file.
 	err = row.Write()
@@ -319,7 +319,7 @@ func main() {
 			continue
 		}
 
-		// Get the first field by column position
+		// Print the current row values.
 		fmt.Println(row.Values()...)
 	}
 }
@@ -356,7 +356,10 @@ type Product struct {
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter), false)
+	dbf, err := dbase.Open(&dbase.Config{
+		Filename:  "../test_data/TEST.DBF",
+		Converter: new(dbase.Win1250Converter),
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -372,7 +375,7 @@ func main() {
 
 	// Init the field we want to search for.
 	// Search for a product containing the word "test" in the name.
-	field, err := dbf.NewField(dbf.ColumnPosByName("PRODNAME"), "TEST")
+	field, err := dbf.NewFieldByName("PRODNAME", "TEST")
 	if err != nil {
 		panic(err)
 	}
@@ -386,7 +389,7 @@ func main() {
 	// Print all found records.
 	fmt.Println("Found records with match:")
 	for _, record := range records {
-		field, err := record.Field(dbf.ColumnPosByName("PRODNAME"))
+		field, err := record.FieldByName("PRODNAME")
 		if err != nil {
 			panic(err)
 		}
@@ -403,7 +406,7 @@ func main() {
 	// Print all found records.
 	fmt.Println("Found records with exact match:")
 	for _, record := range records {
-		field, err := record.Field(dbf.ColumnPosByName("PRODNAME"))
+		field, err := record.FieldByName("PRODNAME")
 		if err != nil {
 			panic(err)
 		}
@@ -411,6 +414,5 @@ func main() {
 		fmt.Printf("%v \n", field.GetValue())
 	}
 }
-
 ```
 </details>

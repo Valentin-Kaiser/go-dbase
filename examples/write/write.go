@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// Get the company name field by column name.
-	field, err := row.Field(dbf.ColumnPosByName("PRODNAME"))
+	field, err := row.FieldByName("PRODNAME")
 	if err != nil {
 		panic(err)
 	}
@@ -65,7 +65,7 @@ func main() {
 	}
 
 	// Change a memo field value.
-	field, err = row.Field(dbf.ColumnPosByName("DESC"))
+	field, err = row.FieldByName("DESC")
 	if err != nil {
 		panic(err)
 	}
@@ -88,8 +88,8 @@ func main() {
 	// === Modifications ===
 
 	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-	dbf.SetColumnModification(dbf.ColumnPosByName("INTEGER"), true, "FLOAT", nil)
-	dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "INTEGER", nil)
+	dbf.SetColumnModificationByName("INTEGER", true, "FLOAT", nil)
+	dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
 
 	// Create a new row with the same structure as the database file.
 	t := Product{
