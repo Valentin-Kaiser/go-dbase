@@ -199,6 +199,15 @@ func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string,
 	}
 }
 
+func (dbf *DBF) SetColumnModificationByName(name string, trimspaces bool, key string, convert func(interface{}) (interface{}, error)) error {
+	position := dbf.ColumnPosByName(name)
+	if position < 0 {
+		return newError("dbase-table-setcolumnmodificationbyname-1", fmt.Errorf("Column '%s' not found", name))
+	}
+	dbf.SetColumnModification(position, trimspaces, key, convert)
+	return nil
+}
+
 // Returns the column modification for a column at the given position
 func (dbf *DBF) GetColumnModification(position int) *Modification {
 	return dbf.table.mods[position]
@@ -307,6 +316,14 @@ func (dbf *DBF) NewField(pos int, value interface{}) (*Field, error) {
 		column: column,
 		value:  value,
 	}, nil
+}
+
+func (dbf *DBF) NewFieldByName(name string, value interface{}) (*Field, error) {
+	pos := dbf.ColumnPosByName(name)
+	if pos < 0 {
+		return nil, newError("dbase-table-newfieldbyname-1", fmt.Errorf("column '%s' not found", name))
+	}
+	return dbf.NewField(pos, value)
 }
 
 // Writes the row to the file at the row pointer position
