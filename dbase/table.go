@@ -333,6 +333,15 @@ func (row *Row) Field(pos int) (*Field, error) {
 	return row.fields[pos], nil
 }
 
+// Returns the field of a row by name
+func (row *Row) FieldByName(name string) (*Field, error) {
+	position := row.dbf.ColumnPosByName(name)
+	if position < 0 {
+		return nil, newError("dbase-table-fieldbyname-1", fmt.Errorf("column %v not found", name))
+	}
+	return row.Field(position)
+}
+
 // Returns all values of a row as a slice of interface{}
 func (row *Row) Values() []interface{} {
 	values := make([]interface{}, 0)
