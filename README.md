@@ -12,7 +12,7 @@
 
 There are several similar packages but they are not suited for our use case, this package implements the following features:
 
-| Feature | go-dbase | [go-dbf](https://github.com/LindsayBradford/go-dbf) | [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) | 
+| Feature | [go-dbase](https://github.com/Valentin-Kaiser/go-dbase) | [go-dbf](https://github.com/LindsayBradford/go-dbf) | [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) | 
 | --- | --- | --- | --- |
 | Windows-1250 to UTF8 encoding ¹ | ✅ | ✅ | ✅ |
 | Read | ✅ | ✅ | ✅ |
@@ -25,7 +25,6 @@ There are several similar packages but they are not suited for our use case, thi
 | Search by value | ✅ | ❌ | ❌ |
 
 > ¹ Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
-
 
 > ² IO efficiency is achieved by using one file handle for the DBF file and one file handle for the FPT file. This allows for non blocking IO and the ability to read files while other processes are accessing these. In addition, only the required positions in the file are read instead of keeping a copy of the entire file in memory.
 
