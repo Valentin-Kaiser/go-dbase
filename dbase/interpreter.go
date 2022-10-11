@@ -39,113 +39,113 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 	if len(raw) != int(column.Length) {
 		return nil, newError("dbase-interpreter-datatovalue-1", fmt.Errorf("invalid length %v Bytes != %v Bytes at column field: %v", len(raw), column.Length, column.Name()))
 	}
-	switch column.Type() {
-	case "M":
+	switch column.DataType {
+	case Memo:
 		// M values contain the address in the FPT file from where to read data
 		return dbf.parseMValue(raw, column)
-	case "C":
+	case Character:
 		// C values are stored as strings, the returned string is not trimmed
 		return dbf.parseCValue(raw, column)
-	case "I":
+	case Integer:
 		// I values are stored as numeric values
 		return dbf.parseIValue(raw)
-	case "B":
+	case Double:
 		// B (double) values are stored as numeric values
 		return dbf.parseBValue(raw)
-	case "D":
+	case Date:
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
 		return dbf.parseDValue(raw, column)
-	case "T":
+	case DateTime:
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
 		return dbf.parseTValue(raw, column)
-	case "L":
+	case Logical:
 		// L values are stored as strings T or F, we only check for T, the rest is false...
 		return dbf.parseLValue(raw)
-	case "Y":
+	case Currency:
 		// Y values are currency values stored as ints with 4 decimal places
 		return dbf.parseYValue(raw)
-	case "N":
+	case Numeric:
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
 		return dbf.parseNValue(raw, column)
-	case "F":
+	case Float:
 		// F values are stored as string values
 		return dbf.parseFValue(raw, column)
-	case "Q":
+	case Varbinary:
 		// Q values just return the raw value
 		fallthrough
-	case "V":
+	case Varchar:
 		// V values just return the raw value
 		fallthrough
-	case "W":
+	case Blob:
 		// W values just return the raw value
 		fallthrough
-	case "P":
+	case Picture:
 		// P values just return the raw value
 		fallthrough
-	case "G":
+	case General:
 		// G values just return the raw value
 		return dbf.parseRawValue(raw, column)
 	default:
-		return nil, newError("dbase-interpreter-datatovalue-2", fmt.Errorf("unsupported column data type: %s", column.Type()))
+		return nil, newError("dbase-interpreter-datatovalue-2", fmt.Errorf("unsupported column data type: %s", string(column.DataType)))
 	}
 }
 
 // Converts column data to the byte representation
 // For M values the data has to be written to the memo file
 func (dbf *DBF) valueToByteRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
-	switch field.Type() {
-	case "M":
+	switch field.column.DataType {
+	case Memo:
 		return dbf.getMRepresentation(field)
-	case "C":
+	case Character:
 		// C values are stored as strings, the returned string is not trimmed
 		return dbf.getCRepresentation(field, skipSpacing)
-	case "I":
+	case Integer:
 		// I values (int32)
 		return dbf.getIRepresentation(field)
-	case "Y":
+	case Currency:
 		// Y (currency)
 		return dbf.getYRepresentation(field)
-	case "F":
+	case Float:
 		// F (Float)
 		return dbf.getFRepresentation(field, skipSpacing)
-	case "B":
+	case Double:
 		// B (double)
 		return dbf.getBRepresentation(field)
-	case "D":
+	case Date:
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
 		return dbf.getDRepresentation(field)
-	case "T":
+	case DateTime:
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
 		return dbf.getTRepresentation(field)
-	case "L":
+	case Logical:
 		// L (bool) values are stored as strings T or F, we only check for T, the rest is false...
 		return dbf.getLRepresentation(field)
-	case "N":
+	case Numeric:
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
 		return dbf.getNRepresentation(field, skipSpacing)
-	case "Q":
+	case Varbinary:
 		// Q values just return the raw value
 		fallthrough
-	case "V":
+	case Varchar:
 		// V values just return the raw value
 		fallthrough
-	case "W":
+	case Blob:
 		// W values just return the raw value
 		fallthrough
-	case "P":
+	case Picture:
 		// P values just return the raw value
 		fallthrough
-	case "G":
+	case General:
 		// G values just return the raw value
 		return dbf.getRawRepresentation(field)
 	default:
-		return nil, newError("dbase-interpreter-valuetobyterepresentation-1", fmt.Errorf("unsupported column data type: %s at column field: %v", field.column.Type(), field.Name()))
+		return nil, newError("dbase-interpreter-valuetobyterepresentation-1", fmt.Errorf("unsupported column data type: %s at column field: %v", field.Type(), field.Name()))
 	}
 }
 
