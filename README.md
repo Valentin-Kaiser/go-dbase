@@ -18,9 +18,9 @@ There are several similar packages but they are not suited for our use case, thi
 | Read | ✅ | ✅ | ✅ |
 | Write | ✅  | ✅ | ❌ |
 | FPT (memo) file support | ✅ | ❌ | ✅ |
-| Data type support | ✅ | ❌ | ✅ |
 | Struct, json, map conversion | ✅ | ❌ | ✅ |
 | IO efficiency ² | ✅ | ❌ | ✅ |
+| Full data type support | ✅ | ❌ | ❌ |
 | Non full blocking IO³ | ✅ | ❌ | ❌ |
 | Search by value | ✅ | ❌ | ❌ |
 
