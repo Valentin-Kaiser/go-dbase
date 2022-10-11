@@ -253,7 +253,7 @@ func (dbf *DBF) getIRepresentation(field *Field) ([]byte, error) {
 
 // Returns the value as float64
 func (dbf *DBF) parseYValue(raw []byte) (interface{}, error) {
-	return float64(binary.LittleEndian.Uint64(raw)) / 10000, nil
+	return float64(int64(binary.LittleEndian.Uint64(raw))) / 10000, nil
 }
 
 // Returns the float64 value as byte representation
