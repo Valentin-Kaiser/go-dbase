@@ -44,13 +44,13 @@ type DBF struct {
 
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the embedded file handle(s) call DBF.Close().
-func Open(filename string, conv EncodingConverter, useUntested bool) (*DBF, error) {
+func Open(filename string, conv EncodingConverter, exclusive, untested bool) (*DBF, error) {
 	filename = filepath.Clean(filename)
 	dbaseFile, err := os.OpenFile(filename, os.O_RDWR, 0600)
 	if err != nil {
 		return nil, newError("dbase-io-open-1", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
-	dbf, err := prepareDBF(dbaseFile, conv, useUntested)
+	dbf, err := prepareDBF(dbaseFile, conv, untested)
 	if err != nil {
 		return nil, newError("dbase-io-open-2", err)
 	}
@@ -102,13 +102,13 @@ func (dbf *DBF) Close() error {
 
 // Returns a DBF object pointer
 // Reads the DBF Header, the column infos and validates file version.
-func prepareDBF(dbaseFile *os.File, conv EncodingConverter, useUntested bool) (*DBF, error) {
+func prepareDBF(dbaseFile *os.File, conv EncodingConverter, untested bool) (*DBF, error) {
 	header, err := readHeader(dbaseFile)
 	if err != nil {
 		return nil, newError("dbase-io-preparedbf-1", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(header.FileType, useUntested); err != nil {
+	if err := validateFileVersion(header.FileType, untested); err != nil {
 		return nil, newError("dbase-io-preparedbf-2", err)
 	}
 	columns, err := readColumns(dbaseFile)
@@ -199,10 +199,10 @@ func (dbf *DBF) writeHeader() (err error) {
 }
 
 // Check if the file version is supported
-func validateFileVersion(version byte, useUntested bool) error {
+func validateFileVersion(version byte, untested bool) error {
 	switch version {
 	default:
-		if useUntested {
+		if untested {
 			return nil
 		}
 		return newError("dbase-io-validatefileversion-1", fmt.Errorf("untested DBF file version: %d (0x%x)", version, version))

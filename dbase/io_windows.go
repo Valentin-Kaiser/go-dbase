@@ -42,14 +42,17 @@ type DBF struct {
 
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the file handle(s) call DBF.Close().
-func Open(filename string, conv EncodingConverter, openUntested bool) (*DBF, error) {
+func Open(filename string, conv EncodingConverter, exclusive, untested bool) (*DBF, error) {
 	filename = filepath.Clean(filename)
-	// Open file in non blocking mode with windows
-	fd, err := windows.Open(filename, windows.O_RDWR|windows.O_CLOEXEC|windows.O_NONBLOCK, 0644)
+	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_EXCL
+	if !exclusive {
+		mode = windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
+	}
+	fd, err := windows.Open(filename, mode, 0644)
 	if err != nil {
 		return nil, newError("dbase-io-open-1", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
-	dbf, err := prepareDBF(fd, conv, openUntested)
+	dbf, err := prepareDBF(fd, conv, untested)
 	if err != nil {
 		return nil, newError("dbase-io-open-2", err)
 	}
@@ -63,7 +66,7 @@ func Open(filename string, conv EncodingConverter, openUntested bool) (*DBF, err
 		if strings.ToUpper(ext) == ext {
 			fptExt = ".FPT"
 		}
-		fd, err := windows.Open(strings.TrimSuffix(filename, ext)+fptExt, windows.O_RDWR|windows.O_CLOEXEC|windows.O_NONBLOCK, 0644)
+		fd, err := windows.Open(strings.TrimSuffix(filename, ext)+fptExt, mode, 0644)
 		if err != nil {
 			return nil, newError("dbase-io-open-3", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
@@ -101,13 +104,13 @@ func (dbf *DBF) Close() error {
 
 // Returns a DBF object pointer
 // Reads the DBF Header, the column infos and validates file version.
-func prepareDBF(fd windows.Handle, conv EncodingConverter, openUntested bool) (*DBF, error) {
+func prepareDBF(fd windows.Handle, conv EncodingConverter, untested bool) (*DBF, error) {
 	header, err := readHeader(fd)
 	if err != nil {
 		return nil, newError("dbase-io-preparedbf-1", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(header.FileType, openUntested); err != nil {
+	if err := validateFileVersion(header.FileType, untested); err != nil {
 		return nil, newError("dbase-io-preparedbf-2", err)
 	}
 	columns, err := readColumns(fd)
@@ -192,10 +195,10 @@ func (dbf *DBF) writeHeader() (err error) {
 }
 
 // Check if the file version is supported
-func validateFileVersion(version byte, openUntested bool) error {
+func validateFileVersion(version byte, untested bool) error {
 	switch version {
 	default:
-		if openUntested {
+		if untested {
 			return nil
 		}
 		return newError("dbase-io-validatefileversion-1", fmt.Errorf("untested DBF file version: %d (0x%x)", version, version))
@@ -458,6 +461,26 @@ func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 		return buf, newError("dbase-io-readrow-4", ErrIncomplete)
 	}
 	return buf, nil
+}
+
+func (row *Row) Lock() error {
+	row.dbf.dbaseMutex.Lock()
+	defer row.dbf.dbaseMutex.Unlock()
+	position := int64(row.dbf.header.FirstRow) + (int64(row.Position) * int64(row.dbf.header.RowLength))
+	if row.Position >= row.dbf.header.RowsCount {
+		position = int64(row.dbf.header.FirstRow) + (int64(row.Position-1) * int64(row.dbf.header.RowLength))
+		row.dbf.header.RowsCount++
+	}
+	o := &windows.Overlapped{
+		Offset:     uint32(position),
+		OffsetHigh: uint32(position + int64(row.dbf.header.RowLength)),
+	}
+	err := windows.LockFileEx(*row.dbf.dbaseFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, uint32(position), uint32(position+int64(row.dbf.header.RowLength)), o)
+	if err != nil {
+		return newError("dbase-io-writerow-3", err)
+	}
+
+	return nil
 }
 
 // writeRow writes raw row data to the given row position
