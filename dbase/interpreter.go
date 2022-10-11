@@ -477,6 +477,14 @@ func (dbf *DBF) getNumericRepresentation(field *Field, skipSpacing bool) ([]byte
 }
 
 func (dbf *DBF) parseVarchar(raw []byte, column *Column) (interface{}, error) {
+	varlen, err := dbf.readNullFlag(uint64(dbf.table.rowPointer))
+	if err != nil {
+		return nil, newError("dbase-interpreter-parsevvalue-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
+	}
+	if varlen {
+		length := raw[len(raw)-1]
+		raw = raw[:length]
+	}
 	return string(raw), nil
 }
 

@@ -35,6 +35,7 @@ type DBF struct {
 	dbaseMutex      *sync.Mutex     // Mutex locks for concurrent writing access to the DBF file
 	memoMutex       *sync.Mutex     // Mutex locks for concurrent writing access to the FPT file
 	table           *Table          // Containing the columns and internal row pointer
+	nullFlagColumn  *Column         // The column containing the null flag column (if varchar or varbinary field exists)
 }
 
 /**
@@ -129,7 +130,7 @@ func prepareDBF(fd windows.Handle, config *Config) (*DBF, error) {
 	if err := validateFileVersion(header.FileType, config.Untested); err != nil {
 		return nil, newError("dbase-io-preparedbf-2", err)
 	}
-	columns, err := readColumns(fd)
+	columns, nullFlag, err := readColumns(fd)
 	if err != nil {
 		return nil, newError("dbase-io-preparedbf-3", err)
 	}
@@ -141,8 +142,9 @@ func prepareDBF(fd windows.Handle, config *Config) (*DBF, error) {
 			columns: columns,
 			mods:    make([]*Modification, len(columns)),
 		},
-		dbaseMutex: &sync.Mutex{},
-		memoMutex:  &sync.Mutex{},
+		dbaseMutex:     &sync.Mutex{},
+		memoMutex:      &sync.Mutex{},
+		nullFlagColumn: nullFlag,
 	}
 	return dbf, nil
 }
@@ -223,43 +225,70 @@ func validateFileVersion(version byte, untested bool) error {
 }
 
 // Reads columns from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
-func readColumns(fd windows.Handle) ([]*Column, error) {
+func readColumns(fd windows.Handle) ([]*Column, *Column, error) {
+	var nullFlag *Column
 	columns := make([]*Column, 0)
 	offset := int64(32)
 	b := make([]byte, 1)
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
 		if _, err := windows.Seek(fd, offset, 0); err != nil {
-			return nil, newError("dbase-io-readcolumninfos-1", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-1", err)
 		}
 		if _, err := windows.Read(fd, b); err != nil {
-			return nil, newError("dbase-io-readcolumninfos-2", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-2", err)
 		}
 		if b[0] == ColumnEnd {
 			break
 		}
 		// Position back one byte and read the column
 		if _, err := windows.Seek(fd, -1, 1); err != nil {
-			return nil, newError("dbase-io-readcolumninfos-3", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-3", err)
 		}
-		buf := make([]byte, 2048)
+		buf := make([]byte, 33)
 		n, err := windows.Read(fd, buf)
 		if err != nil {
-			return nil, newError("dbase-io-readcolumninfos-4", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-4", err)
 		}
 		column := &Column{}
 		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
-			return nil, newError("dbase-io-readcolumninfos-5", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-5", err)
 		}
 		if column.Name() == "_NullFlags" {
+			nullFlag = column
 			offset += 32
 			continue
 		}
 		columns = append(columns, column)
 		offset += 32
 	}
-	return columns, nil
+	return columns, nullFlag, nil
+}
+
+// Read the nullFlag field at the end of the row
+// The nullFlag field indicates if the field has a variable length
+// If varlength is true, the field is variable length and the length is stored in the last byte
+// If varlength is false, we read the complete field
+func (dbf *DBF) readNullFlag(position uint64) (bool, error) {
+	if dbf.nullFlagColumn == nil {
+		return false, fmt.Errorf("null flag column missing")
+	}
+	// Read the null flag field
+	position = uint64(dbf.header.FirstRow) + position*uint64(dbf.header.RowLength) + uint64(dbf.nullFlagColumn.Position)
+	_, err := windows.Seek(*dbf.dbaseFileHandle, int64(position), 0)
+	if err != nil {
+		return false, newError("dbase-io-readnullflag-1", err)
+	}
+	buf := make([]byte, dbf.nullFlagColumn.Length)
+	n, err := windows.Read(*dbf.dbaseFileHandle, buf)
+	if err != nil {
+		return false, newError("dbase-io-readnullflag-2", err)
+	}
+	if n != int(dbf.nullFlagColumn.Length) {
+		return false, newError("dbase-io-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, dbf.nullFlagColumn.Length))
+	}
+	return buf[0] != 0x00, nil
 }
 
 /**
