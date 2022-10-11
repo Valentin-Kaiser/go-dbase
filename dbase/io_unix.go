@@ -46,7 +46,11 @@ type DBF struct {
 // To close the embedded file handle(s) call DBF.Close().
 func Open(filename string, conv EncodingConverter, exclusive, untested bool) (*DBF, error) {
 	filename = filepath.Clean(filename)
-	dbaseFile, err := os.OpenFile(filename, os.O_RDWR, 0600)
+	mode := os.O_RDWR
+	if exclusive {
+		mode |= os.O_EXCL
+	}
+	dbaseFile, err := os.OpenFile(filename, mode, 0600)
 	if err != nil {
 		return nil, newError("dbase-io-open-1", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
@@ -64,7 +68,7 @@ func Open(filename string, conv EncodingConverter, exclusive, untested bool) (*D
 		if strings.ToUpper(ext) == ext {
 			fptExt = ".FPT"
 		}
-		memoFile, err := os.OpenFile(strings.TrimSuffix(filename, ext)+fptExt, os.O_RDWR, 0600)
+		memoFile, err := os.OpenFile(strings.TrimSuffix(filename, ext)+fptExt, mode, 0600)
 		if err != nil {
 			return nil, newError("dbase-io-open-3", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
