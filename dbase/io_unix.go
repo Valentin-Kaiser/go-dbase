@@ -337,7 +337,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 }
 
 // Parses a memo file from raw []byte, decodes and returns as []byte
-func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
+func (dbf *DBF) parseMemoFile(raw []byte) ([]byte, bool, error) {
 	memo, isText, err := dbf.readMemo(raw)
 	if err != nil {
 		return []byte{}, false, newError("dbase-io-parse-memo-1", err)
