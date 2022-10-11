@@ -1,25 +1,34 @@
 package dbase
 
+// Supported and testet file types - other file types may work but are not tested
+// The file type check has to be bypassed when opening a file type that is not supported
+const (
+	FoxPro              = 0x30
+	FoxProAutoincrement = 0x31
+)
+
+// Relevant byte marker
+const (
+	Null      = 0x00
+	Blank     = 0x20
+	ColumnEnd = 0x0D
+	Active    = Blank
+	Deleted   = 0x2A
+	EOFMarker = 0x1A
+)
+
+// Table flags
+const (
+	StructuralFlag     = 0x01
+	MemoFlag           = 0x02
+	StructuralMemoFlag = 0x03
+	DatabaseFlag       = 0x04
+)
+
+// DataType defines the possible types of a column
 type DataType byte
 
 const (
-	// Supported and testet file types - other file types may work but are not tested
-	// The file type check has to be bypassed when opening, if the file type is not supported
-	FoxPro              byte = 0x30
-	FoxProAutoincrement byte = 0x31
-	// Relevant byte marker
-	Null      byte = 0x00
-	Blank     byte = 0x20
-	ColumnEnd byte = 0x0D
-	Active         = Blank
-	Deleted        = 0x2A
-	EOFMarker byte = 0x1A
-	// DBase Table flags
-	StructuralFlag     byte = 0x01
-	MemoFlag           byte = 0x02
-	StructuralMemoFlag byte = 0x03
-	DatabaseFlag       byte = 0x04
-	// Data types
 	Character DataType = 0x43
 	Currency  DataType = 0x59
 	Double    DataType = 0x42
@@ -37,7 +46,7 @@ const (
 	Varchar   DataType = 0x56
 )
 
-// Returns the type of the column as string (length 1)
+// Returns the type of the column as string
 func (t DataType) String() string {
 	return string(t)
 }
