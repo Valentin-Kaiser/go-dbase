@@ -24,7 +24,12 @@ type Product struct {
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open("../test_data/TEST.DBF", new(dbase.Win1250Converter), false, false)
+	dbf, err := dbase.Open(&dbase.Config{
+		Filename:   "../test_data/TEST.DBF",
+		Converter:  new(dbase.Win1250Converter),
+		TrimSpaces: true,
+		WriteLock:  true,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -82,8 +87,6 @@ func main() {
 
 	// === Modifications ===
 
-	// Enable space trimming per default
-	dbf.SetTrimspacesDefault(true)
 	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
 	dbf.SetColumnModification(dbf.ColumnPosByName("INTEGER"), true, "FLOAT", nil)
 	dbf.SetColumnModification(dbf.ColumnPosByName("FLOAT"), true, "INTEGER", nil)

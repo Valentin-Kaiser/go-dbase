@@ -35,7 +35,6 @@ type Table struct {
 	columns    []*Column       // Columns defined in this table
 	mods       []*Modification // Modification to change values or name of fields
 	rowPointer uint32          // Internal row pointer, can be moved
-	trimSpaces bool            // Trimspaces default value
 }
 
 // Column is a struct containing the column information
@@ -198,11 +197,6 @@ func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string,
 		Convert:     convert,
 		ExternalKey: key,
 	}
-}
-
-// Set the default trimspaces value for all columns
-func (dbf *DBF) SetTrimspacesDefault(b bool) {
-	dbf.table.trimSpaces = b
 }
 
 // Returns the column modification for a column at the given position
@@ -423,7 +417,7 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 		val := field.GetValue()
 		mod := row.dbf.table.mods[i]
 		if mod != nil {
-			if row.dbf.table.trimSpaces && mod.TrimSpaces || mod.TrimSpaces {
+			if row.dbf.config.TrimSpaces && mod.TrimSpaces || mod.TrimSpaces {
 				if str, ok := val.(string); ok {
 					val = strings.TrimSpace(str)
 				}

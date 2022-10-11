@@ -190,7 +190,7 @@ func (dbf *DBF) getMRepresentation(field *Field) ([]byte, error) {
 // Returns the value as string
 func (dbf *DBF) parseCValue(raw []byte, column *Column) (interface{}, error) {
 	// C values are stored as strings, the returned string is not trimmed
-	str, err := toUTF8String(raw, dbf.converter)
+	str, err := toUTF8String(raw, dbf.config.Converter)
 	if err != nil {
 		return str, newError("dbase-interpreter-parsecvalue-1", fmt.Errorf("parsing to utf8 string failed at column field: %v failed with error: %w", column.Name(), err))
 	}
@@ -205,7 +205,7 @@ func (dbf *DBF) getCRepresentation(field *Field, skipSpacing bool) ([]byte, erro
 		return nil, newError("dbase-interpreter-getcrepresentation-1", fmt.Errorf("invalid data type %T, expected string on column field: %v", field.value, field.Name()))
 	}
 	raw := make([]byte, field.column.Length)
-	bin, err := fromUtf8String([]byte(c), dbf.converter)
+	bin, err := fromUtf8String([]byte(c), dbf.config.Converter)
 	if err != nil {
 		return nil, newError("dbase-interpreter-getcrepresentation-2", fmt.Errorf("parsing from utf8 string at column field: %v failed with error %w", field.Name(), err))
 	}
