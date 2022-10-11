@@ -40,7 +40,7 @@ type Table struct {
 // Column is a struct containing the column information
 type Column struct {
 	ColumnName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
-	DataType   byte     // Column type
+	DataType   DataType // Column type
 	Position   uint32   // Displacement of column in row
 	Length     uint8    // Length of column (in bytes)
 	Decimals   uint8    // Number of decimal places
@@ -380,8 +380,8 @@ func (field *Field) Name() string {
 }
 
 // Type returns the field type
-func (field *Field) Type() string {
-	return field.column.Type()
+func (field *Field) Type() DataType {
+	return field.column.DataType
 }
 
 // Column returns the field column definition
