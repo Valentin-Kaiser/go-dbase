@@ -14,6 +14,7 @@ import (
 type EncodingConverter interface {
 	Decode(in []byte) ([]byte, error)
 	Encode(in []byte) ([]byte, error)
+	CodePageMark() byte
 }
 
 // Win1250Decoder translates a Windows-1250 DBF to UTF8 and back
@@ -41,4 +42,9 @@ func (d *Win1250Converter) Encode(in []byte) ([]byte, error) {
 		return nil, newError("dbase-encoding-encode-1", err)
 	}
 	return out[:nDst], nil
+}
+
+// CodePageMark returns the code page mark for the Windows1250 encoding
+func (d *Win1250Converter) CodePageMark() byte {
+	return 0x03
 }
