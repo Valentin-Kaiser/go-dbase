@@ -13,8 +13,8 @@ const (
 	Deleted        = 0x2A
 	EOFMarker byte = 0x1A
 	// DBase Table flags
-	Structural     byte = 0x01
-	Memo           byte = 0x02
-	StructuralMemo byte = 0x03
-	Database       byte = 0x04
+	StructuralFlag     byte = 0x01
+	MemoFlag           byte = 0x02
+	StructuralMemoFlag byte = 0x03
+	DatabaseFlag       byte = 0x04
 )
