@@ -44,9 +44,9 @@ type DBF struct {
 // To close the file handle(s) call DBF.Close().
 func Open(filename string, conv EncodingConverter, exclusive, untested bool) (*DBF, error) {
 	filename = filepath.Clean(filename)
-	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_EXCL
-	if !exclusive {
-		mode = windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
+	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
+	if exclusive {
+		mode = windows.O_RDWR | windows.O_CLOEXEC | windows.O_EXCL
 	}
 	fd, err := windows.Open(filename, mode, 0644)
 	if err != nil {
@@ -461,26 +461,6 @@ func (dbf *DBF) readRow(rowPosition uint32) ([]byte, error) {
 		return buf, newError("dbase-io-readrow-4", ErrIncomplete)
 	}
 	return buf, nil
-}
-
-func (row *Row) Lock() error {
-	row.dbf.dbaseMutex.Lock()
-	defer row.dbf.dbaseMutex.Unlock()
-	position := int64(row.dbf.header.FirstRow) + (int64(row.Position) * int64(row.dbf.header.RowLength))
-	if row.Position >= row.dbf.header.RowsCount {
-		position = int64(row.dbf.header.FirstRow) + (int64(row.Position-1) * int64(row.dbf.header.RowLength))
-		row.dbf.header.RowsCount++
-	}
-	o := &windows.Overlapped{
-		Offset:     uint32(position),
-		OffsetHigh: uint32(position + int64(row.dbf.header.RowLength)),
-	}
-	err := windows.LockFileEx(*row.dbf.dbaseFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, uint32(position), uint32(position+int64(row.dbf.header.RowLength)), o)
-	if err != nil {
-		return newError("dbase-io-writerow-3", err)
-	}
-
-	return nil
 }
 
 // writeRow writes raw row data to the given row position
