@@ -18,12 +18,13 @@ import (
 )
 
 type Config struct {
-	Filename   string            // The filename of the DBF file.
-	Converter  EncodingConverter // The encoding converter to use.
-	Exclusive  bool              // If true the file is opened in exclusive mode.
-	Untested   bool              // If true the file version is not checked.
-	TrimSpaces bool              // Trimspaces default value
-	WriteLock  bool              // Whether or not the write operations should lock the record
+	Filename           string            // The filename of the DBF file.
+	Converter          EncodingConverter // The encoding converter to use.
+	Exclusive          bool              // If true the file is opened in exclusive mode.
+	Untested           bool              // If true the file version is not checked.
+	TrimSpaces         bool              // Trimspaces default value
+	WriteLock          bool              // Whether or not the write operations should lock the record
+	CodePageValidation bool              // Whether or not the code page mark should be validated
 }
 
 // DBF is the main struct to handle a dBase file.
@@ -61,10 +62,14 @@ func Open(config *Config) (*DBF, error) {
 		return nil, newError("dbase-io-open-2", err)
 	}
 	dbf.dbaseFile = dbaseFile
+	// Check if the code page mark is matchin the converter
+	if config.CodePageValidation && dbf.header.CodePage != dbf.config.Converter.CodePageMark() {
+		return nil, newError("dbase-io-open-3", fmt.Errorf("code page mark mismatch: %d != %d", dbf.header.CodePage, dbf.config.Converter.CodePageMark()))
+	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
 	// If the FPT file does not exist an error is returned.
-	if (dbf.header.TableFlags & Memo) != 0 {
+	if (dbf.header.TableFlags & MemoFlag) != 0 {
 		ext := filepath.Ext(filename)
 		fptExt := ".fpt"
 		if strings.ToUpper(ext) == ext {
@@ -72,11 +77,11 @@ func Open(config *Config) (*DBF, error) {
 		}
 		memoFile, err := os.OpenFile(strings.TrimSuffix(filename, ext)+fptExt, mode, 0600)
 		if err != nil {
-			return nil, newError("dbase-io-open-3", fmt.Errorf("opening FPT file failed with error: %w", err))
+			return nil, newError("dbase-io-open-4", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
 		err = dbf.prepareMemo(memoFile)
 		if err != nil {
-			return nil, newError("dbase-io-open-4", err)
+			return nil, newError("dbase-io-open-5", err)
 		}
 		dbf.memoFile = memoFile
 	}
