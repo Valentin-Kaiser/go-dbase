@@ -217,7 +217,7 @@ func validateFileVersion(version byte, untested bool) error {
 			return nil
 		}
 		return newError("dbase-io-validatefileversion-1", fmt.Errorf("untested DBF file version: %d (0x%x)", version, version))
-	case FoxPro, FoxProAutoincrement:
+	case FoxPro, FoxProAutoincrement, FoxProVar:
 		return nil
 	}
 }

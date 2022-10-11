@@ -5,6 +5,7 @@ package dbase
 const (
 	FoxPro              = 0x30
 	FoxProAutoincrement = 0x31
+	FoxProVar           = 0x32
 )
 
 // Relevant byte marker
