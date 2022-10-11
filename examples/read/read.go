@@ -84,10 +84,10 @@ func main() {
 		// === Modifications ===
 
 		// Disable space trimming for the company name
-		dbf.SetColumnModificationByName("PRODNAME", false, "", nil)
+		dbf.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
 		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-		dbf.SetColumnModificationByName("INTEGER", true, "FLOAT", nil)
-		dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
+		dbf.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+		dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
 		// === Struct Conversion ===
 

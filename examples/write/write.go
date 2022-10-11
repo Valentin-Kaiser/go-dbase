@@ -88,8 +88,8 @@ func main() {
 	// === Modifications ===
 
 	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-	dbf.SetColumnModificationByName("INTEGER", true, "FLOAT", nil)
-	dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
+	dbf.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+	dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
 	// Create a new row with the same structure as the database file.
 	t := Product{

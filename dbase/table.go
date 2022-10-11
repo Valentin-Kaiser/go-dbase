@@ -187,24 +187,20 @@ func (dbf *DBF) ColumnPos(column *Column) int {
  */
 
 // SetColumnModification sets a modification for a column
-func (dbf *DBF) SetColumnModification(position int, trimspaces bool, key string, convert func(interface{}) (interface{}, error)) {
+func (dbf *DBF) SetColumnModification(position int, mod *Modification) {
 	// Skip if position is out of range
 	if position < 0 || position >= len(dbf.table.columns) {
 		return
 	}
-	dbf.table.mods[position] = &Modification{
-		TrimSpaces:  trimspaces,
-		Convert:     convert,
-		ExternalKey: key,
-	}
+	dbf.table.mods[position] = mod
 }
 
-func (dbf *DBF) SetColumnModificationByName(name string, trimspaces bool, key string, convert func(interface{}) (interface{}, error)) error {
+func (dbf *DBF) SetColumnModificationByName(name string, mod *Modification) error {
 	position := dbf.ColumnPosByName(name)
 	if position < 0 {
 		return newError("dbase-table-setcolumnmodificationbyname-1", fmt.Errorf("Column '%s' not found", name))
 	}
-	dbf.SetColumnModification(position, trimspaces, key, convert)
+	dbf.SetColumnModification(position, mod)
 	return nil
 }
 
