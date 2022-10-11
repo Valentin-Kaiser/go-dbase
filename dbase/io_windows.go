@@ -527,11 +527,11 @@ func (dbf *DBF) Search(field *Field, exactMatch bool) ([]*Row, error) {
 	}
 	// Search for the value
 	rows := make([]*Row, 0)
-	position := dbf.header.FirstRow
+	position := uint64(dbf.header.FirstRow)
 	for i := uint32(0); i < dbf.header.RowsCount; i++ {
 		// Read the field value
 		_, err := windows.Seek(*dbf.dbaseFileHandle, int64(position)+int64(field.column.Position), 0)
-		position += dbf.header.RowLength
+		position += uint64(dbf.header.RowLength)
 		if err != nil {
 			continue
 		}
