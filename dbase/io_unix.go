@@ -18,23 +18,24 @@ import (
 )
 
 type Config struct {
-	Filename  string            // The filename of the DBF file.
-	Converter EncodingConverter // The encoding converter to use.
-	Exclusive bool              // If true the file is opened in exclusive mode.
-	Untested  bool              // If true the file version is not checked.
+	Filename   string            // The filename of the DBF file.
+	Converter  EncodingConverter // The encoding converter to use.
+	Exclusive  bool              // If true the file is opened in exclusive mode.
+	Untested   bool              // If true the file version is not checked.
+	TrimSpaces bool              // Trimspaces default value
+	WriteLock  bool              // Whether or not the write operations should lock the record
 }
 
 // DBF is the main struct to handle a dBase file.
 type DBF struct {
-	converter  EncodingConverter // The used converter instance passed by opening a file
-	dbaseFile  *os.File          // DBase file handle
-	memoFile   *os.File          // Memo file handle
-	header     *Header           // DBase file header containing relevant information
-	memoHeader *MemoHeader       // Memo file header containing relevant information
-	dbaseMutex *sync.Mutex       // Mutex locks for concurrent writing access to the DBF file
-	memoMutex  *sync.Mutex       // Mutex locks for concurrent writing access to the FPT file
-	writeLock  bool              // Whether or not the write operations should lock the record
-	table      *Table            // Containing the columns and internal row pointer
+	config     *Config     // The config used when working with the DBF file.
+	dbaseFile  *os.File    // DBase file handle
+	memoFile   *os.File    // Memo file handle
+	header     *Header     // DBase file header containing relevant information
+	memoHeader *MemoHeader // Memo file header containing relevant information
+	dbaseMutex *sync.Mutex // Mutex locks for concurrent writing access to the DBF file
+	memoMutex  *sync.Mutex // Mutex locks for concurrent writing access to the FPT file
+	table      *Table      // Containing the columns and internal row pointer
 }
 
 /**
@@ -55,7 +56,7 @@ func Open(config *Config) (*DBF, error) {
 	if err != nil {
 		return nil, newError("dbase-io-open-1", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
-	dbf, err := prepareDBF(dbaseFile, config.Converter, config.Untested)
+	dbf, err := prepareDBF(dbaseFile, config)
 	if err != nil {
 		return nil, newError("dbase-io-open-2", err)
 	}
@@ -107,13 +108,13 @@ func (dbf *DBF) Close() error {
 
 // Returns a DBF object pointer
 // Reads the DBF Header, the column infos and validates file version.
-func prepareDBF(dbaseFile *os.File, conv EncodingConverter, untested bool) (*DBF, error) {
+func prepareDBF(dbaseFile *os.File, config *Config) (*DBF, error) {
 	header, err := readHeader(dbaseFile)
 	if err != nil {
 		return nil, newError("dbase-io-preparedbf-1", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(header.FileType, untested); err != nil {
+	if err := validateFileVersion(header.FileType, config.Untested); err != nil {
 		return nil, newError("dbase-io-preparedbf-2", err)
 	}
 	columns, err := readColumns(dbaseFile)
@@ -121,6 +122,7 @@ func prepareDBF(dbaseFile *os.File, conv EncodingConverter, untested bool) (*DBF
 		return nil, newError("dbase-io-preparedbf-3", err)
 	}
 	dbf := &DBF{
+		config:    config,
 		header:    header,
 		dbaseFile: dbaseFile,
 		table: &Table{
@@ -129,7 +131,6 @@ func prepareDBF(dbaseFile *os.File, conv EncodingConverter, untested bool) (*DBF
 		},
 		dbaseMutex: &sync.Mutex{},
 		memoMutex:  &sync.Mutex{},
-		converter:  conv,
 	}
 	return dbf, nil
 }
@@ -156,7 +157,7 @@ func readHeader(dbaseFile *os.File) (*Header, error) {
 // writeHeader writes the header to the dbase file
 func (dbf *DBF) writeHeader() (err error) {
 	// Lock the block we are writing to
-	if dbf.writeLock {
+	if dbf.config.WriteLock {
 		flock := &unix.Flock_t{
 			Type:   unix.F_WRLCK,
 			Start:  0,
@@ -337,7 +338,7 @@ func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
 		return []byte{}, false, newError("dbase-io-parse-memo-1", err)
 	}
 	if isText {
-		memo, err = dbf.converter.Decode(memo)
+		memo, err = dbf.config.Converter.Decode(memo)
 		if err != nil {
 			return []byte{}, false, newError("dbase-io-parse-memo-2", err)
 		}
@@ -378,7 +379,7 @@ func (dbf *DBF) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 		Len:    int64(dbf.memoHeader.BlockSize),
 		Whence: 0,
 	}
-	if dbf.writeLock {
+	if dbf.config.WriteLock {
 		for {
 			err = unix.FcntlFlock(dbf.memoFile.Fd(), unix.F_SETLK, flock)
 			if err == nil {
@@ -421,7 +422,7 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 		return newError("dbase-io-writememoheader-1", ErrNoFPT)
 	}
 	// Lock the block we are writing to
-	if dbf.writeLock {
+	if dbf.config.WriteLock {
 		flock := &unix.Flock_t{
 			Type:   unix.F_WRLCK,
 			Start:  0,
@@ -512,7 +513,7 @@ func (row *Row) writeRow() (err error) {
 		return newError("dbase-io-writerow-2", err)
 	}
 	// Lock the block we are writing to
-	if row.dbf.writeLock {
+	if row.dbf.config.WriteLock {
 		flock := &unix.Flock_t{
 			Type:   unix.F_WRLCK,
 			Start:  position,
@@ -636,7 +637,7 @@ func (dbf *DBF) Skip(offset int64) {
 
 // Whether or not the write operations should lock the record
 func (dbf *DBF) WriteLock(enabled bool) {
-	dbf.writeLock = enabled
+	dbf.config.WriteLock = enabled
 }
 
 // Returns if the row at internal row pointer is deleted
