@@ -17,23 +17,24 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+type Config struct {
+	Filename  string            // The filename of the DBF file.
+	Converter EncodingConverter // The encoding converter to use.
+	Exclusive bool              // If true the file is opened in exclusive mode.
+	Untested  bool              // If true the file version is not checked.
+}
+
 // DBF is the main struct to handle a dBase file.
 type DBF struct {
-	// The used converter instance passed by opening a file
-	converter EncodingConverter
-	// DBase and memo file syscall handle pointer
-	dbaseFile *os.File
-	memoFile  *os.File
-	// DBase and memo file header containing relevant information
-	header     *Header
-	memoHeader *MemoHeader
-	// 	// Mutex locks
-	dbaseMutex *sync.Mutex
-	memoMutex  *sync.Mutex
-	// File data lock at writing
-	writeLock bool
-	// Containing the columns and internal row pointer
-	table *Table
+	converter  EncodingConverter // The used converter instance passed by opening a file
+	dbaseFile  *os.File          // DBase file handle
+	memoFile   *os.File          // Memo file handle
+	header     *Header           // DBase file header containing relevant information
+	memoHeader *MemoHeader       // Memo file header containing relevant information
+	dbaseMutex *sync.Mutex       // Mutex locks for concurrent writing access to the DBF file
+	memoMutex  *sync.Mutex       // Mutex locks for concurrent writing access to the FPT file
+	writeLock  bool              // Whether or not the write operations should lock the record
+	table      *Table            // Containing the columns and internal row pointer
 }
 
 /**
@@ -44,17 +45,17 @@ type DBF struct {
 
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the embedded file handle(s) call DBF.Close().
-func Open(filename string, conv EncodingConverter, exclusive, untested bool) (*DBF, error) {
-	filename = filepath.Clean(filename)
+func Open(config *Config) (*DBF, error) {
+	filename := filepath.Clean(config.Filename)
 	mode := os.O_RDWR
-	if exclusive {
+	if config.Exclusive {
 		mode |= os.O_EXCL
 	}
 	dbaseFile, err := os.OpenFile(filename, mode, 0600)
 	if err != nil {
 		return nil, newError("dbase-io-open-1", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
-	dbf, err := prepareDBF(dbaseFile, conv, untested)
+	dbf, err := prepareDBF(dbaseFile, config.Converter, config.Untested)
 	if err != nil {
 		return nil, newError("dbase-io-open-2", err)
 	}
