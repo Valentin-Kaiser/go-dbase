@@ -64,9 +64,6 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 	case "L":
 		// L values are stored as strings T or F, we only check for T, the rest is false...
 		return dbf.parseLValue(raw)
-	case "V":
-		// V values just return the raw value
-		return dbf.parseVValue(raw, column)
 	case "Y":
 		// Y values are currency values stored as ints with 4 decimal places
 		return dbf.parseYValue(raw)
@@ -76,6 +73,21 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 	case "F":
 		// F values are stored as string values
 		return dbf.parseFValue(raw, column)
+	case "Q":
+		// Q values just return the raw value
+		fallthrough
+	case "V":
+		// V values just return the raw value
+		fallthrough
+	case "W":
+		// W values just return the raw value
+		fallthrough
+	case "P":
+		// P values just return the raw value
+		fallthrough
+	case "G":
+		// G values just return the raw value
+		return dbf.parseRawValue(raw, column)
 	default:
 		return nil, newError("dbase-interpreter-datatovalue-2", fmt.Errorf("unsupported column data type: %s", column.Type()))
 	}
@@ -114,12 +126,24 @@ func (dbf *DBF) valueToByteRepresentation(field *Field, skipSpacing bool) ([]byt
 	case "L":
 		// L (bool) values are stored as strings T or F, we only check for T, the rest is false...
 		return dbf.getLRepresentation(field)
-	case "V":
-		// V values just return the raw value
-		return dbf.getVRepresentation(field)
 	case "N":
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
 		return dbf.getNRepresentation(field, skipSpacing)
+	case "Q":
+		// Q values just return the raw value
+		fallthrough
+	case "V":
+		// V values just return the raw value
+		fallthrough
+	case "W":
+		// W values just return the raw value
+		fallthrough
+	case "P":
+		// P values just return the raw value
+		fallthrough
+	case "G":
+		// G values just return the raw value
+		return dbf.getRawRepresentation(field)
 	default:
 		return nil, newError("dbase-interpreter-valuetobyterepresentation-1", fmt.Errorf("unsupported column data type: %s at column field: %v", field.column.Type(), field.Name()))
 	}
@@ -399,15 +423,15 @@ func (dbf *DBF) getLRepresentation(field *Field) ([]byte, error) {
 }
 
 // Get the raw value as byte representation
-func (dbf *DBF) parseVValue(raw []byte, column *Column) (interface{}, error) {
+func (dbf *DBF) parseRawValue(raw []byte, column *Column) (interface{}, error) {
 	return raw, nil
 }
 
 // Get the raw value as byte representation (only type check for []byte is performed)
-func (dbf *DBF) getVRepresentation(field *Field) ([]byte, error) {
+func (dbf *DBF) getRawRepresentation(field *Field) ([]byte, error) {
 	raw, ok := field.value.([]byte)
 	if !ok {
-		return nil, newError("dbase-interpreter-getvrepresentation-1", fmt.Errorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name()))
+		return nil, newError("dbase-interpreter-getrawrepresentation-1", fmt.Errorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name()))
 	}
 	return raw, nil
 }

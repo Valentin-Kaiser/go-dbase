@@ -41,9 +41,11 @@ The supported column types with their return Go types are:
 
 | Column Type | Column Type Name | Golang type |
 |------------|-----------------|-------------|
-| B | Double | float64 |
 | C | Character | string |
+| Y | Currency | float64 |
+| B | Double | float64 |
 | D | Date | time.Time |
+| T | DateTime | time.Time | 	
 | F | Float | float64 |
 | I | Integer | int32 |
 | L | Logical | bool |
@@ -51,10 +53,15 @@ The supported column types with their return Go types are:
 | M | Memo (Binary) | []byte |
 | N | Numeric (0 decimals) | int64 |
 | N | Numeric (with decimals) | float64 |
-| T | DateTime | time.Time |
-| Y | Currency | float64 |
+| W* | Blob | []byte |
+| G* | General | []byte |
+| P* | Picture | []byte |
+| P* | Picture | []byte |
+| V* | Varchar | []byte |
 
 > If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
+
+> **These types are not interpreted by this package, the raw data is returned. This means the user must interpret the values themselves.*
 
 # Installation
 ``` 
