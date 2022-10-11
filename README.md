@@ -167,13 +167,13 @@ func main() {
 		// === Struct Conversion ===
 
 		// Read the row into a struct.
-		t := &Product{}
-		err = row.ToStruct(t)
+		p := &Product{}
+		err = row.ToStruct(p)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Printf("Product: %v \n", t.Name)
+		fmt.Printf("Product: %v \n", p.Name)
 	}
 }
 ```
@@ -277,7 +277,7 @@ func main() {
 	dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
 
 	// Create a new row with the same structure as the database file.
-	t := Product{
+	p := Product{
 		ID:          99,
 		Name:        "NEW_PRODUCT",
 		Price:       99.99,
@@ -292,7 +292,7 @@ func main() {
 		Double:      103.45,
 	}
 
-	row, err = dbf.RowFromStruct(t)
+	row, err = dbf.RowFromStruct(p)
 	if err != nil {
 		panic(err)
 	}
@@ -334,25 +334,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
-
-type Product struct {
-	ID          int32     `json:"PRODUCTID"`
-	Name        string    `json:"PRODNAME"`
-	Price       float64   `json:"PRICE"`
-	Tax         float64   `json:"TAX"`
-	Stock       int64     `json:"STOCK"`
-	Date        time.Time `json:"DATE"`
-	DateTime    time.Time `json:"DATETIME"`
-	Description string    `json:"DESCRIPTION"`
-	Active      bool      `json:"ACTIVE"`
-	Float       float64   `json:"FLOAT"`
-	Integer     int64     `json:"INTEGER"`
-	Double      float64   `json:"DOUBLE"`
-}
 
 func main() {
 	// Open the example database file.

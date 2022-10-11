@@ -2,25 +2,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
-
-type Product struct {
-	ID          int32     `json:"PRODUCTID"`
-	Name        string    `json:"PRODNAME"`
-	Price       float64   `json:"PRICE"`
-	Tax         float64   `json:"TAX"`
-	Stock       int64     `json:"STOCK"`
-	Date        time.Time `json:"DATE"`
-	DateTime    time.Time `json:"DATETIME"`
-	Description string    `json:"DESCRIPTION"`
-	Active      bool      `json:"ACTIVE"`
-	Float       float64   `json:"FLOAT"`
-	Integer     int64     `json:"INTEGER"`
-	Double      float64   `json:"DOUBLE"`
-}
 
 func main() {
 	// Open the example database file.

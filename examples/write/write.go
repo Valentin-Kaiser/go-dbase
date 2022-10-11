@@ -92,7 +92,7 @@ func main() {
 	dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
 	// Create a new row with the same structure as the database file.
-	t := Product{
+	p := Product{
 		ID:          99,
 		Name:        "NEW_PRODUCT",
 		Price:       99.99,
@@ -107,7 +107,7 @@ func main() {
 		Double:      103.45,
 	}
 
-	row, err = dbf.RowFromStruct(t)
+	row, err = dbf.RowFromStruct(p)
 	if err != nil {
 		panic(err)
 	}

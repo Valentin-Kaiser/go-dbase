@@ -92,12 +92,12 @@ func main() {
 		// === Struct Conversion ===
 
 		// Read the row into a struct.
-		t := &Product{}
-		err = row.ToStruct(t)
+		p := &Product{}
+		err = row.ToStruct(p)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Printf("Product: %v \n", t.Name)
+		fmt.Printf("Product: %v \n", p.Name)
 	}
 }
