@@ -77,7 +77,7 @@ func Open(config *Config) (*DBF, error) {
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
 	// If the FPT file does not exist an error is returned.
-	if (dbf.header.TableFlags & MemoFlag) != 0 {
+	if (dbf.header.TableFlags & byte(MemoFlag)) != 0 {
 		ext := filepath.Ext(filename)
 		fptExt := ".fpt"
 		if strings.ToUpper(ext) == ext {
@@ -219,7 +219,7 @@ func validateFileVersion(version byte, untested bool) error {
 			return nil
 		}
 		return newError("dbase-io-validatefileversion-1", fmt.Errorf("untested DBF file version: %d (0x%x)", version, version))
-	case FoxPro, FoxProAutoincrement, FoxProVar:
+	case byte(FoxPro), byte(FoxProAutoincrement), byte(FoxProVar):
 		return nil
 	}
 }
@@ -238,7 +238,7 @@ func readColumns(fd windows.Handle) ([]*Column, *Column, error) {
 		if _, err := windows.Read(fd, b); err != nil {
 			return nil, nil, newError("dbase-io-readcolumninfos-2", err)
 		}
-		if b[0] == ColumnEnd {
+		if Marker(b[0]) == ColumnEnd {
 			break
 		}
 		// Position back one byte and read the column
@@ -251,6 +251,7 @@ func readColumns(fd windows.Handle) ([]*Column, *Column, error) {
 			return nil, nil, newError("dbase-io-readcolumninfos-4", err)
 		}
 		column := &Column{}
+		fmt.Printf("Column %v data: %x \n", string(buf[:11]), buf[18:19])
 		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
 			return nil, nil, newError("dbase-io-readcolumninfos-5", err)
@@ -270,25 +271,44 @@ func readColumns(fd windows.Handle) ([]*Column, *Column, error) {
 // The nullFlag field indicates if the field has a variable length
 // If varlength is true, the field is variable length and the length is stored in the last byte
 // If varlength is false, we read the complete field
-func (dbf *DBF) readNullFlag(position uint64) (bool, error) {
+// If the field is null, we return true as second return value
+func (dbf *DBF) readNullFlag(rowPosition uint64, column *Column) (bool, bool, error) {
 	if dbf.nullFlagColumn == nil {
-		return false, fmt.Errorf("null flag column missing")
+		return false, false, fmt.Errorf("null flag column missing")
+	}
+	if column.DataType != byte(Varchar) && column.DataType != byte(Varbinary) {
+		return false, false, fmt.Errorf("column not a varchar or varbinary")
+	}
+	// count what number of varchar field this field is
+	bitCount := 0
+	for _, c := range dbf.table.columns {
+		if c.DataType == byte(Varchar) || c.DataType == byte(Varbinary) {
+			if c == column {
+				break
+			}
+			if c.Flag == byte(NullableFlag) || c.Flag == byte(NullableFlag|BinaryFlag) {
+				bitCount += 2
+			} else {
+				bitCount++
+			}
+		}
 	}
 	// Read the null flag field
-	position = uint64(dbf.header.FirstRow) + position*uint64(dbf.header.RowLength) + uint64(dbf.nullFlagColumn.Position)
+	position := uint64(dbf.header.FirstRow) + rowPosition*uint64(dbf.header.RowLength) + uint64(dbf.nullFlagColumn.Position)
 	_, err := windows.Seek(*dbf.dbaseFileHandle, int64(position), 0)
 	if err != nil {
-		return false, newError("dbase-io-readnullflag-1", err)
+		return false, false, newError("dbase-io-readnullflag-1", err)
 	}
 	buf := make([]byte, dbf.nullFlagColumn.Length)
 	n, err := windows.Read(*dbf.dbaseFileHandle, buf)
 	if err != nil {
-		return false, newError("dbase-io-readnullflag-2", err)
+		return false, false, newError("dbase-io-readnullflag-2", err)
 	}
 	if n != int(dbf.nullFlagColumn.Length) {
-		return false, newError("dbase-io-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, dbf.nullFlagColumn.Length))
+		return false, false, newError("dbase-io-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, dbf.nullFlagColumn.Length))
 	}
-	return buf[0] != 0x00, nil
+
+	return nthBit(buf, bitCount), nthBit(buf, bitCount+1), nil
 }
 
 /**
@@ -660,5 +680,5 @@ func (dbf *DBF) Deleted() (bool, error) {
 	if read != 1 {
 		return false, newError("dbase-io-deleted-4", ErrIncomplete)
 	}
-	return buf[0] == Deleted, nil
+	return Marker(buf[0]) == Deleted, nil
 }
