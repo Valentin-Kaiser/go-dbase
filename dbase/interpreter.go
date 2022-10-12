@@ -478,7 +478,6 @@ func (dbf *DBF) getNumericRepresentation(field *Field, skipSpacing bool) ([]byte
 
 func (dbf *DBF) parseVarchar(raw []byte, column *Column) (interface{}, error) {
 	varlen, null, err := dbf.readNullFlag(uint64(dbf.table.rowPointer), column)
-	fmt.Printf("Field: %v, varlen: %v, null: %v, err: %v \n", column.Name(), varlen, null, err)
 	if err != nil {
 		return nil, newError("dbase-interpreter-parsevvalue-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
 	}
@@ -506,7 +505,6 @@ func (dbf *DBF) getVarcharRepresentation(field *Field) ([]byte, error) {
 
 func (dbf *DBF) parseVarbinary(raw []byte, column *Column) (interface{}, error) {
 	varlen, null, err := dbf.readNullFlag(uint64(dbf.table.rowPointer), column)
-	fmt.Printf("Field: %v, varlen: %v, null: %v, err: %v \n", column.Name(), varlen, null, err)
 	if err != nil {
 		return nil, newError("dbase-interpreter-parsebvalue-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
 	}

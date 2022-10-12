@@ -251,7 +251,6 @@ func readColumns(fd windows.Handle) ([]*Column, *Column, error) {
 			return nil, nil, newError("dbase-io-readcolumninfos-4", err)
 		}
 		column := &Column{}
-		fmt.Printf("Column %v data: %x \n", string(buf[:11]), buf[18:19])
 		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
 			return nil, nil, newError("dbase-io-readcolumninfos-5", err)
