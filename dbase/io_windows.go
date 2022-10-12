@@ -307,7 +307,11 @@ func (dbf *DBF) readNullFlag(rowPosition uint64, column *Column) (bool, bool, er
 		return false, false, newError("dbase-io-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, dbf.nullFlagColumn.Length))
 	}
 
-	return nthBit(buf, bitCount), nthBit(buf, bitCount+1), nil
+	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
+		return nthBit(buf, bitCount), nthBit(buf, bitCount+1), nil
+	}
+
+	return nthBit(buf, bitCount), false, nil
 }
 
 /**
