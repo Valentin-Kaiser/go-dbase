@@ -158,3 +158,15 @@ func prependSpaces(raw []byte, length int) []byte {
 	}
 	return raw
 }
+
+// nthBit returns the nth bit of a byte
+func nthBit(bytes []byte, n int) bool {
+	byteIndex := n / 8 // byte index
+	bitIndex := n % 8  // bit index
+	for index, v := range bytes {
+		if index == byteIndex {
+			return v&(1<<bitIndex) == (1 << bitIndex)
+		}
+	}
+	return false // not found
+}
