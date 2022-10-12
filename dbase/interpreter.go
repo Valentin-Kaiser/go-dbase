@@ -38,7 +38,7 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 	if len(raw) != int(column.Length) {
 		return nil, newError("dbase-interpreter-datatovalue-1", fmt.Errorf("invalid length %v Bytes != %v Bytes at column field: %v", len(raw), column.Length, column.Name()))
 	}
-	switch column.DataType {
+	switch DataType(column.DataType) {
 	case Memo:
 		// M values contain the address in the FPT file from where to read data
 		return dbf.parseMemo(raw, column)
@@ -77,7 +77,7 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 		return dbf.parseVarchar(raw, column)
 	case Varbinary:
 		// Q values just return the raw value
-		fallthrough
+		return dbf.parseVarbinary(raw, column)
 	case Blob:
 		// W values just return the raw value
 		fallthrough
@@ -95,7 +95,7 @@ func (dbf *DBF) dataToValue(raw []byte, column *Column) (interface{}, error) {
 // Converts column data to the byte representation
 // For M values the data has to be written to the memo file
 func (dbf *DBF) valueToByteRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
-	switch field.column.DataType {
+	switch DataType(field.column.DataType) {
 	case Memo:
 		return dbf.getMemoRepresentation(field)
 	case Character:
@@ -133,7 +133,7 @@ func (dbf *DBF) valueToByteRepresentation(field *Field, skipSpacing bool) ([]byt
 		return dbf.getVarcharRepresentation(field)
 	case Varbinary:
 		// Q values just return the raw value
-		fallthrough
+		return dbf.getVarbinaryRepresentation(field)
 	case Blob:
 		// W values just return the raw value
 		fallthrough
@@ -477,9 +477,13 @@ func (dbf *DBF) getNumericRepresentation(field *Field, skipSpacing bool) ([]byte
 }
 
 func (dbf *DBF) parseVarchar(raw []byte, column *Column) (interface{}, error) {
-	varlen, err := dbf.readNullFlag(uint64(dbf.table.rowPointer))
+	varlen, null, err := dbf.readNullFlag(uint64(dbf.table.rowPointer), column)
+	fmt.Printf("Field: %v, varlen: %v, null: %v, err: %v \n", column.Name(), varlen, null, err)
 	if err != nil {
 		return nil, newError("dbase-interpreter-parsevvalue-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
+	}
+	if null {
+		return []byte{}, nil
 	}
 	if varlen {
 		length := raw[len(raw)-1]
@@ -498,4 +502,28 @@ func (dbf *DBF) getVarcharRepresentation(field *Field) ([]byte, error) {
 		return m, nil
 	}
 	return nil, newError("dbase-interpreter-getvrepresentation-1", fmt.Errorf("invalid data type %T, expected string at column field: %v", field.value, field.Name()))
+}
+
+func (dbf *DBF) parseVarbinary(raw []byte, column *Column) (interface{}, error) {
+	varlen, null, err := dbf.readNullFlag(uint64(dbf.table.rowPointer), column)
+	fmt.Printf("Field: %v, varlen: %v, null: %v, err: %v \n", column.Name(), varlen, null, err)
+	if err != nil {
+		return nil, newError("dbase-interpreter-parsebvalue-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
+	}
+	if null {
+		return []byte{}, nil
+	}
+	if varlen {
+		length := raw[len(raw)-1]
+		raw = raw[:length]
+	}
+	return raw, nil
+}
+
+func (dbf *DBF) getVarbinaryRepresentation(field *Field) ([]byte, error) {
+	raw, ok := field.value.([]byte)
+	if !ok {
+		return nil, newError("dbase-interpreter-getbrepresentation-1", fmt.Errorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name()))
+	}
+	return raw, nil
 }
