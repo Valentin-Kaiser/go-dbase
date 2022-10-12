@@ -40,11 +40,11 @@ type Table struct {
 // Column is a struct containing the column information
 type Column struct {
 	ColumnName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
-	DataType   DataType // Column type
+	DataType   byte     // Column type
 	Position   uint32   // Displacement of column in row
 	Length     uint8    // Length of column (in bytes)
 	Decimals   uint8    // Number of decimal places
-	Flags      byte     // Column flags
+	Flag       byte     // Column flag
 	Next       uint32   // Value of autoincrement Next value
 	Step       uint16   // Value of autoincrement Step value
 	Reserved   [8]byte  // Reserved
@@ -271,8 +271,9 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 		return nil, newError("dbase-table-bytestorow-1", fmt.Errorf("invalid row data size %v Bytes < %v Bytes", len(data), int(dbf.header.RowLength)))
 	}
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
-	rec.Deleted = data[0] == Deleted
-	if !rec.Deleted && data[0] != Active {
+
+	rec.Deleted = Marker(data[0]) == Deleted
+	if !rec.Deleted && Marker(data[0]) != Active {
 		return nil, newError("dbase-table-bytestorow-2", fmt.Errorf("invalid row data, no delete flag found at beginning of row"))
 	}
 	// deleted flag already read
@@ -394,7 +395,7 @@ func (field *Field) Name() string {
 
 // Type returns the field type
 func (field *Field) Type() DataType {
-	return field.column.DataType
+	return DataType(field.column.DataType)
 }
 
 // Column returns the field column definition
@@ -413,9 +414,9 @@ func (row *Row) ToBytes() ([]byte, error) {
 	data := make([]byte, row.dbf.header.RowLength)
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 	if row.Deleted {
-		data[0] = Deleted
+		data[0] = byte(Deleted)
 	} else {
-		data[0] = Active
+		data[0] = byte(Active)
 	}
 	// deleted flag already read
 	offset := uint16(1)

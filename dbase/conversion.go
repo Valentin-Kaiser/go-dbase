@@ -1,6 +1,7 @@
 package dbase
 
 import (
+	"bytes"
 	"encoding/binary"
 	"strconv"
 	"strings"
@@ -124,6 +125,16 @@ func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
 	return utf8, nil
 }
 
+// Convert data to binary representation
+func toBinary(data interface{}) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, data)
+	if err != nil {
+		return nil, newError("dbase-interpreter-tobinary-1", err)
+	}
+	return buf.Bytes(), nil
+}
+
 // appendSpaces appends spaces to a byte slice until it reaches the given length
 func appendSpaces(raw []byte, length int) []byte {
 	if len(raw) < length {
@@ -146,4 +157,11 @@ func prependSpaces(raw []byte, length int) []byte {
 		return append(result, raw...)
 	}
 	return raw
+}
+
+// nthBit returns the nth bit of a byte
+func nthBit(bytes []byte, n int) bool {
+	byteIndex := n / 8 // byte index
+	bitIndex := n % 8  // bit index
+	return bytes[byteIndex]&(1<<bitIndex) == (1 << bitIndex)
 }

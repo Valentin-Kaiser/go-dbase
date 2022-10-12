@@ -29,14 +29,15 @@ type Config struct {
 
 // DBF is the main struct to handle a dBase file.
 type DBF struct {
-	config     *Config     // The config used when working with the DBF file.
-	dbaseFile  *os.File    // DBase file handle
-	memoFile   *os.File    // Memo file handle
-	header     *Header     // DBase file header containing relevant information
-	memoHeader *MemoHeader // Memo file header containing relevant information
-	dbaseMutex *sync.Mutex // Mutex locks for concurrent writing access to the DBF file
-	memoMutex  *sync.Mutex // Mutex locks for concurrent writing access to the FPT file
-	table      *Table      // Containing the columns and internal row pointer
+	config         *Config     // The config used when working with the DBF file.
+	dbaseFile      *os.File    // DBase file handle
+	memoFile       *os.File    // Memo file handle
+	header         *Header     // DBase file header containing relevant information
+	memoHeader     *MemoHeader // Memo file header containing relevant information
+	dbaseMutex     *sync.Mutex // Mutex locks for concurrent writing access to the DBF file
+	memoMutex      *sync.Mutex // Mutex locks for concurrent writing access to the FPT file
+	table          *Table      // Containing the columns and internal row pointer
+	nullFlagColumn *Column     // The column containing the null flag column (if varchar or varbinary field exists)
 }
 
 /**
@@ -69,7 +70,7 @@ func Open(config *Config) (*DBF, error) {
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
 	// If the FPT file does not exist an error is returned.
-	if (dbf.header.TableFlags & MemoFlag) != 0 {
+	if (dbf.header.TableFlags & byte(MemoFlag)) != 0 {
 		ext := filepath.Ext(filename)
 		fptExt := ".fpt"
 		if strings.ToUpper(ext) == ext {
@@ -122,7 +123,7 @@ func prepareDBF(dbaseFile *os.File, config *Config) (*DBF, error) {
 	if err := validateFileVersion(header.FileType, config.Untested); err != nil {
 		return nil, newError("dbase-io-preparedbf-2", err)
 	}
-	columns, err := readColumns(dbaseFile)
+	columns, nullFlag, err := readColumns(dbaseFile)
 	if err != nil {
 		return nil, newError("dbase-io-preparedbf-3", err)
 	}
@@ -134,8 +135,9 @@ func prepareDBF(dbaseFile *os.File, config *Config) (*DBF, error) {
 			columns: columns,
 			mods:    make([]*Modification, len(columns)),
 		},
-		dbaseMutex: &sync.Mutex{},
-		memoMutex:  &sync.Mutex{},
+		dbaseMutex:     &sync.Mutex{},
+		memoMutex:      &sync.Mutex{},
+		nullFlagColumn: nullFlag,
 	}
 	return dbf, nil
 }
@@ -217,49 +219,99 @@ func validateFileVersion(version byte, untested bool) error {
 			return nil
 		}
 		return newError("dbase-io-validatefileversion-1", fmt.Errorf("untested DBF file version: %d (0x%x)", version, version))
-	case FoxPro, FoxProAutoincrement:
+	case byte(FoxPro), byte(FoxProAutoincrement), byte(FoxProVar):
 		return nil
 	}
 }
 
 // Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
-func readColumns(dbaseFile *os.File) ([]*Column, error) {
+func readColumns(dbaseFile *os.File) ([]*Column, *Column, error) {
+	var nullFlag *Column
 	columns := make([]*Column, 0)
 	offset := int64(32)
 	b := make([]byte, 1)
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
 		if _, err := dbaseFile.Seek(offset, 0); err != nil {
-			return nil, newError("dbase-io-readcolumninfos-1", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-1", err)
 		}
 		if _, err := dbaseFile.Read(b); err != nil {
-			return nil, newError("dbase-io-readcolumninfos-2", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-2", err)
 		}
-		if b[0] == ColumnEnd {
+		if b[0] == byte(ColumnEnd) {
 			break
 		}
 		// Position back one byte and read the column
 		if _, err := dbaseFile.Seek(-1, 1); err != nil {
-			return nil, newError("dbase-io-readcolumninfos-3", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-3", err)
 		}
-		buf := make([]byte, 2048)
+		buf := make([]byte, 33)
 		n, err := dbaseFile.Read(buf)
 		if err != nil {
-			return nil, newError("dbase-io-readcolumninfos-4", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-4", err)
 		}
 		column := &Column{}
 		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
-			return nil, newError("dbase-io-readcolumninfos-5", err)
+			return nil, nil, newError("dbase-io-readcolumninfos-5", err)
 		}
 		if column.Name() == "_NullFlags" {
+			nullFlag = column
 			offset += 32
 			continue
 		}
 		columns = append(columns, column)
 		offset += 32
 	}
-	return columns, nil
+	return columns, nullFlag, nil
+}
+
+// Read the nullFlag field at the end of the row
+// The nullFlag field indicates if the field has a variable length
+// If varlength is true, the field is variable length and the length is stored in the last byte
+// If varlength is false, we read the complete field
+// If the field is null, we return true as second return value
+func (dbf *DBF) readNullFlag(rowPosition uint64, column *Column) (bool, bool, error) {
+	if dbf.nullFlagColumn == nil {
+		return false, false, fmt.Errorf("null flag column missing")
+	}
+	if column.DataType != byte(Varchar) && column.DataType != byte(Varbinary) {
+		return false, false, fmt.Errorf("column not a varchar or varbinary")
+	}
+	// count what number of varchar field this field is
+	bitCount := 0
+	for _, c := range dbf.table.columns {
+		if c.DataType == byte(Varchar) || c.DataType == byte(Varbinary) {
+			if c == column {
+				break
+			}
+			if c.Flag == byte(NullableFlag) || c.Flag == byte(NullableFlag|BinaryFlag) {
+				bitCount += 2
+			} else {
+				bitCount++
+			}
+		}
+	}
+	// Read the null flag field
+	position := uint64(dbf.header.FirstRow) + rowPosition*uint64(dbf.header.RowLength) + uint64(dbf.nullFlagColumn.Position)
+	_, err := dbf.dbaseFile.Seek(int64(position), 0)
+	if err != nil {
+		return false, false, newError("dbase-io-readnullflag-1", err)
+	}
+	buf := make([]byte, dbf.nullFlagColumn.Length)
+	n, err := dbf.dbaseFile.Read(buf)
+	if err != nil {
+		return false, false, newError("dbase-io-readnullflag-2", err)
+	}
+	if n != int(dbf.nullFlagColumn.Length) {
+		return false, false, newError("dbase-io-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, dbf.nullFlagColumn.Length))
+	}
+
+	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
+		return nthBit(buf, bitCount), nthBit(buf, bitCount+1), nil
+	}
+
+	return nthBit(buf, bitCount), false, nil
 }
 
 /**
@@ -337,7 +389,7 @@ func (dbf *DBF) readMemo(blockdata []byte) ([]byte, bool, error) {
 }
 
 // Parses a memo file from raw []byte, decodes and returns as []byte
-func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
+func (dbf *DBF) parseMemoFile(raw []byte) ([]byte, bool, error) {
 	memo, isText, err := dbf.readMemo(raw)
 	if err != nil {
 		return []byte{}, false, newError("dbase-io-parse-memo-1", err)
@@ -662,5 +714,5 @@ func (dbf *DBF) Deleted() (bool, error) {
 	if read != 1 {
 		return false, newError("dbase-io-deleted-4", ErrIncomplete)
 	}
-	return buf[0] == Deleted, nil
+	return buf[0] == byte(Deleted), nil
 }

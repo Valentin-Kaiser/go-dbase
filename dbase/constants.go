@@ -2,27 +2,41 @@ package dbase
 
 // Supported and testet file types - other file types may work but are not tested
 // The file type check has to be bypassed when opening a file type that is not supported
+type FileType byte
+
 const (
-	FoxPro              = 0x30
-	FoxProAutoincrement = 0x31
+	FoxPro              FileType = 0x30
+	FoxProAutoincrement FileType = 0x31
+	FoxProVar           FileType = 0x32
 )
 
-// Relevant byte marker
+type Marker byte
+
 const (
-	Null      = 0x00
-	Blank     = 0x20
-	ColumnEnd = 0x0D
-	Active    = Blank
-	Deleted   = 0x2A
-	EOFMarker = 0x1A
+	Null      Marker = 0x00
+	Blank     Marker = 0x20
+	ColumnEnd Marker = 0x0D
+	Active    Marker = Blank
+	Deleted   Marker = 0x2A
+	EOFMarker Marker = 0x1A
 )
 
-// Table flags
+type TableFlag byte
+
 const (
-	StructuralFlag     = 0x01
-	MemoFlag           = 0x02
-	StructuralMemoFlag = 0x03
-	DatabaseFlag       = 0x04
+	StructuralFlag     TableFlag = 0x01
+	MemoFlag           TableFlag = 0x02
+	StructuralMemoFlag TableFlag = 0x03
+	DatabaseFlag       TableFlag = 0x04
+)
+
+type ColumnFlag byte
+
+const (
+	HiddenFlag        ColumnFlag = 0x01
+	NullableFlag      ColumnFlag = 0x02
+	BinaryFlag        ColumnFlag = 0x04
+	AutoincrementFlag ColumnFlag = 0x0C
 )
 
 // DataType defines the possible types of a column
