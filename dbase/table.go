@@ -334,6 +334,27 @@ func (row *Row) Add() error {
 	return row.Write()
 }
 
+// Returns all values of a row as a slice of interface{}
+func (row *Row) Values() []interface{} {
+	values := make([]interface{}, 0)
+	for _, field := range row.fields {
+		values = append(values, field.value)
+	}
+	return values
+}
+
+func (row *Row) Value(pos int) interface{} {
+	return row.fields[pos].value
+}
+
+func (row *Row) ValueByName(name string) (interface{}, error) {
+	pos := row.dbf.ColumnPosByName(name)
+	if pos < 0 {
+		return nil, newError("dbase-table-valuebyname-1", fmt.Errorf("column %v not found", name))
+	}
+	return row.Value(pos), nil
+}
+
 // Returns all fields of the current row
 func (row *Row) Fields() []*Field {
 	return row.fields
@@ -354,15 +375,6 @@ func (row *Row) FieldByName(name string) (*Field, error) {
 		return nil, newError("dbase-table-fieldbyname-1", fmt.Errorf("column %v not found", name))
 	}
 	return row.Field(position)
-}
-
-// Returns all values of a row as a slice of interface{}
-func (row *Row) Values() []interface{} {
-	values := make([]interface{}, 0)
-	for _, field := range row.fields {
-		values = append(values, field.value)
-	}
-	return values
 }
 
 // ChangeField applies a modificated field to the row
