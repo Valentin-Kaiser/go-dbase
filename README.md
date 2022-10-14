@@ -31,6 +31,8 @@ There are several similar packages but they are not suited for our use case, thi
 
 > ³ When reading or writing a file, not the complete file is locked. But while writing, the data block to be written is locked during the operation. This is done to prevent other processes from writing the same block of data. This is not a problem when reading since the data is not changed.
 
+> **Disclaimer:** _This library should never be used to develop new software solutions with dbase tables. The creation of new tables only serves to transfer old databases or to remove faulty data._
+
 # Supported column types
 
 At this moment not all FoxPro column types are supported. 
