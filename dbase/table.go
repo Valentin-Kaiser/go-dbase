@@ -506,6 +506,7 @@ func (dbf *DBF) NewField(pos int, value interface{}) (*Field, error) {
 	}, nil
 }
 
+// Creates a new field with the given value and column specified by name
 func (dbf *DBF) NewFieldByName(name string, value interface{}) (*Field, error) {
 	pos := dbf.ColumnPosByName(name)
 	if pos < 0 {
@@ -534,10 +535,12 @@ func (row *Row) Values() []interface{} {
 	return values
 }
 
+// Returns the value of a row at the given position
 func (row *Row) Value(pos int) interface{} {
 	return row.fields[pos].value
 }
 
+// Returns the value of a row at the given column name
 func (row *Row) ValueByName(name string) (interface{}, error) {
 	pos := row.dbf.ColumnPosByName(name)
 	if pos < 0 {
@@ -551,7 +554,7 @@ func (row *Row) Fields() []*Field {
 	return row.fields
 }
 
-// Returns the field of a row by position
+// Returns the field of a row by position or nil if not found
 func (row *Row) Field(pos int) *Field {
 	if pos < 0 || pos >= len(row.fields) {
 		return nil
@@ -559,7 +562,7 @@ func (row *Row) Field(pos int) *Field {
 	return row.fields[pos]
 }
 
-// Returns the field of a row by name
+// Returns the field of a row by name or nil if not found
 func (row *Row) FieldByName(name string) *Field {
 	return row.Field(row.dbf.ColumnPosByName(name))
 }
@@ -574,22 +577,22 @@ func (field *Field) SetValue(value interface{}) error {
 }
 
 // Value returns the field value
-func (field *Field) GetValue() interface{} {
+func (field Field) GetValue() interface{} {
 	return field.value
 }
 
 // Name returns the field name
-func (field *Field) Name() string {
+func (field Field) Name() string {
 	return field.column.Name()
 }
 
 // Type returns the field type
-func (field *Field) Type() DataType {
+func (field Field) Type() DataType {
 	return DataType(field.column.DataType)
 }
 
 // Column returns the field column definition
-func (field *Field) Column() *Column {
+func (field Field) Column() *Column {
 	return field.column
 }
 
