@@ -23,6 +23,7 @@ There are several similar packages but they are not suited for our use case, thi
 | Full data type support | ✅ | ❌ | ❌ |
 | Non full blocking IO³ | ✅ | ❌ | ❌ |
 | Search by value | ✅ | ❌ | ❌ |
+| Create new tables from scratch | ✅ | ❌ | ❌ |
 
 > ¹ Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
 
@@ -328,25 +329,28 @@ func main() {
 		panic(err)
 	}
 
-	// Field name are always save uppercase
+	// Field name are always saved uppercase
 	nameCol, err := dbase.NewColumn("Name", dbase.Character, 20, 0, false)
 	if err != nil {
 		panic(err)
 	}
 
-	// Memo fields need no length the memo block size is defined when calling New()
+	// Memo fields need no length the memo block size is defined as last parameter when calling New()
 	memoCol, err := dbase.NewColumn("Memo", dbase.Memo, 0, 0, false)
 	if err != nil {
 		panic(err)
 	}
 
+	// Some fields can be null this is defined by the last parameter
 	varCol, err := dbase.NewColumn("Var", dbase.Varchar, 64, 0, true)
 	if err != nil {
 		panic(err)
 	}
 
+	// When creating a new table you need to define table type
+	// For more information about table types see the constants.go file
 	dbf, err := dbase.New(
-		0x32,
+		dbase.FoxProVar,
 		&dbase.Config{
 			Filename:   "test.dbf",
 			Converter:  new(dbase.Win1250Converter),
@@ -385,14 +389,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	err = row.FieldByName("NAME").SetValue("TOTALLY_NEW_ROW")
 	if err != nil {
 		panic(err)
 	}
+
 	err = row.FieldByName("MEMO").SetValue("This is a memo field")
 	if err != nil {
 		panic(err)
 	}
+
 	err = row.FieldByName("VAR").SetValue("This is a varchar field")
 	if err != nil {
 		panic(err)
