@@ -2,14 +2,29 @@ package dbase
 
 // Supported and testet file types - other file types may work but are not tested
 // The file type check has to be bypassed when opening a file type that is not supported
+// https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.71)
 type FileType byte
 
+// Supported and testet file types - other file types may work but are not tested
 const (
 	FoxPro              FileType = 0x30
 	FoxProAutoincrement FileType = 0x31
 	FoxProVar           FileType = 0x32
 )
 
+// Not tested
+const (
+	FoxBase         FileType = 0x02
+	FoxBase2        FileType = 0xFB
+	FoxBasePlus     FileType = 0x03
+	DBaseSQLTable   FileType = 0x43
+	FoxBasePlusMemo FileType = 0x83
+	DBaseMemo       FileType = 0x8B
+	DBaseSQLMemo    FileType = 0xCB
+	FoxPro2Memo     FileType = 0xF5
+)
+
+// Important byte marker for the dbase file
 type Marker byte
 
 const (
@@ -21,6 +36,8 @@ const (
 	EOFMarker Marker = 0x1A
 )
 
+// Table flags inidicate the type of the table
+// https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.71)
 type TableFlag byte
 
 const (
@@ -30,6 +47,7 @@ const (
 	DatabaseFlag       TableFlag = 0x04
 )
 
+// Column flags indicate wether a column is hidden, can be null, is binary or is autoincremented
 type ColumnFlag byte
 
 const (

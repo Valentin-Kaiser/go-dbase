@@ -112,6 +112,37 @@ func (dbf *DBF) Close() error {
  *	################################################################
  */
 
+func create(dbf *DBF) (*DBF, error) {
+	dbf.config.Filename = strings.ToUpper(strings.TrimSpace(dbf.config.Filename))
+	// Check for valid file name
+	if len(dbf.config.Filename) == 0 {
+		return nil, newError("dbase-io-create-1", fmt.Errorf("missing filename"))
+	}
+	// Check for valid file extension
+	if filepath.Ext(strings.ToUpper(dbf.config.Filename)) != ".DBF" {
+		return nil, newError("dbase-io-create-2", fmt.Errorf("invalid file extension"))
+	}
+	// Check if file exists already
+	if _, err := os.Stat(dbf.config.Filename); err == nil {
+		return nil, newError("dbase-io-create-3", fmt.Errorf("file already exists"))
+	}
+	// Create the file
+	dbaseFile, err := os.Create(strings.ToUpper(dbf.config.Filename))
+	if err != nil {
+		return nil, newError("dbase-io-create-2", fmt.Errorf("creating DBF file failed with error: %w", err))
+	}
+	dbf.dbaseFile = dbaseFile
+	if dbf.memoHeader != nil {
+		// Create the memo file
+		memoFile, err := os.Create(strings.TrimSuffix(dbf.config.Filename, filepath.Ext(dbf.config.Filename)) + ".FPT")
+		if err != nil {
+			return nil, newError("dbase-io-create-4", fmt.Errorf("creating FPT file failed with error: %w", err))
+		}
+		dbf.memoFile = memoFile
+	}
+	return dbf, nil
+}
+
 // Returns a DBF object pointer
 // Reads the DBF Header, the column infos and validates file version.
 func prepareDBF(dbaseFile *os.File, config *Config) (*DBF, error) {
@@ -264,6 +295,75 @@ func readColumns(dbaseFile *os.File) ([]*Column, *Column, error) {
 		offset += 32
 	}
 	return columns, nullFlag, nil
+}
+
+func (dbf *DBF) writeColumns() (err error) {
+	// Lock the block we are writing to
+	position := uint32(32)
+	// Lock the block we are writing to
+	if dbf.config.WriteLock {
+		flock := &unix.Flock_t{
+			Type:   unix.F_WRLCK,
+			Start:  int64(position),
+			Len:    int64(dbf.header.FirstRow),
+			Whence: 0,
+		}
+		for {
+			err = unix.FcntlFlock(dbf.dbaseFile.Fd(), unix.F_SETLK, flock)
+			if err == nil {
+				break
+			}
+			if !errors.Is(err, unix.EAGAIN) {
+				return newError("dbase-io-writecolumns-1", err)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		defer func() {
+			flock.Type = unix.F_ULOCK
+			ulockErr := unix.FcntlFlock(dbf.dbaseFile.Fd(), unix.F_ULOCK, flock)
+			if ulockErr != nil {
+				err = newError("dbase-io-writecolumns-2", ulockErr)
+			}
+		}()
+	}
+	// Seek to the beginning of the file
+	_, err = dbf.dbaseFile.Seek(32, 0)
+	if err != nil {
+		return newError("dbase-io-writecolumns-3", err)
+	}
+	// Write the columns
+	buf := new(bytes.Buffer)
+	for _, column := range dbf.table.columns {
+		err = binary.Write(buf, binary.LittleEndian, column)
+		if err != nil {
+			return newError("dbase-io-writecolumns-4", err)
+		}
+	}
+	if dbf.nullFlagColumn != nil {
+		err = binary.Write(buf, binary.LittleEndian, dbf.nullFlagColumn)
+		if err != nil {
+			return newError("dbase-io-writecolumns-5", err)
+		}
+	}
+	_, err = dbf.dbaseFile.Write(buf.Bytes())
+	if err != nil {
+		return newError("dbase-io-writecolumns-5", err)
+	}
+	// Write the column terminator
+	_, err = dbf.dbaseFile.Write([]byte{byte(ColumnEnd)})
+	if err != nil {
+		return newError("dbase-io-writecolumns-6", err)
+	}
+	// Write null till the end of the header
+	pos := dbf.header.FirstRow - uint16(len(dbf.table.columns)*32) - 32
+	if dbf.nullFlagColumn != nil {
+		pos -= 32
+	}
+	_, err = dbf.dbaseFile.Write(make([]byte, pos))
+	if err != nil {
+		return newError("dbase-io-writecolumns-7", err)
+	}
+	return nil
 }
 
 // Read the nullFlag field at the end of the row
@@ -520,6 +620,11 @@ func (dbf *DBF) writeMemoHeader() (err error) {
 	_, err = dbf.memoFile.Write(buf)
 	if err != nil {
 		return newError("dbase-io-writememoheader-5", err)
+	}
+	// Write null till end of header
+	_, err = dbf.memoFile.Write(make([]byte, 512-8))
+	if err != nil {
+		return newError("dbase-io-writememoheader-6", err)
 	}
 	return nil
 }

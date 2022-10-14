@@ -3,8 +3,10 @@ package dbase
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -39,15 +41,15 @@ type Table struct {
 
 // Column is a struct containing the column information
 type Column struct {
-	ColumnName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
-	DataType   byte     // Column type
-	Position   uint32   // Displacement of column in row
-	Length     uint8    // Length of column (in bytes)
-	Decimals   uint8    // Number of decimal places
-	Flag       byte     // Column flag
-	Next       uint32   // Value of autoincrement Next value
-	Step       uint16   // Value of autoincrement Step value
-	Reserved   [8]byte  // Reserved
+	FieldName [11]byte // Column name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
+	DataType  byte     // Column type
+	Position  uint32   // Displacement of column in row
+	Length    uint8    // Length of column (in bytes)
+	Decimals  uint8    // Number of decimal places
+	Flag      byte     // Column flag
+	Next      uint32   // Value of autoincrement Next value
+	Step      uint16   // Value of autoincrement Step value
+	Reserved  [7]byte  // Reserved
 }
 
 // Row is a struct containing the row Position, deleted flag and data fields
@@ -70,6 +72,188 @@ type Modification struct {
 	TrimSpaces  bool                                   // Trim spaces from string values
 	Convert     func(interface{}) (interface{}, error) // Conversion function to convert the value
 	ExternalKey string                                 // External key to use for the column
+}
+
+/**
+ *  ###############################################################
+ *  #                   Create new DBF file
+ *  ###############################################################
+ */
+
+// Create a new DBF file
+func New(version FileType, config *Config, columns []*Column, memoBlockSize uint16) (*DBF, error) {
+	if len(columns) == 0 {
+		return nil, errors.New("no columns defined")
+	}
+	dbf := &DBF{
+		config: config,
+		header: &Header{
+			FileType:  byte(version),
+			Year:      uint8(time.Now().Year() - 2000),
+			Month:     uint8(time.Now().Month()),
+			Day:       uint8(time.Now().Day()),
+			FirstRow:  296 + uint16(len(columns))*32,
+			RowLength: 1,
+			CodePage:  config.Converter.CodePageMark(),
+		},
+		table: &Table{
+			columns: make([]*Column, 0),
+		},
+		dbaseMutex: &sync.Mutex{},
+		memoMutex:  &sync.Mutex{},
+	}
+	// Determines how many bytes are needed for the _NullFlag field if needed
+	nullFlagLength := 0
+	// Check if we need a memo file
+	memoField := false
+	for _, column := range columns {
+		if column.DataType == byte(Memo) {
+			memoField = true
+			dbf.header.TableFlags = byte(MemoFlag)
+		}
+		if column.DataType == byte(Varchar) || column.DataType == byte(Varbinary) {
+			if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
+				nullFlagLength += 2
+			} else {
+				nullFlagLength++
+			}
+		}
+		// Set the column position in the row
+		column.Position = uint32(dbf.header.RowLength)
+		// Add the column length to the row length
+		dbf.header.RowLength += uint16(column.Length)
+		// Add columns to the table
+		dbf.table.columns = append(dbf.table.columns, column)
+	}
+	// If there are memo fields, add the memo header
+	if memoField {
+		dbf.memoHeader = &MemoHeader{
+			NextFree:  0,
+			Unused:    [2]byte{0x00, 0x00},
+			BlockSize: memoBlockSize,
+		}
+	}
+	// If there are nullable or variable length fields, add the null flag column
+	if nullFlagLength > 0 {
+		length := nullFlagLength / 8
+		if nullFlagLength%8 > 0 {
+			length++
+		}
+		dbf.nullFlagColumn = &Column{
+			FieldName: [11]byte{0x5F, 0x4E, 0x75, 0x6C, 0x6C, 0x46, 0x6C, 0x61, 0x67, 0x73},
+			DataType:  0x30,
+			Position:  uint32(dbf.header.RowLength),
+			Length:    uint8(length),
+			Decimals:  0,
+			Flag:      0x05,
+			Next:      0x00,
+			Step:      0x00,
+			Reserved:  [7]byte{},
+		}
+		dbf.header.FirstRow += 32
+		dbf.header.RowLength += uint16(length)
+	}
+	// Create the files
+	dbf, err := create(dbf)
+	if err != nil {
+		return nil, err
+	}
+	// Write the headers
+	err = dbf.writeHeader()
+	if err != nil {
+		return nil, err
+	}
+	// Write the columns
+	err = dbf.writeColumns()
+	if err != nil {
+		return nil, err
+	}
+	// Write the memo header
+	if dbf.memoHeader != nil {
+		err = dbf.writeMemoHeader()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return dbf, nil
+}
+
+func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nullable bool) (*Column, error) {
+	if len(name) == 0 {
+		return nil, errors.New("no column name defined")
+	}
+	if len(name) > 10 {
+		return nil, newError("dbase-table-newcolumn-1", errors.New("column name can only be 10 characters long"))
+	}
+	column := &Column{
+		FieldName: [11]byte{},
+		DataType:  byte(dataType),
+		Position:  uint32(0),
+		Decimals:  decimals,
+		Length:    uint8(0),
+		Flag:      0x00,
+		Next:      uint32(0),
+		Step:      uint16(0),
+		Reserved:  [7]byte{},
+	}
+	copy(column.FieldName[:], []byte(strings.ToUpper(name))[:11])
+	// Set the appropriate flag for nullable fields
+	if nullable {
+		column.Flag = byte(NullableFlag)
+	}
+	// Check for data type to specify the length
+	switch dataType {
+	case Character:
+		if length > 254 {
+			return nil, newError("dbase-table-newcolumn-2", errors.New("character length can only be 254 bytes long"))
+		}
+		if length == 0 {
+			return nil, newError("dbase-table-newcolumn-3", errors.New("character length can not be 0"))
+		}
+		column.Length = length
+	case Varbinary:
+		if length > 254 {
+			return nil, newError("dbase-table-newcolumn-5", errors.New("varbinary length can only be 254 bytes long"))
+		}
+		if length == 0 {
+			return nil, newError("dbase-table-newcolumn-6", errors.New("varbinary length can not be 0"))
+		}
+		column.Length = length
+		column.Flag |= byte(BinaryFlag)
+	case Varchar:
+		if length > 254 {
+			return nil, newError("dbase-table-newcolumn-6", errors.New("varchar length can only be 254 bytes long"))
+		}
+		if length == 0 {
+			return nil, newError("dbase-table-newcolumn-7", errors.New("varchar length can not be 0"))
+		}
+		column.Length = length
+	case Numeric:
+		if length > 20 {
+			return nil, newError("dbase-table-newcolumn-3", errors.New("numeric length can only be 20 bytes long"))
+		}
+		if length == 0 {
+			return nil, newError("dbase-table-newcolumn-4", errors.New("numeric length can not be 0"))
+		}
+		column.Length = length
+	case Float:
+		if length > 20 {
+			return nil, newError("dbase-table-newcolumn-4", errors.New("float length can only be 20 bytes long"))
+		}
+		if length == 0 {
+			return nil, newError("dbase-table-newcolumn-5", errors.New("float length can not be 0"))
+		}
+		column.Length = length
+	case Logical:
+		column.Length = 1
+	case Integer, Memo:
+		column.Length = 4
+	case Currency, Date, DateTime, Double:
+		column.Length = 8
+	default:
+		return nil, newError("dbase-table-newcolumn-2", errors.New("invalid data type"))
+	}
+	return column, nil
 }
 
 /**
@@ -217,7 +401,7 @@ func (dbf *DBF) GetColumnModification(position int) *Modification {
 
 // Returns the name of the column as a trimmed string (max length 10)
 func (c *Column) Name() string {
-	return string(bytes.TrimRight(c.ColumnName[:], "\x00"))
+	return string(bytes.TrimRight(c.FieldName[:], "\x00"))
 }
 
 // Returns the type of the column as string (length 1)
@@ -295,12 +479,19 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 
 // Returns a new Row struct with the same column structure as the dbf and the next row pointer
 func (dbf *DBF) NewRow() *Row {
-	return &Row{
+	row := &Row{
 		dbf:      dbf,
 		Position: dbf.header.RowsCount + 1,
 		Deleted:  false,
-		fields:   make([]*Field, len(dbf.table.columns)),
+		fields:   make([]*Field, 0),
 	}
+	for _, column := range dbf.table.columns {
+		row.fields = append(row.fields, &Field{
+			column: column,
+			value:  nil,
+		})
+	}
+	return row
 }
 
 // Creates a new field with the given value and column
@@ -361,38 +552,25 @@ func (row *Row) Fields() []*Field {
 }
 
 // Returns the field of a row by position
-func (row *Row) Field(pos int) (*Field, error) {
-	if pos < 0 || len(row.fields) < pos {
-		return nil, newError("dbase-table-field-1", ErrInvalidPosition)
+func (row *Row) Field(pos int) *Field {
+	if pos < 0 || pos >= len(row.fields) {
+		return nil
 	}
-	return row.fields[pos], nil
+	return row.fields[pos]
 }
 
 // Returns the field of a row by name
-func (row *Row) FieldByName(name string) (*Field, error) {
-	position := row.dbf.ColumnPosByName(name)
-	if position < 0 {
-		return nil, newError("dbase-table-fieldbyname-1", fmt.Errorf("column %v not found", name))
-	}
-	return row.Field(position)
-}
-
-// ChangeField applies a modificated field to the row
-func (row *Row) ChangeField(field *Field) error {
-	if field.column == nil {
-		return newError("dbase-table-changefield-1", fmt.Errorf("column missing"))
-	}
-	pos := row.dbf.ColumnPos(field.column)
-	if pos < 0 || len(row.fields) < pos {
-		return newError("dbase-table-changefield-2", ErrInvalidPosition)
-	}
-	row.fields[pos] = field
-	return nil
+func (row *Row) FieldByName(name string) *Field {
+	return row.Field(row.dbf.ColumnPosByName(name))
 }
 
 // SetValue allows to change the field value
-func (field *Field) SetValue(value interface{}) {
+func (field *Field) SetValue(value interface{}) error {
+	if field == nil {
+		return newError("dbase-table-setvalue-1", fmt.Errorf("field is not defined by table"))
+	}
 	field.value = value
+	return nil
 }
 
 // Value returns the field value

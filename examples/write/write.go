@@ -50,31 +50,13 @@ func main() {
 	}
 
 	// Get the company name field by column name.
-	field, err := row.FieldByName("PRODNAME")
-	if err != nil {
-		panic(err)
-	}
-
-	// Change the field value
-	field.SetValue("CHANGED_PRODUCT_NAME")
-
-	// Apply the changed field value to the row.
-	err = row.ChangeField(field)
+	err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
 	if err != nil {
 		panic(err)
 	}
 
 	// Change a memo field value.
-	field, err = row.FieldByName("DESC")
-	if err != nil {
-		panic(err)
-	}
-
-	// Change the field value
-	field.SetValue("MEMO_TEST_VALUE")
-
-	// Apply the changed field value to the row.
-	err = row.ChangeField(field)
+	err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
 	if err != nil {
 		panic(err)
 	}

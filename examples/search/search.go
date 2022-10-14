@@ -41,9 +41,9 @@ func main() {
 	// Print all found records.
 	fmt.Println("Found records with match:")
 	for _, record := range records {
-		field, err := record.FieldByName("PRODNAME")
-		if err != nil {
-			panic(err)
+		field = record.FieldByName("PRODNAME")
+		if field == nil {
+			panic("Field 'PRODNAME' not found")
 		}
 
 		fmt.Printf("%v \n", field.GetValue())
@@ -58,9 +58,9 @@ func main() {
 	// Print all found records.
 	fmt.Println("Found records with exact match:")
 	for _, record := range records {
-		field, err := record.FieldByName("PRODNAME")
-		if err != nil {
-			panic(err)
+		field = record.FieldByName("PRODNAME")
+		if field == nil {
+			panic("Field 'PRODNAME' not found")
 		}
 
 		fmt.Printf("%v \n", field.GetValue())

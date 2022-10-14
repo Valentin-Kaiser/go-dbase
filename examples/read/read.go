@@ -64,18 +64,18 @@ func main() {
 		}
 
 		// Get the first field by column position
-		field, err := row.Field(0)
-		if err != nil {
-			panic(err)
+		field := row.Field(0)
+		if field == nil {
+			panic("Field not found")
 		}
 
 		// Print the field value.
 		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.GetValue())
 
 		// Get value by column name
-		field, err = row.FieldByName("PRODNAME")
-		if err != nil {
-			panic(err)
+		field = row.FieldByName("PRODNAME")
+		if field == nil {
+			panic("Field not found")
 		}
 
 		// Print the field value.
