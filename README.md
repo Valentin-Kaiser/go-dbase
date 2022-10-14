@@ -139,18 +139,18 @@ func main() {
 		}
 
 		// Get the first field by column position
-		field, err := row.Field(0)
-		if err != nil {
-			panic(err)
+		field := row.Field(0)
+		if field == nil {
+			panic("Field not found")
 		}
 
 		// Print the field value.
 		fmt.Printf("Field: %v [%v] => %v \n", field.Name(), field.Type(), field.GetValue())
 
 		// Get value by column name
-		field, err = row.FieldByName("PRODNAME")
-		if err != nil {
-			panic(err)
+		field = row.FieldByName("PRODNAME")
+		if field == nil {
+			panic("Field not found")
 		}
 
 		// Print the field value.
@@ -159,10 +159,10 @@ func main() {
 		// === Modifications ===
 
 		// Disable space trimming for the company name
-		dbf.SetColumnModificationByName("PRODNAME", false, "", nil)
+		dbf.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
 		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-		dbf.SetColumnModificationByName("INTEGER", true, "FLOAT", nil)
-		dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
+		dbf.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+		dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
 		// === Struct Conversion ===
 
@@ -235,31 +235,13 @@ func main() {
 	}
 
 	// Get the company name field by column name.
-	field, err := row.FieldByName("PRODNAME")
-	if err != nil {
-		panic(err)
-	}
-
-	// Change the field value
-	field.SetValue("CHANGED_PRODUCT_NAME")
-
-	// Apply the changed field value to the row.
-	err = row.ChangeField(field)
+	err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
 	if err != nil {
 		panic(err)
 	}
 
 	// Change a memo field value.
-	field, err = row.FieldByName("DESC")
-	if err != nil {
-		panic(err)
-	}
-
-	// Change the field value
-	field.SetValue("MEMO_TEST_VALUE")
-
-	// Apply the changed field value to the row.
-	err = row.ChangeField(field)
+	err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
 	if err != nil {
 		panic(err)
 	}
@@ -273,8 +255,8 @@ func main() {
 	// === Modifications ===
 
 	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-	dbf.SetColumnModificationByName("INTEGER", true, "FLOAT", nil)
-	dbf.SetColumnModificationByName("FLOAT", true, "INTEGER", nil)
+	dbf.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+	dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
 	// Create a new row with the same structure as the database file.
 	p := Product{
@@ -326,6 +308,129 @@ func main() {
 ```
 </details>
 
+
+<details open>
+  <summary>Create</summary>
+  
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/Valentin-Kaiser/go-dbase/dbase"
+)
+
+func main() {
+	// Integer are allways 4 bytes long
+	idCol, err := dbase.NewColumn("ID", dbase.Integer, 0, 0, false)
+	if err != nil {
+		panic(err)
+	}
+
+	// Field name are always save uppercase
+	nameCol, err := dbase.NewColumn("Name", dbase.Character, 20, 0, false)
+	if err != nil {
+		panic(err)
+	}
+
+	// Memo fields need no length the memo block size is defined when calling New()
+	memoCol, err := dbase.NewColumn("Memo", dbase.Memo, 0, 0, false)
+	if err != nil {
+		panic(err)
+	}
+
+	varCol, err := dbase.NewColumn("Var", dbase.Varchar, 64, 0, true)
+	if err != nil {
+		panic(err)
+	}
+
+	dbf, err := dbase.New(
+		0x32,
+		&dbase.Config{
+			Filename:   "test.dbf",
+			Converter:  new(dbase.Win1250Converter),
+			TrimSpaces: true,
+		},
+		[]*dbase.Column{
+			idCol,
+			nameCol,
+			memoCol,
+			varCol,
+		},
+		64,
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer dbf.Close()
+
+	fmt.Printf(
+		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
+		dbf.Header().Modified(),
+		dbf.Header().ColumnsCount(),
+		dbf.Header().RecordsCount(),
+		dbf.Header().FileSize(),
+	)
+
+	// Print all database column infos.
+	for _, column := range dbf.Columns() {
+		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
+	}
+
+	// Write a new record
+	row := dbf.NewRow()
+
+	err = row.FieldByName("ID").SetValue(int32(1))
+	if err != nil {
+		panic(err)
+	}
+	err = row.FieldByName("NAME").SetValue("TOTALLY_NEW_ROW")
+	if err != nil {
+		panic(err)
+	}
+	err = row.FieldByName("MEMO").SetValue("This is a memo field")
+	if err != nil {
+		panic(err)
+	}
+	err = row.FieldByName("VAR").SetValue("This is a varchar field")
+	if err != nil {
+		panic(err)
+	}
+
+	err = row.Add()
+	if err != nil {
+		panic(err)
+	}
+
+	// Read all records
+	for !dbf.EOF() {
+		row, err := dbf.Row()
+		if err != nil {
+			panic(err)
+		}
+
+		// Increment the row pointer.
+		dbf.Skip(1)
+
+		// Skip deleted rows.
+		if row.Deleted {
+			fmt.Printf("Deleted row at position: %v \n", row.Position)
+			continue
+		}
+
+		name, err := row.ValueByName("NAME")
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("Row at position: %v => %v \n", row.Position, name)
+	}
+}
+```
+</details>
+
+
 <details open>
   <summary>Search</summary>
   
@@ -373,9 +478,9 @@ func main() {
 	// Print all found records.
 	fmt.Println("Found records with match:")
 	for _, record := range records {
-		field, err := record.FieldByName("PRODNAME")
-		if err != nil {
-			panic(err)
+		field = record.FieldByName("PRODNAME")
+		if field == nil {
+			panic("Field 'PRODNAME' not found")
 		}
 
 		fmt.Printf("%v \n", field.GetValue())
@@ -390,9 +495,9 @@ func main() {
 	// Print all found records.
 	fmt.Println("Found records with exact match:")
 	for _, record := range records {
-		field, err := record.FieldByName("PRODNAME")
-		if err != nil {
-			panic(err)
+		field = record.FieldByName("PRODNAME")
+		if field == nil {
+			panic("Field 'PRODNAME' not found")
 		}
 
 		fmt.Printf("%v \n", field.GetValue())
