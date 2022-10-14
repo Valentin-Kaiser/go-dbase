@@ -144,7 +144,6 @@ func create(dbf *DBF) (*DBF, error) {
 		return nil, newError("dbase-io-create-2", fmt.Errorf("creating DBF file failed with error: %w", err))
 	}
 	dbf.dbaseFileHandle = &fd
-
 	if dbf.memoHeader != nil {
 		// Create the memo file
 		fptname, err := windows.UTF16FromString(strings.TrimSuffix(dbf.config.Filename, filepath.Ext(dbf.config.Filename)) + ".FPT")
@@ -157,7 +156,6 @@ func create(dbf *DBF) (*DBF, error) {
 		}
 		dbf.memoFileHandle = &fd
 	}
-
 	return dbf, nil
 }
 
