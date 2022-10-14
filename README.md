@@ -53,11 +53,12 @@ The supported column types with their return Go types are:
 | M | Memo (Binary) | []byte |
 | N | Numeric (0 decimals) | int64 |
 | N | Numeric (with decimals) | float64 |
-| W* | Blob | []byte |
+| Q | Varbinary | []byte |
+| V | Varchar | []byte |
+| W | Blob | []byte |
 | G* | General | []byte |
 | P* | Picture | []byte |
-| Q* | Varbinary | []byte |
-| V* | Varchar | []byte |
+
 
 > If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
 
