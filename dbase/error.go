@@ -13,7 +13,7 @@ var (
 	ErrNoFPT = errors.New("FPT_FILE_NOT_FOUND")
 	ErrNoDBF = errors.New("DBF_FILE_NOT_FOUND")
 	// Returned when an invalid column position is used (x<1 or x>number of columns)
-	ErrInvalidPosition = errors.New("INVALID_Position")
+	ErrInvalidPosition = errors.New("INVALID_POSITION")
 	ErrInvalidEncoding = errors.New("INVALID_ENCODING")
 )
 
