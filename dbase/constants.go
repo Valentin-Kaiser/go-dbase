@@ -4,10 +4,23 @@ package dbase
 // The file type check has to be bypassed when opening a file type that is not supported
 type FileType byte
 
+// Supported and testet file types - other file types may work but are not tested
 const (
 	FoxPro              FileType = 0x30
 	FoxProAutoincrement FileType = 0x31
 	FoxProVar           FileType = 0x32
+)
+
+// Not tested
+const (
+	FoxBase         FileType = 0x02
+	FoxBase2        FileType = 0xFB
+	FoxBasePlus     FileType = 0x03
+	DBaseSQLTable   FileType = 0x43
+	FoxBasePlusMemo FileType = 0x83
+	DBaseMemo       FileType = 0x8B
+	DBaseSQLMemo    FileType = 0xCB
+	FoxPro2Memo     FileType = 0xF5
 )
 
 type Marker byte
