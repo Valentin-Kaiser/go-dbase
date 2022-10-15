@@ -85,6 +85,9 @@ func New(version FileType, config *Config, columns []*Column, memoBlockSize uint
 	if len(columns) == 0 {
 		return nil, errors.New("no columns defined")
 	}
+	if config.Converter == nil {
+		return nil, errors.New("no converter defined")
+	}
 	dbf := &DBF{
 		config: config,
 		header: &Header{
