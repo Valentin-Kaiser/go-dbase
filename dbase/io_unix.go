@@ -18,13 +18,14 @@ import (
 )
 
 type Config struct {
-	Filename           string            // The filename of the DBF file.
-	Converter          EncodingConverter // The encoding converter to use.
-	Exclusive          bool              // If true the file is opened in exclusive mode.
-	Untested           bool              // If true the file version is not checked.
-	TrimSpaces         bool              // Trimspaces default value
-	WriteLock          bool              // Whether or not the write operations should lock the record
-	CodePageValidation bool              // Whether or not the code page mark should be validated
+	Filename          string            // The filename of the DBF file.
+	Converter         EncodingConverter // The encoding converter to use.
+	Exclusive         bool              // If true the file is opened in exclusive mode.
+	Untested          bool              // If true the file version is not checked.
+	TrimSpaces        bool              // Trimspaces default value
+	WriteLock         bool              // Whether or not the write operations should lock the record
+	ValidateCodePage  bool              // Whether or not the code page mark should be validated.
+	InterpretCodePage bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.
 }
 
 // DBF is the main struct to handle a dBase file.
@@ -49,6 +50,15 @@ type DBF struct {
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the embedded file handle(s) call DBF.Close().
 func Open(config *Config) (*DBF, error) {
+	if config == nil {
+		return nil, newError("dbase-io-open-1", fmt.Errorf("missing configuration"))
+	}
+	if config.Filename == "" {
+		return nil, newError("dbase-io-open-2", fmt.Errorf("missing filename"))
+	}
+	if config.Converter == nil {
+		config.InterpretCodePage = true
+	}
 	filename := filepath.Clean(config.Filename)
 	mode := os.O_RDWR
 	if config.Exclusive {
@@ -56,16 +66,20 @@ func Open(config *Config) (*DBF, error) {
 	}
 	dbaseFile, err := os.OpenFile(filename, mode, 0600)
 	if err != nil {
-		return nil, newError("dbase-io-open-1", fmt.Errorf("opening DBF file failed with error: %w", err))
+		return nil, newError("dbase-io-open-3", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
 	dbf, err := prepareDBF(dbaseFile, config)
 	if err != nil {
-		return nil, newError("dbase-io-open-2", err)
+		return nil, newError("dbase-io-open-4", err)
 	}
 	dbf.dbaseFile = dbaseFile
+	// Interpret the code page mark if needed
+	if config.InterpretCodePage {
+		dbf.config.Converter = NewDefaultConverterFromCodePage(dbf.header.CodePage)
+	}
 	// Check if the code page mark is matchin the converter
-	if config.CodePageValidation && dbf.header.CodePage != dbf.config.Converter.CodePageMark() {
-		return nil, newError("dbase-io-open-3", fmt.Errorf("code page mark mismatch: %d != %d", dbf.header.CodePage, dbf.config.Converter.CodePageMark()))
+	if config.ValidateCodePage && dbf.header.CodePage != dbf.config.Converter.CodePageMark() {
+		return nil, newError("dbase-io-open-5", fmt.Errorf("code page mark mismatch: %d != %d", dbf.header.CodePage, dbf.config.Converter.CodePageMark()))
 	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
@@ -78,11 +92,11 @@ func Open(config *Config) (*DBF, error) {
 		}
 		memoFile, err := os.OpenFile(strings.TrimSuffix(filename, ext)+fptExt, mode, 0600)
 		if err != nil {
-			return nil, newError("dbase-io-open-4", fmt.Errorf("opening FPT file failed with error: %w", err))
+			return nil, newError("dbase-io-open-6", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
 		err = dbf.prepareMemo(memoFile)
 		if err != nil {
-			return nil, newError("dbase-io-open-5", err)
+			return nil, newError("dbase-io-open-7", err)
 		}
 		dbf.memoFile = memoFile
 	}
@@ -94,13 +108,13 @@ func (dbf *DBF) Close() error {
 	if dbf.dbaseFile != nil {
 		err := dbf.dbaseFile.Close()
 		if err != nil {
-			return newError("dbase-io-close-1", fmt.Errorf("closing DBF failed with error: %w", err))
+			return newError("dbase-io-close-8", fmt.Errorf("closing DBF failed with error: %w", err))
 		}
 	}
 	if dbf.memoFile != nil {
 		err := dbf.memoFile.Close()
 		if err != nil {
-			return newError("dbase-io-close-2", fmt.Errorf("closing FPT failed with error: %w", err))
+			return newError("dbase-io-close-9", fmt.Errorf("closing FPT failed with error: %w", err))
 		}
 	}
 	return nil
