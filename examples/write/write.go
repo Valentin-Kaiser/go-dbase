@@ -26,7 +26,6 @@ func main() {
 	// Open the example database file.
 	dbf, err := dbase.Open(&dbase.Config{
 		Filename:   "../test_data/TEST.DBF",
-		Converter:  new(dbase.Win1250Converter),
 		TrimSpaces: true,
 		WriteLock:  true,
 	})
