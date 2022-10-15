@@ -9,7 +9,7 @@ import (
 func main() {
 	// Open the example database file.
 	dbf, err := dbase.Open(&dbase.Config{
-		Filename: "../test_data/TEST.DBF",
+		Filename: "../test_data/table/TEST.DBF",
 	})
 	if err != nil {
 		panic(err)

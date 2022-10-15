@@ -82,11 +82,12 @@ func Open(config *Config) (*DBF, error) {
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
 	// If the FPT file does not exist an error is returned.
-	if (dbf.header.TableFlags & byte(MemoFlag)) != 0 {
+	if MemoFlag.Defined(dbf.header.TableFlags) {
+		// Wherer check for the file extension so we get the correct case.
 		ext := filepath.Ext(filename)
-		fptExt := ".fpt"
+		fptExt := string(MemoFileExtension)
 		if strings.ToUpper(ext) == ext {
-			fptExt = ".FPT"
+			fptExt = strings.ToUpper(string(MemoFileExtension))
 		}
 		fd, err := windows.Open(strings.TrimSuffix(filename, ext)+fptExt, mode, 0644)
 		if err != nil {
@@ -131,7 +132,7 @@ func create(dbf *DBF) (*DBF, error) {
 		return nil, newError("dbase-io-create-1", fmt.Errorf("missing filename"))
 	}
 	// Check for valid file extension
-	if filepath.Ext(strings.ToUpper(dbf.config.Filename)) != ".DBF" {
+	if filepath.Ext(strings.ToUpper(dbf.config.Filename)) != string(TableFileExtension) {
 		return nil, newError("dbase-io-create-2", fmt.Errorf("invalid file extension"))
 	}
 	dbfname, err := windows.UTF16FromString(dbf.config.Filename)

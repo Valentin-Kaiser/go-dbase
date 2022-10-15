@@ -24,6 +24,21 @@ const (
 	FoxPro2Memo     FileType = 0xF5
 )
 
+// Table file extenstions
+type FileExtension string
+
+const (
+	DatabaseFileExtension          FileExtension = ".DBC"
+	TableFileExtension             FileExtension = ".DBT"
+	MemoFileExtension              FileExtension = ".FPT"
+	FormFileExtension              FileExtension = ".SCX"
+	LabelFileExtension             FileExtension = ".LBX"
+	MenuFileExtension              FileExtension = ".MNX"
+	ProjectFileExtension           FileExtension = ".PJX"
+	ReportFileExtension            FileExtension = ".RPX"
+	VisualClassLibaryFileExtension FileExtension = ".VCX"
+)
+
 // Important byte marker for the dbase file
 type Marker byte
 
@@ -41,11 +56,14 @@ const (
 type TableFlag byte
 
 const (
-	StructuralFlag     TableFlag = 0x01
-	MemoFlag           TableFlag = 0x02
-	StructuralMemoFlag TableFlag = 0x03
-	DatabaseFlag       TableFlag = 0x04
+	StructuralFlag TableFlag = 0x01
+	MemoFlag       TableFlag = 0x02
+	DatabaseFlag   TableFlag = 0x04
 )
+
+func (t TableFlag) Defined(flag byte) bool {
+	return t&TableFlag(flag) == TableFlag(t)
+}
 
 // Column flags indicate wether a column is hidden, can be null, is binary or is autoincremented
 type ColumnFlag byte
