@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
+	"golang.org/x/text/encoding/charmap"
 )
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 		dbase.FoxProVar,
 		&dbase.Config{
 			Filename:   "test.dbf",
-			Converter:  new(dbase.Win1250Converter),
+			Converter:  dbase.NewDefaultConverter(charmap.Windows1250),
 			TrimSpaces: true,
 		},
 		[]*dbase.Column{
