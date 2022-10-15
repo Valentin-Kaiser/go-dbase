@@ -14,7 +14,7 @@ There are several similar packages but they are not suited for our use case, thi
 
 | Feature | [go-dbase](https://github.com/Valentin-Kaiser/go-dbase) | [go-dbf](https://github.com/LindsayBradford/go-dbf) | [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) | 
 | --- | --- | --- | --- |
-| Windows-1250 to UTF8 encoding ¹ | ✅ | ✅ | ✅ |
+| Encoding support ¹ | ✅ | ✅ | ✅ |
 | Read | ✅ | ✅ | ✅ |
 | Write | ✅  | ✅ | ❌ |
 | FPT (memo) file support | ✅ | ❌ | ✅ |
@@ -25,7 +25,7 @@ There are several similar packages but they are not suited for our use case, thi
 | Search by value | ✅ | ❌ | ❌ |
 | Create new tables from scratch | ✅ | ❌ | ❌ |
 
-> ¹ Since these files are almost always used on Windows platforms the default encoding is from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
+> ¹ This package currently supports 13 of the 25 possible encodings, but a universal encoder will be provided for other code pages that can be extended at will. A list of supported encodings can be found [here](#supported-encodings).
 
 > ² IO efficiency is achieved by using one file handle for the DBF file and one file handle for the FPT file. This allows for non blocking IO and the ability to read files while other processes are accessing these. In addition, only the required positions in the file are read instead of keeping a copy of the entire file in memory.
 
@@ -65,6 +65,30 @@ The supported column types with their return Go types are:
 > If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
 
 > **These types are not interpreted by this package, the raw data is returned. This means the user must interpret the values themselves.*
+
+# Supported encodings
+
+The following encodings are supported by this package:
+
+| Code page | Platform | Code page identifier |
+| --- | --- | --- |
+| 437 | U.S. MS-DOS | x01 |
+| 850 | International MS-DOS | x02 | 
+| 852 | Eastern European MS-DOS	| x64| 
+| 865 | Nordic MS-DOS | x66 | 
+| 866 | Russian MS-DOS | x65 | 
+| 874 | Thai Windows | x7C | 
+| 1250 | Central European Windows | xC8 | 
+| 1251 | Russian Windows | xC9 | 
+| 1252 | Windows ANSI | x03 | 
+| 1253 | Greek Windows	| xCB | 
+| 1254 | Turkish Windows| xCA | 
+| 1255 | Hebrew Windows | x7D | 
+| 1256 | Arabic Windows	| x7E | 
+
+
+
+> All encodings are converted from and to UTF-8.
 
 # Installation
 ``` 
