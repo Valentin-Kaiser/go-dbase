@@ -16,26 +16,27 @@ import (
 )
 
 type Config struct {
-	Filename           string            // The filename of the DBF file.
-	Converter          EncodingConverter // The encoding converter to use.
-	Exclusive          bool              // If true the file is opened in exclusive mode.
-	Untested           bool              // If true the file version is not checked.
-	TrimSpaces         bool              // Trimspaces default value
-	WriteLock          bool              // Whether or not the write operations should lock the record
-	CodePageValidation bool              // Whether or not the code page mark should be validated
+	Filename          string            // The filename of the DBF file.
+	Converter         EncodingConverter // The encoding converter to use.
+	Exclusive         bool              // If true the file is opened in exclusive mode.
+	Untested          bool              // If true the file version is not checked.
+	TrimSpaces        bool              // Trimspaces default value.
+	WriteLock         bool              // Whether or not the write operations should lock the record.
+	ValidateCodePage  bool              // Whether or not the code page mark should be validated.
+	InterpretCodePage bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.
 }
 
 // DBF is the main struct to handle a dBase file.
 type DBF struct {
 	config          *Config         // The config used when working with the DBF file.
-	dbaseFileHandle *windows.Handle // DBase file windows handle pointer
-	memoFileHandle  *windows.Handle // Memo file windows handle pointer
-	header          *Header         // DBase file header containing relevant information
-	memoHeader      *MemoHeader     // Memo file header containing relevant information
-	dbaseMutex      *sync.Mutex     // Mutex locks for concurrent writing access to the DBF file
-	memoMutex       *sync.Mutex     // Mutex locks for concurrent writing access to the FPT file
-	table           *Table          // Containing the columns and internal row pointer
-	nullFlagColumn  *Column         // The column containing the null flag column (if varchar or varbinary field exists)
+	dbaseFileHandle *windows.Handle // DBase file windows handle pointer.
+	memoFileHandle  *windows.Handle // Memo file windows handle pointer.
+	header          *Header         // DBase file header containing relevant information.
+	memoHeader      *MemoHeader     // Memo file header containing relevant information.
+	dbaseMutex      *sync.Mutex     // Mutex locks for concurrent writing access to the DBF file.
+	memoMutex       *sync.Mutex     // Mutex locks for concurrent writing access to the FPT file.
+	table           *Table          // Containing the columns and internal row pointer.
+	nullFlagColumn  *Column         // The column containing the null flag column (if varchar or varbinary field exists).
 }
 
 /**
@@ -54,7 +55,7 @@ func Open(config *Config) (*DBF, error) {
 		return nil, newError("dbase-io-open-2", fmt.Errorf("missing filename"))
 	}
 	if config.Converter == nil {
-		return nil, newError("dbase-io-open-3", fmt.Errorf("missing encoding converter"))
+		config.InterpretCodePage = true
 	}
 	filename := filepath.Clean(config.Filename)
 	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
@@ -63,16 +64,20 @@ func Open(config *Config) (*DBF, error) {
 	}
 	fd, err := windows.Open(filename, mode, 0644)
 	if err != nil {
-		return nil, newError("dbase-io-open-1", fmt.Errorf("opening DBF file failed with error: %w", err))
+		return nil, newError("dbase-io-open-3", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
 	dbf, err := prepareDBF(fd, config)
 	if err != nil {
-		return nil, newError("dbase-io-open-2", err)
+		return nil, newError("dbase-io-open-4", err)
 	}
 	dbf.dbaseFileHandle = &fd
+	// Interpret the code page mark if needed
+	if config.InterpretCodePage {
+		dbf.config.Converter = NewDefaultConverterFromCodePage(dbf.header.CodePage)
+	}
 	// Check if the code page mark is matchin the converter
-	if config.CodePageValidation && dbf.header.CodePage != dbf.config.Converter.CodePageMark() {
-		return nil, newError("dbase-io-open-3", fmt.Errorf("code page mark mismatch: %d != %d", dbf.header.CodePage, dbf.config.Converter.CodePageMark()))
+	if config.ValidateCodePage && dbf.header.CodePage != dbf.config.Converter.CodePageMark() {
+		return nil, newError("dbase-io-open-6", fmt.Errorf("code page mark mismatch: %d != %d", dbf.header.CodePage, dbf.config.Converter.CodePageMark()))
 	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
@@ -85,11 +90,11 @@ func Open(config *Config) (*DBF, error) {
 		}
 		fd, err := windows.Open(strings.TrimSuffix(filename, ext)+fptExt, mode, 0644)
 		if err != nil {
-			return nil, newError("dbase-io-open-4", fmt.Errorf("opening FPT file failed with error: %w", err))
+			return nil, newError("dbase-io-open-7", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
 		err = dbf.prepareMemo(fd)
 		if err != nil {
-			return nil, newError("dbase-io-open-5", err)
+			return nil, newError("dbase-io-open-8", err)
 		}
 		dbf.memoFileHandle = &fd
 	}
@@ -101,13 +106,13 @@ func (dbf *DBF) Close() error {
 	if dbf.dbaseFileHandle != nil {
 		err := windows.Close(*dbf.dbaseFileHandle)
 		if err != nil {
-			return newError("dbase-io-close-1", fmt.Errorf("closing DBF failed with error: %w", err))
+			return newError("dbase-io-close-9", fmt.Errorf("closing DBF failed with error: %w", err))
 		}
 	}
 	if dbf.memoFileHandle != nil {
 		err := windows.Close(*dbf.memoFileHandle)
 		if err != nil {
-			return newError("dbase-io-close-2", fmt.Errorf("closing FPT failed with error: %w", err))
+			return newError("dbase-io-close-10", fmt.Errorf("closing FPT failed with error: %w", err))
 		}
 	}
 	return nil
