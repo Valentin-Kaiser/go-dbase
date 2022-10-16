@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -47,22 +48,23 @@ type DBF struct {
 
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the file handle(s) call DBF.Close().
-func Open(config *Config) (*DBF, error) {
+func OpenTable(config *Config) (*DBF, error) {
 	if config == nil {
 		return nil, newError("dbase-io-open-1", fmt.Errorf("missing configuration"))
 	}
-	if config.Filename == "" {
+	if len(strings.TrimSpace(config.Filename)) == 0 {
 		return nil, newError("dbase-io-open-2", fmt.Errorf("missing filename"))
 	}
+	fileName := filepath.Clean(config.Filename)
+	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
 	if config.Converter == nil {
 		config.InterpretCodePage = true
 	}
-	filename := filepath.Clean(config.Filename)
 	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
 	if config.Exclusive {
 		mode = windows.O_RDWR | windows.O_CLOEXEC | windows.O_EXCL
 	}
-	fd, err := windows.Open(filename, mode, 0644)
+	fd, err := windows.Open(fileName, mode, 0644)
 	if err != nil {
 		return nil, newError("dbase-io-open-3", fmt.Errorf("opening DBF file failed with error: %w", err))
 	}
@@ -83,15 +85,14 @@ func Open(config *Config) (*DBF, error) {
 	// If there is we will try to open it in the same dir (using the same filename and case).
 	// If the FPT file does not exist an error is returned.
 	if MemoFlag.Defined(dbf.header.TableFlags) {
-		// Wherer check for the file extension so we get the correct case.
-		ext := filepath.Ext(filename)
-		fptExt := string(MemoFileExtension)
-		if strings.ToUpper(ext) == ext {
-			fptExt = strings.ToUpper(string(MemoFileExtension))
+		ext := string(FPT)
+		if fileExtension == DBC {
+			ext = string(DCT)
 		}
-		fd, err := windows.Open(strings.TrimSuffix(filename, ext)+fptExt, mode, 0644)
+		relatedFile := strings.TrimSuffix(fileName, path.Ext(fileName)) + ext
+		fd, err := windows.Open(relatedFile, mode, 0644)
 		if err != nil {
-			return nil, newError("dbase-io-open-7", fmt.Errorf("opening FPT file failed with error: %w", err))
+			return nil, newError("dbase-io-open-7", fmt.Errorf("opening related file %v failed with error: %w", relatedFile, err))
 		}
 		err = dbf.prepareMemo(fd)
 		if err != nil {
@@ -132,7 +133,7 @@ func create(dbf *DBF) (*DBF, error) {
 		return nil, newError("dbase-io-create-1", fmt.Errorf("missing filename"))
 	}
 	// Check for valid file extension
-	if filepath.Ext(strings.ToUpper(dbf.config.Filename)) != string(TableFileExtension) {
+	if filepath.Ext(strings.ToUpper(dbf.config.Filename)) != string(DBT) {
 		return nil, newError("dbase-io-create-2", fmt.Errorf("invalid file extension"))
 	}
 	dbfname, err := windows.UTF16FromString(dbf.config.Filename)
