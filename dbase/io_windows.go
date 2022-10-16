@@ -29,15 +29,15 @@ type Config struct {
 
 // File is the main struct to handle a dBase file.
 type File struct {
-	config          *Config         // The config used when working with the DBF file.
-	dbaseFileHandle *windows.Handle // DBase file windows handle pointer.
-	memoFileHandle  *windows.Handle // Memo file windows handle pointer.
-	header          *Header         // DBase file header containing relevant information.
-	memoHeader      *MemoHeader     // Memo file header containing relevant information.
-	dbaseMutex      *sync.Mutex     // Mutex locks for concurrent writing access to the DBF file.
-	memoMutex       *sync.Mutex     // Mutex locks for concurrent writing access to the FPT file.
-	table           *Table          // Containing the columns and internal row pointer.
-	nullFlagColumn  *Column         // The column containing the null flag column (if varchar or varbinary field exists).
+	config         *Config         // The config used when working with the DBF file.
+	handle         *windows.Handle // DBase file windows handle pointer.
+	relatedHandle  *windows.Handle // Memo file windows handle pointer.
+	header         *Header         // DBase file header containing relevant information.
+	memoHeader     *MemoHeader     // Memo file header containing relevant information.
+	dbaseMutex     *sync.Mutex     // Mutex locks for concurrent writing access to the DBF file.
+	memoMutex      *sync.Mutex     // Mutex locks for concurrent writing access to the FPT file.
+	table          *Table          // Containing the columns and internal row pointer.
+	nullFlagColumn *Column         // The column containing the null flag column (if varchar or varbinary field exists).
 }
 
 /**
@@ -72,7 +72,7 @@ func OpenTable(config *Config) (*File, error) {
 	if err != nil {
 		return nil, newError("dbase-io-open-4", err)
 	}
-	file.dbaseFileHandle = &fd
+	file.handle = &fd
 	// Interpret the code page mark if needed
 	if config.InterpretCodePage {
 		file.config.Converter = NewDefaultConverterFromCodePage(file.header.CodePage)
@@ -98,21 +98,21 @@ func OpenTable(config *Config) (*File, error) {
 		if err != nil {
 			return nil, newError("dbase-io-open-8", err)
 		}
-		file.memoFileHandle = &fd
+		file.relatedHandle = &fd
 	}
 	return file, nil
 }
 
 // Closes the file handlers.
 func (file *File) Close() error {
-	if file.dbaseFileHandle != nil {
-		err := windows.Close(*file.dbaseFileHandle)
+	if file.handle != nil {
+		err := windows.Close(*file.handle)
 		if err != nil {
 			return newError("dbase-io-close-9", fmt.Errorf("closing DBF failed with error: %w", err))
 		}
 	}
-	if file.memoFileHandle != nil {
-		err := windows.Close(*file.memoFileHandle)
+	if file.relatedHandle != nil {
+		err := windows.Close(*file.relatedHandle)
 		if err != nil {
 			return newError("dbase-io-close-10", fmt.Errorf("closing FPT failed with error: %w", err))
 		}
@@ -146,7 +146,7 @@ func create(file *File) (*File, error) {
 	if err != nil {
 		return nil, newError("dbase-io-create-2", fmt.Errorf("creating DBF file failed with error: %w", err))
 	}
-	file.dbaseFileHandle = &fd
+	file.handle = &fd
 	if file.memoHeader != nil {
 		// Create the memo file
 		fptname, err := windows.UTF16FromString(strings.TrimSuffix(file.config.Filename, filepath.Ext(file.config.Filename)) + ".FPT")
@@ -157,7 +157,7 @@ func create(file *File) (*File, error) {
 		if err != nil {
 			return nil, newError("dbase-io-create-4", fmt.Errorf("creating FPT file failed with error: %w", err))
 		}
-		file.memoFileHandle = &fd
+		file.relatedHandle = &fd
 	}
 	return file, nil
 }
@@ -178,9 +178,9 @@ func prepareFile(fd windows.Handle, config *Config) (*File, error) {
 		return nil, newError("dbase-io-preparedbf-3", err)
 	}
 	file := &File{
-		config:          config,
-		header:          header,
-		dbaseFileHandle: &fd,
+		config: config,
+		header: header,
+		handle: &fd,
 		table: &Table{
 			columns: columns,
 			mods:    make([]*Modification, len(columns)),
@@ -221,19 +221,19 @@ func (file *File) writeHeader() (err error) {
 	}
 	// Lock the block we are writing to
 	if file.config.WriteLock {
-		err = windows.LockFileEx(*file.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, position, position+uint32(file.header.FirstRow), o)
+		err = windows.LockFileEx(*file.relatedHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, position, position+uint32(file.header.FirstRow), o)
 		if err != nil {
 			return newError("dbase-io-writeheader-1", err)
 		}
 		defer func() {
-			ulockErr := windows.UnlockFileEx(*file.memoFileHandle, 0, position, position+uint32(file.header.FirstRow), o)
+			ulockErr := windows.UnlockFileEx(*file.relatedHandle, 0, position, position+uint32(file.header.FirstRow), o)
 			if err != nil {
 				err = newError("dbase-io-writeheader-2", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
-	_, err = windows.Seek(*file.dbaseFileHandle, 0, 0)
+	_, err = windows.Seek(*file.handle, 0, 0)
 	if err != nil {
 		return newError("dbase-io-writeheader-3", err)
 	}
@@ -247,7 +247,7 @@ func (file *File) writeHeader() (err error) {
 	if err != nil {
 		return newError("dbase-io-writeheader-4", err)
 	}
-	_, err = windows.Write(*file.dbaseFileHandle, buf.Bytes())
+	_, err = windows.Write(*file.handle, buf.Bytes())
 	if err != nil {
 		return newError("dbase-io-writeheader-5", err)
 	}
@@ -318,19 +318,19 @@ func (file *File) writeColumns() (err error) {
 	}
 	// Lock the block we are writing to
 	if file.config.WriteLock {
-		err = windows.LockFileEx(*file.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, position, position+uint32(file.header.FirstRow), o)
+		err = windows.LockFileEx(*file.relatedHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, position, position+uint32(file.header.FirstRow), o)
 		if err != nil {
 			return newError("dbase-io-writecolumns-1", err)
 		}
 		defer func() {
-			ulockErr := windows.UnlockFileEx(*file.memoFileHandle, 0, position, position+uint32(file.header.FirstRow), o)
+			ulockErr := windows.UnlockFileEx(*file.relatedHandle, 0, position, position+uint32(file.header.FirstRow), o)
 			if err != nil {
 				err = newError("dbase-io-writecolumns-2", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
-	_, err = windows.Seek(*file.dbaseFileHandle, 32, 0)
+	_, err = windows.Seek(*file.handle, 32, 0)
 	if err != nil {
 		return newError("dbase-io-writecolumns-3", err)
 	}
@@ -348,12 +348,12 @@ func (file *File) writeColumns() (err error) {
 			return newError("dbase-io-writecolumns-5", err)
 		}
 	}
-	_, err = windows.Write(*file.dbaseFileHandle, buf.Bytes())
+	_, err = windows.Write(*file.handle, buf.Bytes())
 	if err != nil {
 		return newError("dbase-io-writecolumns-5", err)
 	}
 	// Write the column terminator
-	_, err = windows.Write(*file.dbaseFileHandle, []byte{byte(ColumnEnd)})
+	_, err = windows.Write(*file.handle, []byte{byte(ColumnEnd)})
 	if err != nil {
 		return newError("dbase-io-writecolumns-6", err)
 	}
@@ -362,7 +362,7 @@ func (file *File) writeColumns() (err error) {
 	if file.nullFlagColumn != nil {
 		pos -= 32
 	}
-	_, err = windows.Write(*file.dbaseFileHandle, make([]byte, pos))
+	_, err = windows.Write(*file.handle, make([]byte, pos))
 	if err != nil {
 		return newError("dbase-io-writecolumns-7", err)
 	}
@@ -397,12 +397,12 @@ func (file *File) readNullFlag(rowPosition uint64, column *Column) (bool, bool, 
 	}
 	// Read the null flag field
 	position := uint64(file.header.FirstRow) + rowPosition*uint64(file.header.RowLength) + uint64(file.nullFlagColumn.Position)
-	_, err := windows.Seek(*file.dbaseFileHandle, int64(position), 0)
+	_, err := windows.Seek(*file.handle, int64(position), 0)
 	if err != nil {
 		return false, false, newError("dbase-io-readnullflag-1", err)
 	}
 	buf := make([]byte, file.nullFlagColumn.Length)
-	n, err := windows.Read(*file.dbaseFileHandle, buf)
+	n, err := windows.Read(*file.handle, buf)
 	if err != nil {
 		return false, false, newError("dbase-io-readnullflag-2", err)
 	}
@@ -429,7 +429,7 @@ func (file *File) prepareMemo(fd windows.Handle) error {
 	if err != nil {
 		return newError("dbase-io-prepare-memo-1", err)
 	}
-	file.memoFileHandle = &fd
+	file.relatedHandle = &fd
 	file.memoHeader = memoHeader
 	return nil
 }
@@ -455,7 +455,7 @@ func readMemoHeader(fd windows.Handle) (*MemoHeader, error) {
 // Reads one or more blocks from the FPT file, called for each memo column.
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (file *File) readMemo(address []byte) ([]byte, bool, error) {
-	if file.memoFileHandle == nil {
+	if file.relatedHandle == nil {
 		return nil, false, newError("dbase-io-readmemo-1", ErrNoFPT)
 	}
 	// Determine the block number
@@ -464,7 +464,7 @@ func (file *File) readMemo(address []byte) ([]byte, bool, error) {
 		return []byte{}, false, nil
 	}
 	// The position in the file is blocknumber*blocksize
-	_, err := windows.Seek(*file.memoFileHandle, int64(file.memoHeader.BlockSize)*int64(block), 0)
+	_, err := windows.Seek(*file.relatedHandle, int64(file.memoHeader.BlockSize)*int64(block), 0)
 	if err != nil {
 		return nil, false, newError("dbase-io-readmemo-2", err)
 	}
@@ -472,7 +472,7 @@ func (file *File) readMemo(address []byte) ([]byte, bool, error) {
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
 	// as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
-	_, err = windows.Read(*file.memoFileHandle, hbuf)
+	_, err = windows.Read(*file.relatedHandle, hbuf)
 	if err != nil {
 		return nil, false, newError("dbase-io-readmemo-3", err)
 	}
@@ -484,7 +484,7 @@ func (file *File) readMemo(address []byte) ([]byte, bool, error) {
 	}
 	// Now read the actual data
 	buf := make([]byte, leng)
-	read, err := windows.Read(*file.memoFileHandle, buf)
+	read, err := windows.Read(*file.relatedHandle, buf)
 	if err != nil {
 		return buf, false, newError("dbase-io-readmemo-4", err)
 	}
@@ -504,7 +504,7 @@ func (file *File) readMemo(address []byte) ([]byte, bool, error) {
 func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()
-	if file.memoFileHandle == nil {
+	if file.relatedHandle == nil {
 		return nil, newError("dbase-io-writememo-1", ErrNoFPT)
 	}
 	// Get the block position
@@ -532,24 +532,24 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 			Offset:     blockPosition,
 			OffsetHigh: blockPosition + uint32(file.memoHeader.BlockSize),
 		}
-		err = windows.LockFileEx(*file.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
+		err = windows.LockFileEx(*file.relatedHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
 		if err != nil {
 			return nil, newError("dbase-io-writememo-3", err)
 		}
 		defer func() {
-			ulockErr := windows.UnlockFileEx(*file.memoFileHandle, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
+			ulockErr := windows.UnlockFileEx(*file.relatedHandle, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
 			if err != nil {
 				err = newError("dbase-io-writememoheader-4", ulockErr)
 			}
 		}()
 	}
 	// Seek to new the next free block
-	_, err = windows.Seek(*file.memoFileHandle, int64(blockPosition)*int64(file.memoHeader.BlockSize), 0)
+	_, err = windows.Seek(*file.relatedHandle, int64(blockPosition)*int64(file.memoHeader.BlockSize), 0)
 	if err != nil {
 		return nil, newError("dbase-io-writememo-5", err)
 	}
 	// Write the memo data
-	_, err = windows.Write(*file.memoFileHandle, block)
+	_, err = windows.Write(*file.relatedHandle, block)
 	if err != nil {
 		return nil, newError("dbase-io-writememo-6", err)
 	}
@@ -563,7 +563,7 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 
 // writeMemoHeader writes the memo header to the memo file.
 func (file *File) writeMemoHeader() (err error) {
-	if file.memoFileHandle == nil {
+	if file.relatedHandle == nil {
 		return newError("dbase-io-writememoheader-1", ErrNoFPT)
 	}
 	// Lock the block we are writing to
@@ -572,19 +572,19 @@ func (file *File) writeMemoHeader() (err error) {
 		OffsetHigh: uint32(file.header.FirstRow),
 	}
 	if file.config.WriteLock {
-		err = windows.LockFileEx(*file.memoFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 0, uint32(file.header.FirstRow), o)
+		err = windows.LockFileEx(*file.relatedHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 0, uint32(file.header.FirstRow), o)
 		if err != nil {
 			return newError("dbase-io-writememoheader-2", err)
 		}
 		defer func() {
-			ulockErr := windows.UnlockFileEx(*file.memoFileHandle, 0, 0, uint32(file.header.FirstRow), o)
+			ulockErr := windows.UnlockFileEx(*file.relatedHandle, 0, 0, uint32(file.header.FirstRow), o)
 			if err != nil {
 				err = newError("dbase-io-writememoheader-3", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
-	_, err = windows.Seek(*file.memoFileHandle, 0, 0)
+	_, err = windows.Seek(*file.relatedHandle, 0, 0)
 	if err != nil {
 		return newError("dbase-io-writememoheader-4", err)
 	}
@@ -594,12 +594,12 @@ func (file *File) writeMemoHeader() (err error) {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint32(buf[:4], file.memoHeader.NextFree)
 	binary.BigEndian.PutUint16(buf[6:8], file.memoHeader.BlockSize)
-	_, err = windows.Write(*file.memoFileHandle, buf)
+	_, err = windows.Write(*file.relatedHandle, buf)
 	if err != nil {
 		return newError("dbase-io-writememoheader-5", err)
 	}
 	// Write null till end of header
-	_, err = windows.Write(*file.memoFileHandle, make([]byte, 512-8))
+	_, err = windows.Write(*file.relatedHandle, make([]byte, 512-8))
 	if err != nil {
 		return newError("dbase-io-writememoheader-6", err)
 	}
@@ -618,11 +618,11 @@ func (file *File) readRow(rowPosition uint32) ([]byte, error) {
 		return nil, newError("dbase-io-readrow-1", ErrEOF)
 	}
 	buf := make([]byte, file.header.RowLength)
-	_, err := windows.Seek(*file.dbaseFileHandle, int64(file.header.FirstRow)+(int64(rowPosition)*int64(file.header.RowLength)), 0)
+	_, err := windows.Seek(*file.handle, int64(file.header.FirstRow)+(int64(rowPosition)*int64(file.header.RowLength)), 0)
 	if err != nil {
 		return buf, newError("dbase-io-readrow-2", err)
 	}
-	read, err := windows.Read(*file.dbaseFileHandle, buf)
+	read, err := windows.Read(*file.handle, buf)
 	if err != nil {
 		return buf, newError("dbase-io-readrow-3", err)
 	}
@@ -657,24 +657,24 @@ func (row *Row) writeRow() (err error) {
 			Offset:     uint32(position),
 			OffsetHigh: uint32(position + int64(row.handle.header.RowLength)),
 		}
-		err = windows.LockFileEx(*row.handle.dbaseFileHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, uint32(position), uint32(position+int64(row.handle.header.RowLength)), o)
+		err = windows.LockFileEx(*row.handle.handle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, uint32(position), uint32(position+int64(row.handle.header.RowLength)), o)
 		if err != nil {
 			return newError("dbase-io-writerow-3", err)
 		}
 		defer func() {
-			ulockErr := windows.UnlockFileEx(*row.handle.dbaseFileHandle, 0, uint32(position), uint32(position+int64(row.handle.header.RowLength)), o)
+			ulockErr := windows.UnlockFileEx(*row.handle.handle, 0, uint32(position), uint32(position+int64(row.handle.header.RowLength)), o)
 			if err != nil {
 				err = newError("dbase-io-writerow-4", ulockErr)
 			}
 		}()
 	}
 	// Seek to the correct position
-	_, err = windows.Seek(*row.handle.dbaseFileHandle, position, 0)
+	_, err = windows.Seek(*row.handle.handle, position, 0)
 	if err != nil {
 		return newError("dbase-io-writerow-5", err)
 	}
 	// Write the row
-	_, err = windows.Write(*row.handle.dbaseFileHandle, r)
+	_, err = windows.Write(*row.handle.handle, r)
 	if err != nil {
 		return newError("dbase-io-writerow-6", err)
 	}
@@ -702,13 +702,13 @@ func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
 	position := uint64(file.header.FirstRow)
 	for i := uint32(0); i < file.header.RowsCount; i++ {
 		// Read the field value
-		_, err := windows.Seek(*file.dbaseFileHandle, int64(position)+int64(field.column.Position), 0)
+		_, err := windows.Seek(*file.handle, int64(position)+int64(field.column.Position), 0)
 		position += uint64(file.header.RowLength)
 		if err != nil {
 			continue
 		}
 		buf := make([]byte, field.column.Length)
-		read, err := windows.Read(*file.dbaseFileHandle, buf)
+		read, err := windows.Read(*file.handle, buf)
 		if err != nil {
 			continue
 		}
@@ -773,12 +773,12 @@ func (file *File) Deleted() (bool, error) {
 	if file.table.rowPointer >= file.header.RowsCount {
 		return false, newError("dbase-io-deleted-1", ErrEOF)
 	}
-	_, err := windows.Seek(*file.dbaseFileHandle, int64(file.header.FirstRow)+(int64(file.table.rowPointer)*int64(file.header.RowLength)), 0)
+	_, err := windows.Seek(*file.handle, int64(file.header.FirstRow)+(int64(file.table.rowPointer)*int64(file.header.RowLength)), 0)
 	if err != nil {
 		return false, newError("dbase-io-deleted-2", err)
 	}
 	buf := make([]byte, 1)
-	read, err := windows.Read(*file.dbaseFileHandle, buf)
+	read, err := windows.Read(*file.handle, buf)
 	if err != nil {
 		return false, newError("dbase-io-deleted-3", err)
 	}
