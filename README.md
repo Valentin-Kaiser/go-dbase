@@ -14,7 +14,7 @@ There are several similar packages but they are not suited for our use case, thi
 
 | Feature | [go-dbase](https://github.com/Valentin-Kaiser/go-dbase) | [go-dbf](https://github.com/LindsayBradford/go-dbf) | [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) | 
 | --- | --- | --- | --- |
-| Encoding support ¹ | ✅ | ✅[*](https://github.com/LindsayBradford/go-dbf/issues/3) | ✅** |
+| Encoding support ¹ | ✅ | ✅[*](https://github.com/LindsayBradford/go-dbf/issues/3) | ✅ |
 | Read | ✅ | ✅ | ✅ |
 | Write | ✅  | ✅ | ❌ |
 | FPT (memo) file support | ✅ | ❌ | ✅ |
@@ -58,13 +58,11 @@ The supported column types with their return Go types are:
 | Q | Varbinary | []byte |
 | V | Varchar | []byte |
 | W | Blob | []byte |
-| G* | General | []byte |
-| P* | Picture | []byte |
+| G | General | []byte |
+| P | Picture | []byte |
 
 
 > If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
-
-> **These types are not interpreted by this package, the raw data is returned. This means the user must interpret the values themselves.*
 
 ### Supported encodings
 
@@ -87,13 +85,18 @@ The following encodings are supported by this package:
 | 1256 | Arabic Windows	| x7E | 
 
 
-
 > All encodings are converted from and to UTF-8.
 
 ## Installation
 ``` 
 go get github.com/Valentin-Kaiser/go-dbase/dbase
 ```
+
+## Projects
+
+Projects using this package:
+
+[👻 G(h)oST](https://github.com/Plaenkler/GoST)
 
 ## Examples
 
