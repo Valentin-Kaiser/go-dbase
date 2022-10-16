@@ -460,6 +460,9 @@ func (file *File) readMemo(address []byte) ([]byte, bool, error) {
 	}
 	// Determine the block number
 	block := binary.LittleEndian.Uint32(address)
+	if block == 0 {
+		return []byte{}, false, nil
+	}
 	// The position in the file is blocknumber*blocksize
 	_, err := windows.Seek(*file.memoFileHandle, int64(file.memoHeader.BlockSize)*int64(block), 0)
 	if err != nil {
@@ -488,22 +491,13 @@ func (file *File) readMemo(address []byte) ([]byte, bool, error) {
 	if read != int(leng) {
 		return buf, sign == 1, newError("dbase-io-readmemo-5", ErrIncomplete)
 	}
-	return buf, sign == 1, nil
-}
-
-// Parses a memo file from raw []byte, decodes and returns as []byte
-func (file *File) parseMemoFile(raw []byte) ([]byte, bool, error) {
-	memo, isText, err := file.readMemo(raw)
-	if err != nil {
-		return []byte{}, false, newError("dbase-io-parse-memo-1", err)
-	}
-	if isText {
-		memo, err = file.config.Converter.Decode(memo)
+	if sign == 1 {
+		buf, err = file.config.Converter.Decode(buf)
 		if err != nil {
-			return []byte{}, false, newError("dbase-io-parse-memo-2", err)
+			return []byte{}, false, newError("dbase-io-readmemo-6", err)
 		}
 	}
-	return memo, isText, nil
+	return buf, sign == 1, nil
 }
 
 // writeMemo writes a memo to the memo file and returns the address of the memo.

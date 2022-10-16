@@ -151,7 +151,7 @@ func (file *File) valueToByteRepresentation(field *Field, skipSpacing bool) ([]b
 // Returns the value from the memo file as string or []byte
 func (file *File) parseMemo(raw []byte, column *Column) (interface{}, error) {
 	// M values contain the address in the FPT file from where to read data
-	memo, isText, err := file.parseMemoFile(raw)
+	memo, isText, err := file.readMemo(raw)
 	if err != nil {
 		return nil, newError("dbase-interpreter-parsemvalue-1", fmt.Errorf("parsing memo failed at column field: %v failed with error: %w", column.Name(), err))
 	}
