@@ -81,7 +81,7 @@ type Modification struct {
  */
 
 // Create a new DBF file
-func New(version FileType, config *Config, columns []*Column, memoBlockSize uint16) (*DBF, error) {
+func New(version FileVersion, config *Config, columns []*Column, memoBlockSize uint16) (*DBF, error) {
 	if len(columns) == 0 {
 		return nil, errors.New("no columns defined")
 	}
@@ -635,8 +635,13 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 	for i, field := range row.fields {
 		val := field.GetValue()
 		mod := row.dbf.table.mods[i]
+		if row.dbf.config.TrimSpaces {
+			if str, ok := val.(string); ok {
+				val = strings.TrimSpace(str)
+			}
+		}
 		if mod != nil {
-			if row.dbf.config.TrimSpaces && mod.TrimSpaces || mod.TrimSpaces {
+			if mod.TrimSpaces {
 				if str, ok := val.(string); ok {
 					val = strings.TrimSpace(str)
 				}
