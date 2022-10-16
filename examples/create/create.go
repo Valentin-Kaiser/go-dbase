@@ -34,7 +34,7 @@ func main() {
 
 	// When creating a new table you need to define table type
 	// For more information about table types see the constants.go file
-	dbf, err := dbase.New(
+	file, err := dbase.New(
 		dbase.FoxProVar,
 		&dbase.Config{
 			Filename:   "test.dbf",
@@ -52,23 +52,23 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer dbf.Close()
+	defer file.Close()
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		dbf.Header().Modified(),
-		dbf.Header().ColumnsCount(),
-		dbf.Header().RecordsCount(),
-		dbf.Header().FileSize(),
+		file.Header().Modified(),
+		file.Header().ColumnsCount(),
+		file.Header().RecordsCount(),
+		file.Header().FileSize(),
 	)
 
 	// Print all database column infos.
-	for _, column := range dbf.Columns() {
+	for _, column := range file.Columns() {
 		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
 	}
 
 	// Write a new record
-	row := dbf.NewRow()
+	row := file.NewRow()
 
 	err = row.FieldByName("ID").SetValue(int32(1))
 	if err != nil {
@@ -96,14 +96,14 @@ func main() {
 	}
 
 	// Read all records
-	for !dbf.EOF() {
-		row, err := dbf.Row()
+	for !file.EOF() {
+		row, err := file.Row()
 		if err != nil {
 			panic(err)
 		}
 
 		// Increment the row pointer.
-		dbf.Skip(1)
+		file.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {

@@ -7,32 +7,32 @@ import (
 )
 
 func main() {
-	// Open the example database file.
-	dbf, err := dbase.OpenTable(&dbase.Config{
+	// Open the example database table.
+	table, err := dbase.OpenTable(&dbase.Config{
 		Filename: "../test_data/table/TEST.DBF",
 	})
 	if err != nil {
 		panic(err)
 	}
-	defer dbf.Close()
+	defer table.Close()
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		dbf.Header().Modified(),
-		dbf.Header().ColumnsCount(),
-		dbf.Header().RecordsCount(),
-		dbf.Header().FileSize(),
+		table.Header().Modified(),
+		table.Header().ColumnsCount(),
+		table.Header().RecordsCount(),
+		table.Header().FileSize(),
 	)
 
 	// Init the field we want to search for.
 	// Search for a product containing the word "test" in the name.
-	field, err := dbf.NewFieldByName("PRODNAME", "TEST")
+	field, err := table.NewFieldByName("PRODNAME", "TEST")
 	if err != nil {
 		panic(err)
 	}
 
 	// Execute the search with an exact match.
-	records, err := dbf.Search(field, false)
+	records, err := table.Search(field, false)
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// Execute the search without exact match.
-	records, err = dbf.Search(field, true)
+	records, err = table.Search(field, true)
 	if err != nil {
 		panic(err)
 	}

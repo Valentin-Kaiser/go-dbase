@@ -23,8 +23,8 @@ type Product struct {
 }
 
 func main() {
-	// Open the example database file.
-	dbf, err := dbase.OpenTable(&dbase.Config{
+	// Open the example database table.
+	table, err := dbase.OpenTable(&dbase.Config{
 		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 		WriteLock:  true,
@@ -32,18 +32,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer dbf.Close()
+	defer table.Close()
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		dbf.Header().Modified(),
-		dbf.Header().ColumnsCount(),
-		dbf.Header().RecordsCount(),
-		dbf.Header().FileSize(),
+		table.Header().Modified(),
+		table.Header().ColumnsCount(),
+		table.Header().RecordsCount(),
+		table.Header().FileSize(),
 	)
 
 	// Read the first row (rowPointer start at the first row).
-	row, err := dbf.Row()
+	row, err := table.Row()
 	if err != nil {
 		panic(err)
 	}
@@ -60,7 +60,7 @@ func main() {
 		panic(err)
 	}
 
-	// Write the changed row to the database file.
+	// Write the changed row to the database table.
 	err = row.Write()
 	if err != nil {
 		panic(err)
@@ -69,10 +69,10 @@ func main() {
 	// === Modifications ===
 
 	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-	dbf.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
-	dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+	table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+	table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
-	// Create a new row with the same structure as the database file.
+	// Create a new row with the same structure as the database table.
 	p := Product{
 		ID:          99,
 		Name:        "NEW_PRODUCT",
@@ -88,26 +88,26 @@ func main() {
 		Double:      103.45,
 	}
 
-	row, err = dbf.RowFromStruct(p)
+	row, err = table.RowFromStruct(p)
 	if err != nil {
 		panic(err)
 	}
 
-	// Add the new row to the database file.
+	// Add the new row to the database table.
 	err = row.Write()
 	if err != nil {
 		panic(err)
 	}
 
 	// Print all rows.
-	for !dbf.EOF() {
-		row, err := dbf.Row()
+	for !table.EOF() {
+		row, err := table.Row()
 		if err != nil {
 			panic(err)
 		}
 
 		// Increment the row pointer.
-		dbf.Skip(1)
+		table.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {
