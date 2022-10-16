@@ -8,32 +8,32 @@
 
 **Golang package for reading and writing FoxPro dBase table and memo files.**
 
-# Features 
+## Features 
 
 There are several similar packages but they are not suited for our use case, this package implements the following features:
 
 | Feature | [go-dbase](https://github.com/Valentin-Kaiser/go-dbase) | [go-dbf](https://github.com/LindsayBradford/go-dbf) | [go-foxpro-dbf](https://github.com/SebastiaanKlippert/go-foxpro-dbf) | 
 | --- | --- | --- | --- |
-| Encoding support ¹ | ✅ | ✅ | ✅ |
+| Encoding support ¹ | ✅ | ✅[*](https://github.com/LindsayBradford/go-dbf/issues/3) | ✅** |
 | Read | ✅ | ✅ | ✅ |
 | Write | ✅  | ✅ | ❌ |
 | FPT (memo) file support | ✅ | ❌ | ✅ |
 | Struct, json, map conversion | ✅ | ❌ | ✅ |
 | IO efficiency ² | ✅ | ❌ | ✅ |
 | Full data type support | ✅ | ❌ | ❌ |
-| Non full blocking IO³ | ✅ | ❌ | ❌ |
-| Search by value | ✅ | ❌ | ❌ |
-| Create new tables from scratch | ✅ | ❌ | ❌ |
+| Exclusive Read/Write³ | ✅ | ❌ | ❌ |
+| Search  | ✅ | ❌ | ❌ |
+| Create new tables file including structure | ✅ | ❌ | ❌ |
 
-> ¹ This package currently supports 13 of the 25 possible encodings, but a universal encoder will be provided for other code pages that can be extended at will. A list of supported encodings can be found [here](#supported-encodings).
+> ¹ This package currently supports 13 of the 25 possible encodings, but a universal encoder will be provided for other code pages that can be extended at will. A list of supported encodings can be found [here](#supported-encodings). The conversion in the go-foxpro-dbf package is extensible, but only Windows-1250 as default and the code page is not interpreted. 
 
 > ² IO efficiency is achieved by using one file handle for the DBF file and one file handle for the FPT file. This allows for non blocking IO and the ability to read files while other processes are accessing these. In addition, only the required positions in the file are read instead of keeping a copy of the entire file in memory.
 
-> ³ When reading or writing a file, not the complete file is locked. But while writing, the data block to be written is locked during the operation. This is done to prevent other processes from writing the same block of data. This is not a problem when reading since the data is not changed.
+> ³ The files can be opened completely exclusively and when writing a file, the data block to be written can be locked during the process. This is done to prevent other processes from writing the same data block. When reading, this is not a concern as the data is not changed.
 
 > **Disclaimer:** _This library should never be used to develop new software solutions with dbase tables. The creation of new tables only serves to transfer old databases or to remove faulty data._
 
-# Supported column types
+### Supported column types
 
 At this moment not all FoxPro column types are supported. 
 When reading column values, the value returned by this package is always `interface{}`. 
@@ -66,7 +66,7 @@ The supported column types with their return Go types are:
 
 > **These types are not interpreted by this package, the raw data is returned. This means the user must interpret the values themselves.*
 
-# Supported encodings
+### Supported encodings
 
 The following encodings are supported by this package:
 
@@ -90,12 +90,12 @@ The following encodings are supported by this package:
 
 > All encodings are converted from and to UTF-8.
 
-# Installation
+## Installation
 ``` 
 go get github.com/Valentin-Kaiser/go-dbase/dbase
 ```
 
-# Examples
+## Examples
 
 <details open>
   <summary>Read</summary>
