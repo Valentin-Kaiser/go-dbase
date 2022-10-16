@@ -54,7 +54,7 @@ func Open(config *Config) (*DBF, error) {
 	if config.Filename == "" {
 		return nil, newError("dbase-io-open-2", fmt.Errorf("missing filename"))
 	}
-	if config.Converter == nil {
+	if config.Converter == nil && !config.InterpretCodePage {
 		config.InterpretCodePage = true
 	}
 	filename := filepath.Clean(config.Filename)
