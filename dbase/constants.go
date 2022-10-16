@@ -30,7 +30,7 @@ type FileExtension string
 const (
 	DBC FileExtension = ".DBC" // Database file extension
 	DCT FileExtension = ".DCT" // Database container file extension
-	DBT FileExtension = ".DBT" // Table file extension
+	DBF FileExtension = ".DBF" // Table file extension
 	FPT FileExtension = ".FPT" // Memo file extension
 	SCX FileExtension = ".SCX" // Form file extension
 	LBX FileExtension = ".LBX" // Label file extension
