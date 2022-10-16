@@ -8,7 +8,7 @@ import (
 
 func main() {
 	// Open the example database file.
-	dbf, err := dbase.Open(&dbase.Config{
+	dbf, err := dbase.OpenTable(&dbase.Config{
 		Filename: "../test_data/table/TEST.DBF",
 	})
 	if err != nil {
