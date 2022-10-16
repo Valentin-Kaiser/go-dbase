@@ -63,7 +63,7 @@ const (
 )
 
 func (t TableFlag) Defined(flag byte) bool {
-	return t&TableFlag(flag) == TableFlag(t)
+	return t&TableFlag(flag) == t
 }
 
 // Column flags indicate wether a column is hidden, can be null, is binary or is autoincremented
