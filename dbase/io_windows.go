@@ -78,6 +78,9 @@ func OpenTable(config *Config) (*File, error) {
 	file.handle = &fd
 	// Interpret the code page mark if needed
 	if config.InterpretCodePage || config.Converter == nil {
+		if config.Converter == nil {
+			debugf("No encoding converter defined, falling back to default (interpreting)")
+		}
 		debugf("Interpreting code page mark...")
 		file.config.Converter = NewDefaultConverterFromCodePage(file.header.CodePage)
 		debugf("Code page: 0x%02x => interpreted: 0x%02x", file.header.CodePage, file.config.Converter.CodePageMark())
