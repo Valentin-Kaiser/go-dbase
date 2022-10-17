@@ -817,7 +817,6 @@ func (file *File) Deleted() (bool, error) {
 	if read != 1 {
 		return false, newError("dbase-io-deleted-4", ErrIncomplete)
 	}
-	debugf("Row %d is deleted: %v", file.table.rowPointer, Marker(buf[0]) == Deleted)
 	return Marker(buf[0]) == Deleted, nil
 }
 
