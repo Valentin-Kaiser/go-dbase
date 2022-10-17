@@ -83,12 +83,12 @@ func OpenTable(config *Config) (*File, error) {
 			debugf("No encoding converter defined, falling back to default (interpreting)")
 		}
 		debugf("Interpreting code page mark...")
-		file.config.Converter = NewDefaultConverterFromCodePage(file.header.CodePage)
-		debugf("Code page: 0x%02x => interpreted: 0x%02x", file.header.CodePage, file.config.Converter.CodePageMark())
+		file.config.Converter = ConverterFromCodePage(file.header.CodePage)
+		debugf("Code page: 0x%02x => interpreted: 0x%02x", file.header.CodePage, file.config.Converter.CodePage())
 	}
 	// Check if the code page mark is matchin the converter
-	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePageMark() {
-		return nil, newError("dbase-io-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePageMark()))
+	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePage() {
+		return nil, newError("dbase-io-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
 	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
