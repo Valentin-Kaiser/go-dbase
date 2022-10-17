@@ -29,7 +29,7 @@ func main() {
 		TrimSpaces: true,
 	})
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 	defer table.Close()
 
@@ -50,7 +50,7 @@ func main() {
 	for !table.EOF() {
 		row, err := table.Row()
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		// Increment the row pointer.
@@ -94,7 +94,7 @@ func main() {
 		p := &Product{}
 		err = row.ToStruct(p)
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		fmt.Printf("Product: %v \n", p.Name)

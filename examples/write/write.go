@@ -30,7 +30,7 @@ func main() {
 		WriteLock:  true,
 	})
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 	defer table.Close()
 
@@ -45,25 +45,25 @@ func main() {
 	// Read the first row (rowPointer start at the first row).
 	row, err := table.Row()
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Get the company name field by column name.
 	err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Change a memo field value.
 	err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Write the changed row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// === Modifications ===
@@ -90,20 +90,20 @@ func main() {
 
 	row, err = table.RowFromStruct(p)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Add the new row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Print all rows.
 	for !table.EOF() {
 		row, err := table.Row()
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		// Increment the row pointer.
