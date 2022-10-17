@@ -33,6 +33,7 @@ import (
 // This package contains the functions to convert a dbase database entry as byte array into a row struct
 // with the columns converted into the corresponding data types.
 func (file *File) dataToValue(raw []byte, column *Column) (interface{}, error) {
+	debugf("Interpreting column: %v - type: %v", column.Name(), DataType(column.DataType))
 	// Not all column types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed
 	if len(raw) != int(column.Length) {
@@ -95,6 +96,7 @@ func (file *File) dataToValue(raw []byte, column *Column) (interface{}, error) {
 // Converts column data to the byte representation
 // For M values the data has to be written to the memo file
 func (file *File) valueToByteRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
+	debugf("Converting to bytes => column: %v - type: %v", field.Name(), DataType(field.column.DataType))
 	// if value is nil, return empty byte array
 	if field.GetValue() == nil {
 		return make([]byte, field.column.Length), nil
