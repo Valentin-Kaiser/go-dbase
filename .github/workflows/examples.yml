@@ -32,7 +32,7 @@ jobs:
       - name: Search table example
         run: cd examples && make search_table
       - name: Database example
-        run: cd examples && make database
+        run: cd examples && make database_tables
   build-windows:
     name: Windows build
     runs-on: windows-latest
@@ -53,4 +53,4 @@ jobs:
       - name: Search table example
         run: cd examples && make search_table
       - name: Database example
-        run: cd examples && make database
+        run: cd examples && make database_tables
