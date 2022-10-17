@@ -57,6 +57,7 @@ func (e Error) Context() []string {
 	return e.context
 }
 
+// trace returns the context of the error in the dbase package as a string
 func (e Error) trace() string {
 	trace := ""
 	// append reverse order
@@ -66,7 +67,8 @@ func (e Error) trace() string {
 	return trace
 }
 
-func ErrorDetails(err error) error {
+// GetErrorTrace returns the context and the error produced by the dbase package as a string
+func GetErrorTrace(err error) error {
 	if err == nil {
 		return nil
 	}

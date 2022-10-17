@@ -14,7 +14,7 @@ import (
 type EncodingConverter interface {
 	Decode(in []byte) ([]byte, error)
 	Encode(in []byte) ([]byte, error)
-	CodePageMark() byte
+	CodePage() byte
 }
 
 type DefaultConverter struct {
@@ -48,7 +48,7 @@ func (c DefaultConverter) Encode(in []byte) ([]byte, error) {
 }
 
 // CodePageMark returns corresponding code page mark for the encoding
-func (c DefaultConverter) CodePageMark() byte {
+func (c DefaultConverter) CodePage() byte {
 	switch c.encoding {
 	case charmap.CodePage437: // U.S. MS-DOS
 		return 0x01
@@ -86,7 +86,7 @@ func NewDefaultConverter(encoding *charmap.Charmap) DefaultConverter {
 }
 
 // NewDefaultConverterFromCodePage returns a new EncodingConverter from a code page mark
-func NewDefaultConverterFromCodePage(codePageMark byte) DefaultConverter {
+func ConverterFromCodePage(codePageMark byte) DefaultConverter {
 	switch codePageMark {
 	case 0x01: // U.S. MS-DOS
 		return NewDefaultConverter(charmap.CodePage437)

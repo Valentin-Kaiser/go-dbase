@@ -31,8 +31,8 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	dbase.SetDebug(true)
-	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
+
+	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
 
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
@@ -40,7 +40,7 @@ func main() {
 		TrimSpaces: true,
 	})
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 	defer table.Close()
 
@@ -61,7 +61,7 @@ func main() {
 	for !table.EOF() {
 		row, err := table.Row()
 		if err != nil {
-			panic(dbase.ErrorDetails(err))
+			panic(dbase.GetErrorTrace(err))
 		}
 
 		// Increment the row pointer.
@@ -105,7 +105,7 @@ func main() {
 		p := &Product{}
 		err = row.ToStruct(p)
 		if err != nil {
-			panic(dbase.ErrorDetails(err))
+			panic(dbase.GetErrorTrace(err))
 		}
 
 		fmt.Printf("Product: %v \n", p.Name)

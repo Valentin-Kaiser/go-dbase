@@ -17,6 +17,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// Configures the file you want to open.
+// The filename is mandatory. The other fields are optional and are false by default.
+// If Converter and InterpretCodePage are both not set the package will try to interpret the code page mark.
+// To open untested files set Untested to true. Tested files are defined in the constants.go file.
 type Config struct {
 	Filename          string            // The filename of the DBF file.
 	Converter         EncodingConverter // The encoding converter to use.
@@ -29,6 +33,7 @@ type Config struct {
 }
 
 // File is the main struct to handle a dBase file.
+// Each file type is basically a Table or a Memo file.
 type File struct {
 	config         *Config         // The config used when working with the DBF file.
 	handle         *windows.Handle // DBase file windows handle pointer.
@@ -82,12 +87,12 @@ func OpenTable(config *Config) (*File, error) {
 			debugf("No encoding converter defined, falling back to default (interpreting)")
 		}
 		debugf("Interpreting code page mark...")
-		file.config.Converter = NewDefaultConverterFromCodePage(file.header.CodePage)
-		debugf("Code page: 0x%02x => interpreted: 0x%02x", file.header.CodePage, file.config.Converter.CodePageMark())
+		file.config.Converter = ConverterFromCodePage(file.header.CodePage)
+		debugf("Code page: 0x%02x => interpreted: 0x%02x", file.header.CodePage, file.config.Converter.CodePage())
 	}
 	// Check if the code page mark is matchin the converter
-	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePageMark() {
-		return nil, newError("dbase-io-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePageMark()))
+	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePage() {
+		return nil, newError("dbase-io-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
 	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).

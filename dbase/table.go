@@ -177,7 +177,7 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 			Day:       uint8(time.Now().Day()),
 			FirstRow:  296 + uint16(len(columns))*32,
 			RowLength: 1,
-			CodePage:  config.Converter.CodePageMark(),
+			CodePage:  config.Converter.CodePage(),
 		},
 		table: &Table{
 			columns: make([]*Column, 0),

@@ -391,7 +391,7 @@ func (file *File) getDateTimeRepresentation(field *Field) ([]byte, error) {
 		t = parsedTime
 	}
 	raw := make([]byte, 8)
-	i := YMD2JD(t.Year(), int(t.Month()), t.Day())
+	i := ymd2jd(t.Year(), int(t.Month()), t.Day())
 	date, err := toBinary(uint64(i))
 	if err != nil {
 		return nil, newError("dbase-interpreter-gettrepresentation-3", fmt.Errorf("time conversion at column field: %v failed with error: %w", field.Name(), err))
