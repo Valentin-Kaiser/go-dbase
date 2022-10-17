@@ -22,14 +22,24 @@ var (
 
 // Error is a wrapper for errors that occur in the dbase package
 type Error struct {
-	context string
+	context []string
 	err     error
 }
 
 // newError creates a new Error
 func newError(context string, err error) Error {
+	e, ok := err.(Error)
+	if ok {
+		ctx := e.Context()
+		ctx = append(ctx, context)
+		err = Error{
+			context: ctx,
+			err:     err,
+		}
+		return err.(Error)
+	}
 	return Error{
-		context: context,
+		context: []string{context},
 		err:     err,
 	}
 }
@@ -40,8 +50,17 @@ func (e Error) Error() string {
 }
 
 // Context returns the context of the error in the dbase package
-func (e Error) Context() string {
+func (e Error) Context() []string {
 	return e.context
+}
+
+func (e Error) trace() string {
+	trace := ""
+	// append reverse order
+	for i := len(e.context) - 1; i >= 0; i-- {
+		trace += e.context[i] + ":"
+	}
+	return trace
 }
 
 func ErrorDetails(err error) error {
@@ -49,7 +68,7 @@ func ErrorDetails(err error) error {
 		return nil
 	}
 	if e, ok := err.(Error); ok {
-		return fmt.Errorf("%s:%s", e.Context(), e.Error())
+		return fmt.Errorf("%s%s", e.trace(), e.Error())
 	}
 	return err
 }
