@@ -69,11 +69,11 @@ func OpenTable(config *Config) (*File, error) {
 	}
 	handle, err := os.OpenFile(fileName, mode, 0600)
 	if err != nil {
-		return nil, newError("dbase-io-open-1", fmt.Errorf("opening file failed with error: %w", err))
+		return nil, newError("dbase-io-open-4", fmt.Errorf("opening file failed with error: %w", err))
 	}
 	file, err := prepareDBF(handle, config)
 	if err != nil {
-		return nil, newError("dbase-io-open-2", err)
+		return nil, newError("dbase-io-open-5", err)
 	}
 	file.handle = handle
 	// Interpret the code page mark if needed
@@ -82,7 +82,7 @@ func OpenTable(config *Config) (*File, error) {
 	}
 	// Check if the code page mark is matchin the converter
 	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePageMark() {
-		return nil, newError("dbase-io-open-3", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePageMark()))
+		return nil, newError("dbase-io-open-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePageMark()))
 	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
@@ -95,11 +95,11 @@ func OpenTable(config *Config) (*File, error) {
 		relatedFile := strings.TrimSuffix(fileName, path.Ext(fileName)) + string(ext)
 		relatedHandle, err := os.OpenFile(relatedFile, mode, 0600)
 		if err != nil {
-			return nil, newError("dbase-io-open-4", fmt.Errorf("opening FPT file failed with error: %w", err))
+			return nil, newError("dbase-io-open-7", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
 		err = file.prepareMemo(relatedHandle)
 		if err != nil {
-			return nil, newError("dbase-io-open-5", err)
+			return nil, newError("dbase-io-open-8", err)
 		}
 		file.relatedHandle = relatedHandle
 	}
@@ -111,13 +111,13 @@ func (file *File) Close() error {
 	if file.handle != nil {
 		err := file.handle.Close()
 		if err != nil {
-			return newError("dbase-io-close-1", fmt.Errorf("closing DBF failed with error: %w", err))
+			return newError("dbase-io-close-9", fmt.Errorf("closing DBF failed with error: %w", err))
 		}
 	}
 	if file.relatedHandle != nil {
 		err := file.relatedHandle.Close()
 		if err != nil {
-			return newError("dbase-io-close-2", fmt.Errorf("closing FPT failed with error: %w", err))
+			return newError("dbase-io-close-10", fmt.Errorf("closing FPT failed with error: %w", err))
 		}
 	}
 	return nil
