@@ -10,13 +10,13 @@ import (
 
 // Convert year, month and day to a julian day number.
 // (Julian day number -> days since 01-01-4712 BC)
-func YMD2JD(y, m, d int) int {
+func ymd2jd(y, m, d int) int {
 	return int(float64(2-(y/100)+y/100/4) + float64(d) + (float64(365.25) * float64(y+4716)) + (float64(30.6001) * float64(m+1)) - 1524.5)
 }
 
 // Convert julian day number to year, month and day.
 // (Julian day number -> days since 01-01-4712 BC)
-func JD2YMD(date int) (int, int, int) {
+func jd2ymd(date int) (int, int, int) {
 	l := date + 68569
 	n := 4 * l / 146097
 	l -= (146097*n + 3) / 4
@@ -30,29 +30,9 @@ func JD2YMD(date int) (int, int, int) {
 	return y, m, d
 }
 
-// Convert julian day number to golang time.Time.
-// (Julian day number -> days since 01-01-4712 BC)
-func JDToDate(number int) (time.Time, error) {
-	y, m, d := JD2YMD(number)
-	ys := strconv.Itoa(y)
-	ms := strconv.Itoa(m)
-	ds := strconv.Itoa(d)
-	if m < 10 {
-		ms = "0" + ms
-	}
-	if d < 10 {
-		ds = "0" + ds
-	}
-	t, err := time.Parse("2006-01-02", ys+"-"+ms+"-"+ds)
-	if err != nil {
-		return t, newError("dbase-conversion-jdtodate-1", err)
-	}
-	return t, nil
-}
-
 // parseDate parses a date string from a byte slice and returns a time.Time
 func parseDate(raw []byte) (time.Time, error) {
-	if string(raw) == strings.Repeat(" ", 8) {
+	if len(strings.TrimSpace(string(raw))) == 0 {
 		return time.Time{}, nil
 	}
 	t, err := time.Parse("20060102", string(raw))
@@ -70,7 +50,7 @@ func parseDateTime(raw []byte) (time.Time, error) {
 	julDat := int(binary.LittleEndian.Uint32(raw[:4]))
 	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
 	// Determine year, month, day
-	y, m, d := JD2YMD(julDat)
+	y, m, d := jd2ymd(julDat)
 	if y < 0 || y > 9999 {
 		return time.Time{}, nil
 	}
