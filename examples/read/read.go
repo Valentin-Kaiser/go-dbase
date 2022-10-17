@@ -23,38 +23,38 @@ type Product struct {
 }
 
 func main() {
-	// Open the example database file.
-	dbf, err := dbase.Open(&dbase.Config{
+	// Open the example database table.
+	table, err := dbase.OpenTable(&dbase.Config{
 		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 	})
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
-	defer dbf.Close()
+	defer table.Close()
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		dbf.Header().Modified(),
-		dbf.Header().ColumnsCount(),
-		dbf.Header().RecordsCount(),
-		dbf.Header().FileSize(),
+		table.Header().Modified(),
+		table.Header().ColumnsCount(),
+		table.Header().RecordsCount(),
+		table.Header().FileSize(),
 	)
 
 	// Print all database column infos.
-	for _, column := range dbf.Columns() {
+	for _, column := range table.Columns() {
 		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
 	}
 
 	// Loop through all rows using rowPointer in DBF struct.
-	for !dbf.EOF() {
-		row, err := dbf.Row()
+	for !table.EOF() {
+		row, err := table.Row()
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		// Increment the row pointer.
-		dbf.Skip(1)
+		table.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {
@@ -83,10 +83,10 @@ func main() {
 		// === Modifications ===
 
 		// Disable space trimming for the company name
-		dbf.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
+		table.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
 		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-		dbf.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
-		dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+		table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+		table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
 		// === Struct Conversion ===
 
@@ -94,7 +94,7 @@ func main() {
 		p := &Product{}
 		err = row.ToStruct(p)
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		fmt.Printf("Product: %v \n", p.Name)

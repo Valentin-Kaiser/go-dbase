@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://github.com/Valentin-Kaiser/go-dbase/blob/main/LICENSE)
 [![Linters](https://github.com/Valentin-Kaiser/go-dbase/workflows/Linters/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
 [![CodeQL](https://github.com/Valentin-Kaiser/go-dbase/workflows/CodeQL/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
+[![Examples](https://github.com/Valentin-Kaiser/go-dbase/workflows/Examples/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
 [![Go Report](https://goreportcard.com/badge/github.com/Valentin-Kaiser/go-dbase)](https://goreportcard.com/report/github.com/Valentin-Kaiser/go-dbase)
 
 **Golang package for reading and writing FoxPro dBase table and memo files.**
@@ -23,7 +24,8 @@ There are several similar packages but they are not suited for our use case, thi
 | Full data type support | ✅ | ❌ | ❌ |
 | Exclusive Read/Write³ | ✅ | ❌ | ❌ |
 | Search  | ✅ | ❌ | ❌ |
-| Create new tables file including structure | ✅ | ❌ | ❌ |
+| Create new tables, including schema | ✅ | ❌ | ❌ |
+| Open database | ✅ | ❌ | ❌ |
 
 > ¹ This package currently supports 13 of the 25 possible encodings, but a universal encoder will be provided for other code pages that can be extended at will. A list of supported encodings can be found [here](#supported-encodings). The conversion in the go-foxpro-dbf package is extensible, but only Windows-1250 as default and the code page is not interpreted. 
 
@@ -129,39 +131,38 @@ type Product struct {
 }
 
 func main() {
-	// Open the example database file.
-	dbf, err := dbase.Open(&dbase.Config{
-		Filename:   "../test_data/TEST.DBF",
-		Converter:  new(dbase.Win1250Converter),
+	// Open the example database table.
+	table, err := dbase.OpenTable(&dbase.Config{
+		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 	})
 	if err != nil {
 		panic(err)
 	}
-	defer dbf.Close()
+	defer table.Close()
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		dbf.Header().Modified(),
-		dbf.Header().ColumnsCount(),
-		dbf.Header().RecordsCount(),
-		dbf.Header().FileSize(),
+		table.Header().Modified(),
+		table.Header().ColumnsCount(),
+		table.Header().RecordsCount(),
+		table.Header().FileSize(),
 	)
 
 	// Print all database column infos.
-	for _, column := range dbf.Columns() {
+	for _, column := range table.Columns() {
 		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
 	}
 
 	// Loop through all rows using rowPointer in DBF struct.
-	for !dbf.EOF() {
-		row, err := dbf.Row()
+	for !table.EOF() {
+		row, err := table.Row()
 		if err != nil {
 			panic(err)
 		}
 
 		// Increment the row pointer.
-		dbf.Skip(1)
+		table.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {
@@ -190,10 +191,10 @@ func main() {
 		// === Modifications ===
 
 		// Disable space trimming for the company name
-		dbf.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
+		table.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
 		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-		dbf.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
-		dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+		table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+		table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
 		// === Struct Conversion ===
 
@@ -239,28 +240,27 @@ type Product struct {
 }
 
 func main() {
-	// Open the example database file.
-	dbf, err := dbase.Open(&dbase.Config{
-		Filename:   "../test_data/TEST.DBF",
-		Converter:  new(dbase.Win1250Converter),
+	// Open the example database table.
+	table, err := dbase.OpenTable(&dbase.Config{
+		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 		WriteLock:  true,
 	})
 	if err != nil {
 		panic(err)
 	}
-	defer dbf.Close()
+	defer table.Close()
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		dbf.Header().Modified(),
-		dbf.Header().ColumnsCount(),
-		dbf.Header().RecordsCount(),
-		dbf.Header().FileSize(),
+		table.Header().Modified(),
+		table.Header().ColumnsCount(),
+		table.Header().RecordsCount(),
+		table.Header().FileSize(),
 	)
 
 	// Read the first row (rowPointer start at the first row).
-	row, err := dbf.Row()
+	row, err := table.Row()
 	if err != nil {
 		panic(err)
 	}
@@ -277,7 +277,7 @@ func main() {
 		panic(err)
 	}
 
-	// Write the changed row to the database file.
+	// Write the changed row to the database table.
 	err = row.Write()
 	if err != nil {
 		panic(err)
@@ -286,10 +286,10 @@ func main() {
 	// === Modifications ===
 
 	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-	dbf.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
-	dbf.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+	table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+	table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 
-	// Create a new row with the same structure as the database file.
+	// Create a new row with the same structure as the database table.
 	p := Product{
 		ID:          99,
 		Name:        "NEW_PRODUCT",
@@ -305,26 +305,26 @@ func main() {
 		Double:      103.45,
 	}
 
-	row, err = dbf.RowFromStruct(p)
+	row, err = table.RowFromStruct(p)
 	if err != nil {
 		panic(err)
 	}
 
-	// Add the new row to the database file.
+	// Add the new row to the database table.
 	err = row.Write()
 	if err != nil {
 		panic(err)
 	}
 
 	// Print all rows.
-	for !dbf.EOF() {
-		row, err := dbf.Row()
+	for !table.EOF() {
+		row, err := table.Row()
 		if err != nil {
 			panic(err)
 		}
 
 		// Increment the row pointer.
-		dbf.Skip(1)
+		table.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {
@@ -339,6 +339,52 @@ func main() {
 ```
 </details>
 
+<details open>
+  <summary>Write</summary>
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/Valentin-Kaiser/go-dbase/dbase"
+)
+
+func main() {
+	db, err := dbase.OpenDatabase(&dbase.Config{
+		Filename:   "Y:\\USER\\VK\\OMS Datenbanken\\KTI\\OMS.DBC",
+		TrimSpaces: true,
+	})
+	if err != nil {
+		panic(dbase.ErrorDetails(err))
+	}
+	defer db.Close()
+
+	tables := db.Tables()
+	for name, table := range tables {
+		fmt.Printf(
+			"Table: %v Last modified: %v Columns count: %v Record count: %v File size: %v First Row: %v Length: %v \n",
+			name,
+			table.Header().Modified(),
+			table.Header().ColumnsCount(),
+			table.Header().RecordsCount(),
+			table.Header().FileSize(),
+			table.Header().FirstRow,
+			table.Header().RowLength,
+		)
+	}
+
+	// Print the database schema
+	for name, columns := range db.Schema() {
+		fmt.Printf("# Table: %v  \n", name)
+		for _, column := range columns {
+			fmt.Printf("	=> Column: %v Data Type: %v Length: %v \n", column.Name(), column.Type(), column.Length)
+		}
+	}
+}
+```
+</details>
 
 <details open>
   <summary>Create</summary>
@@ -350,6 +396,7 @@ import (
 	"fmt"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
+	"golang.org/x/text/encoding/charmap"
 )
 
 func main() {
@@ -379,11 +426,11 @@ func main() {
 
 	// When creating a new table you need to define table type
 	// For more information about table types see the constants.go file
-	dbf, err := dbase.New(
+	file, err := dbase.New(
 		dbase.FoxProVar,
 		&dbase.Config{
 			Filename:   "test.dbf",
-			Converter:  new(dbase.Win1250Converter),
+			Converter:  dbase.NewDefaultConverter(charmap.Windows1250),
 			TrimSpaces: true,
 		},
 		[]*dbase.Column{
@@ -397,23 +444,23 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer dbf.Close()
+	defer file.Close()
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		dbf.Header().Modified(),
-		dbf.Header().ColumnsCount(),
-		dbf.Header().RecordsCount(),
-		dbf.Header().FileSize(),
+		file.Header().Modified(),
+		file.Header().ColumnsCount(),
+		file.Header().RecordsCount(),
+		file.Header().FileSize(),
 	)
 
 	// Print all database column infos.
-	for _, column := range dbf.Columns() {
+	for _, column := range file.Columns() {
 		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
 	}
 
 	// Write a new record
-	row := dbf.NewRow()
+	row := file.NewRow()
 
 	err = row.FieldByName("ID").SetValue(int32(1))
 	if err != nil {
@@ -441,14 +488,14 @@ func main() {
 	}
 
 	// Read all records
-	for !dbf.EOF() {
-		row, err := dbf.Row()
+	for !file.EOF() {
+		row, err := file.Row()
 		if err != nil {
 			panic(err)
 		}
 
 		// Increment the row pointer.
-		dbf.Skip(1)
+		file.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {
@@ -481,33 +528,32 @@ import (
 )
 
 func main() {
-	// Open the example database file.
-	dbf, err := dbase.Open(&dbase.Config{
-		Filename:  "../test_data/TEST.DBF",
-		Converter: new(dbase.Win1250Converter),
+	// Open the example database table.
+	table, err := dbase.OpenTable(&dbase.Config{
+		Filename: "../test_data/table/TEST.DBF",
 	})
 	if err != nil {
 		panic(err)
 	}
-	defer dbf.Close()
+	defer table.Close()
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		dbf.Header().Modified(),
-		dbf.Header().ColumnsCount(),
-		dbf.Header().RecordsCount(),
-		dbf.Header().FileSize(),
+		table.Header().Modified(),
+		table.Header().ColumnsCount(),
+		table.Header().RecordsCount(),
+		table.Header().FileSize(),
 	)
 
 	// Init the field we want to search for.
 	// Search for a product containing the word "test" in the name.
-	field, err := dbf.NewFieldByName("PRODNAME", "TEST")
+	field, err := table.NewFieldByName("PRODNAME", "TEST")
 	if err != nil {
 		panic(err)
 	}
 
 	// Execute the search with an exact match.
-	records, err := dbf.Search(field, false)
+	records, err := table.Search(field, false)
 	if err != nil {
 		panic(err)
 	}
@@ -524,7 +570,7 @@ func main() {
 	}
 
 	// Execute the search without exact match.
-	records, err = dbf.Search(field, true)
+	records, err = table.Search(field, true)
 	if err != nil {
 		panic(err)
 	}

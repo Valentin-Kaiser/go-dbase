@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +34,11 @@ type MemoHeader struct {
 	BlockSize uint16  // Block size (bytes per block)
 }
 
+type Database struct {
+	file   *File
+	tables map[string]*File
+}
+
 // Table is a struct containing the table columns, modifications and the row pointer
 type Table struct {
 	columns    []*Column       // Columns defined in this table
@@ -54,7 +61,7 @@ type Column struct {
 
 // Row is a struct containing the row Position, deleted flag and data fields
 type Row struct {
-	dbf        *DBF     // Pointer to the DBF object this row belongs to
+	handle     *File    // Pointer to the DBF object this row belongs to
 	Position   uint32   // Position of the row in the file
 	ByteOffset int64    // Byte offset of the row in the file
 	Deleted    bool     // Deleted flag
@@ -80,15 +87,86 @@ type Modification struct {
  *  ###############################################################
  */
 
+// Open a database and all related tables
+func OpenDatabase(config *Config) (*Database, error) {
+	if config == nil {
+		return nil, newError("dbase-io-opendatabase-1", fmt.Errorf("missing config"))
+	}
+	if len(strings.TrimSpace(config.Filename)) == 0 {
+		return nil, newError("dbase-io-opendatabase-2", fmt.Errorf("missing filename"))
+	}
+	if strings.ToUpper(filepath.Ext(config.Filename)) != string(DBC) {
+		return nil, newError("dbase-io-opendatabase-3", fmt.Errorf("invalid file name: %v", config.Filename))
+	}
+	databaseTable, err := OpenTable(config)
+	if err != nil {
+		return nil, newError("dbase-io-opendatabase-4", fmt.Errorf("opening database table failed with error: %w", err))
+	}
+	// Search by all records where object type is table
+	typeField, err := databaseTable.NewFieldByName("OBJECTTYPE", "Table")
+	if err != nil {
+		return nil, newError("dbase-io-opendatabase-5", fmt.Errorf("creating type field failed with error: %w", err))
+	}
+	rows, err := databaseTable.Search(typeField, true)
+	if err != nil {
+		return nil, newError("dbase-io-opendatabase-6", fmt.Errorf("searching for type field failed with error: %w", err))
+	}
+	// Try to load the table files
+	tables := make(map[string]*File)
+	for _, row := range rows {
+		objectName, err := row.ValueByName("OBJECTNAME")
+		if err != nil {
+			return nil, newError("dbase-io-opendatabase-7", fmt.Errorf("getting table name failed with error: %w", err))
+		}
+		tableName, ok := objectName.(string)
+		if !ok {
+			return nil, newError("dbase-io-opendatabase-8", fmt.Errorf("table name is not a string"))
+		}
+		tableName = strings.Trim(tableName, " ")
+		if tableName == "" {
+			continue
+		}
+		// Replace underscores with spaces
+		tablePath := path.Join(filepath.Dir(config.Filename), strings.ReplaceAll(tableName, "_", " ")+string(DBF))
+		tableConfig := &Config{
+			Filename:          tablePath,
+			Converter:         config.Converter,
+			Exclusive:         config.Exclusive,
+			Untested:          config.Untested,
+			TrimSpaces:        config.TrimSpaces,
+			WriteLock:         config.WriteLock,
+			ValidateCodePage:  config.ValidateCodePage,
+			InterpretCodePage: config.InterpretCodePage,
+		}
+		// Load the table
+		table, err := OpenTable(tableConfig)
+		if err != nil {
+			return nil, newError("dbase-io-opendatabase-9", fmt.Errorf("opening table failed with error: %w", err))
+		}
+		tables[tableName] = table
+	}
+	return &Database{file: databaseTable, tables: tables}, nil
+}
+
+// Close the database file and all related tables
+func (db *Database) Close() error {
+	for _, table := range db.tables {
+		if err := table.Close(); err != nil {
+			return newError("dbase-io-close-1", err)
+		}
+	}
+	return db.file.Close()
+}
+
 // Create a new DBF file
-func New(version FileType, config *Config, columns []*Column, memoBlockSize uint16) (*DBF, error) {
+func New(version FileVersion, config *Config, columns []*Column, memoBlockSize uint16) (*File, error) {
 	if len(columns) == 0 {
 		return nil, errors.New("no columns defined")
 	}
 	if config.Converter == nil {
 		return nil, errors.New("no converter defined")
 	}
-	dbf := &DBF{
+	file := &File{
 		config: config,
 		header: &Header{
 			FileType:  byte(version),
@@ -112,7 +190,7 @@ func New(version FileType, config *Config, columns []*Column, memoBlockSize uint
 	for _, column := range columns {
 		if column.DataType == byte(Memo) {
 			memoField = true
-			dbf.header.TableFlags = byte(MemoFlag)
+			file.header.TableFlags = byte(MemoFlag)
 		}
 		if column.DataType == byte(Varchar) || column.DataType == byte(Varbinary) {
 			if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
@@ -122,15 +200,15 @@ func New(version FileType, config *Config, columns []*Column, memoBlockSize uint
 			}
 		}
 		// Set the column position in the row
-		column.Position = uint32(dbf.header.RowLength)
+		column.Position = uint32(file.header.RowLength)
 		// Add the column length to the row length
-		dbf.header.RowLength += uint16(column.Length)
+		file.header.RowLength += uint16(column.Length)
 		// Add columns to the table
-		dbf.table.columns = append(dbf.table.columns, column)
+		file.table.columns = append(file.table.columns, column)
 	}
 	// If there are memo fields, add the memo header
 	if memoField {
-		dbf.memoHeader = &MemoHeader{
+		file.memoHeader = &MemoHeader{
 			NextFree:  0,
 			Unused:    [2]byte{0x00, 0x00},
 			BlockSize: memoBlockSize,
@@ -142,10 +220,10 @@ func New(version FileType, config *Config, columns []*Column, memoBlockSize uint
 		if nullFlagLength%8 > 0 {
 			length++
 		}
-		dbf.nullFlagColumn = &Column{
+		file.nullFlagColumn = &Column{
 			FieldName: [11]byte{0x5F, 0x4E, 0x75, 0x6C, 0x6C, 0x46, 0x6C, 0x61, 0x67, 0x73},
 			DataType:  0x30,
-			Position:  uint32(dbf.header.RowLength),
+			Position:  uint32(file.header.RowLength),
 			Length:    uint8(length),
 			Decimals:  0,
 			Flag:      0x05,
@@ -153,34 +231,35 @@ func New(version FileType, config *Config, columns []*Column, memoBlockSize uint
 			Step:      0x00,
 			Reserved:  [7]byte{},
 		}
-		dbf.header.FirstRow += 32
-		dbf.header.RowLength += uint16(length)
+		file.header.FirstRow += 32
+		file.header.RowLength += uint16(length)
 	}
 	// Create the files
-	dbf, err := create(dbf)
+	file, err := create(file)
 	if err != nil {
 		return nil, err
 	}
 	// Write the headers
-	err = dbf.writeHeader()
+	err = file.writeHeader()
 	if err != nil {
 		return nil, err
 	}
 	// Write the columns
-	err = dbf.writeColumns()
+	err = file.writeColumns()
 	if err != nil {
 		return nil, err
 	}
 	// Write the memo header
-	if dbf.memoHeader != nil {
-		err = dbf.writeMemoHeader()
+	if file.memoHeader != nil {
+		err = file.writeMemoHeader()
 		if err != nil {
 			return nil, err
 		}
 	}
-	return dbf, nil
+	return file, nil
 }
 
+// Create a new table column with the given name, type and length
 func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nullable bool) (*Column, error) {
 	if len(name) == 0 {
 		return nil, errors.New("no column name defined")
@@ -295,62 +374,62 @@ func (h *Header) FileSize() int64 {
  */
 
 // Returns if the internal row pointer is at end of file
-func (dbf *DBF) EOF() bool {
-	return dbf.table.rowPointer >= dbf.header.RowsCount
+func (file *File) EOF() bool {
+	return file.table.rowPointer >= file.header.RowsCount
 }
 
 // Returns if the internal row pointer is before first row
-func (dbf *DBF) BOF() bool {
-	return dbf.table.rowPointer == 0
+func (file *File) BOF() bool {
+	return file.table.rowPointer == 0
 }
 
 // Returns the current row pointer position
-func (dbf *DBF) Pointer() uint32 {
-	return dbf.table.rowPointer
+func (file *File) Pointer() uint32 {
+	return file.table.rowPointer
 }
 
 // Returns the dBase database file header struct for inspecting
-func (dbf *DBF) Header() *Header {
-	return dbf.header
+func (file *File) Header() *Header {
+	return file.header
 }
 
 // returns the number of rows
-func (dbf *DBF) RowsCount() uint32 {
-	return dbf.header.RowsCount
+func (file *File) RowsCount() uint32 {
+	return file.header.RowsCount
 }
 
 // Returns all columns
-func (dbf *DBF) Columns() []*Column {
-	return dbf.table.columns
+func (file *File) Columns() []*Column {
+	return file.table.columns
 }
 
 // Returns the requested column
-func (dbf *DBF) Column(pos int) *Column {
-	if pos < 0 || pos >= len(dbf.table.columns) {
+func (file *File) Column(pos int) *Column {
+	if pos < 0 || pos >= len(file.table.columns) {
 		return nil
 	}
-	return dbf.table.columns[pos]
+	return file.table.columns[pos]
 }
 
 // Returns the number of columns
-func (dbf *DBF) ColumnsCount() uint16 {
-	return uint16(len(dbf.table.columns))
+func (file *File) ColumnsCount() uint16 {
+	return uint16(len(file.table.columns))
 }
 
 // Returns a slice of all the column names
-func (dbf *DBF) ColumnNames() []string {
-	num := len(dbf.table.columns)
+func (file *File) ColumnNames() []string {
+	num := len(file.table.columns)
 	names := make([]string, num)
 	for i := 0; i < num; i++ {
-		names[i] = dbf.table.columns[i].Name()
+		names[i] = file.table.columns[i].Name()
 	}
 	return names
 }
 
 // Returns the column position of a column by name or -1 if not found.
-func (dbf *DBF) ColumnPosByName(colname string) int {
-	for i := 0; i < len(dbf.table.columns); i++ {
-		if dbf.table.columns[i].Name() == colname {
+func (file *File) ColumnPosByName(colname string) int {
+	for i := 0; i < len(file.table.columns); i++ {
+		if file.table.columns[i].Name() == colname {
 			return i
 		}
 	}
@@ -358,13 +437,42 @@ func (dbf *DBF) ColumnPosByName(colname string) int {
 }
 
 // Returns the column position of a column or -1 if not found.
-func (dbf *DBF) ColumnPos(column *Column) int {
-	for i := 0; i < len(dbf.table.columns); i++ {
-		if dbf.table.columns[i] == column {
+func (file *File) ColumnPos(column *Column) int {
+	for i := 0; i < len(file.table.columns); i++ {
+		if file.table.columns[i] == column {
 			return i
 		}
 	}
 	return -1
+}
+
+/**
+ *	################################################################
+ *	#						Database helper
+ *	################################################################
+ */
+
+// Returns all table of the database
+func (db *Database) Tables() map[string]*File {
+	return db.tables
+}
+
+// Returns the names of every table in the database
+func (db *Database) Names() []string {
+	names := make([]string, 0)
+	for name := range db.tables {
+		names = append(names, name)
+	}
+	return names
+}
+
+// Returns the complete database schema
+func (db *Database) Schema() map[string][]*Column {
+	schema := make(map[string][]*Column)
+	for name, table := range db.tables {
+		schema[name] = table.Columns()
+	}
+	return schema
 }
 
 /**
@@ -374,26 +482,26 @@ func (dbf *DBF) ColumnPos(column *Column) int {
  */
 
 // SetColumnModification sets a modification for a column
-func (dbf *DBF) SetColumnModification(position int, mod *Modification) {
+func (file *File) SetColumnModification(position int, mod *Modification) {
 	// Skip if position is out of range
-	if position < 0 || position >= len(dbf.table.columns) {
+	if position < 0 || position >= len(file.table.columns) {
 		return
 	}
-	dbf.table.mods[position] = mod
+	file.table.mods[position] = mod
 }
 
-func (dbf *DBF) SetColumnModificationByName(name string, mod *Modification) error {
-	position := dbf.ColumnPosByName(name)
+func (file *File) SetColumnModificationByName(name string, mod *Modification) error {
+	position := file.ColumnPosByName(name)
 	if position < 0 {
 		return newError("dbase-table-setcolumnmodificationbyname-1", fmt.Errorf("Column '%s' not found", name))
 	}
-	dbf.SetColumnModification(position, mod)
+	file.SetColumnModification(position, mod)
 	return nil
 }
 
 // Returns the column modification for a column at the given position
-func (dbf *DBF) GetColumnModification(position int) *Modification {
-	return dbf.table.mods[position]
+func (file *File) GetColumnModification(position int) *Modification {
+	return file.table.mods[position]
 }
 
 /**
@@ -419,16 +527,16 @@ func (c *Column) Type() string {
  */
 
 // Returns all rows as a slice
-func (dbf *DBF) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
+func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 	rows := make([]*Row, 0)
-	for !dbf.EOF() {
+	for !file.EOF() {
 		// This reads the complete row
-		row, err := dbf.Row()
+		row, err := file.Row()
 		if err != nil && !skipInvalid {
 			return nil, newError("dbase-table-rows-1", err)
 		}
 		// Increment the row pointer
-		dbf.Skip(1)
+		file.Skip(1)
 		// skip deleted rows
 		if row.Deleted && skipDeleted {
 			continue
@@ -438,24 +546,24 @@ func (dbf *DBF) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 	return rows, nil
 }
 
-// Returns the requested row at dbf.rowPointer.
-func (dbf *DBF) Row() (*Row, error) {
-	data, err := dbf.readRow(dbf.table.rowPointer)
+// Returns the requested row at file.rowPointer.
+func (file *File) Row() (*Row, error) {
+	data, err := file.readRow(file.table.rowPointer)
 	if err != nil {
 		return nil, newError("dbase-table-row-1", err)
 	}
-	return dbf.BytesToRow(data)
+	return file.BytesToRow(data)
 }
 
 // Converts raw row data to a Row struct
 // If the data points to a memo (FPT) file this file is also read
-func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
+func (file *File) BytesToRow(data []byte) (*Row, error) {
 	rec := &Row{}
-	rec.Position = dbf.table.rowPointer
-	rec.dbf = dbf
-	rec.fields = make([]*Field, dbf.ColumnsCount())
-	if len(data) < int(dbf.header.RowLength) {
-		return nil, newError("dbase-table-bytestorow-1", fmt.Errorf("invalid row data size %v Bytes < %v Bytes", len(data), int(dbf.header.RowLength)))
+	rec.Position = file.table.rowPointer
+	rec.handle = file
+	rec.fields = make([]*Field, file.ColumnsCount())
+	if len(data) < int(file.header.RowLength) {
+		return nil, newError("dbase-table-bytestorow-1", fmt.Errorf("invalid row data size %v Bytes < %v Bytes", len(data), int(file.header.RowLength)))
 	}
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 
@@ -466,8 +574,8 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 	// deleted flag already read
 	offset := uint16(1)
 	for i := 0; i < len(rec.fields); i++ {
-		column := dbf.table.columns[i]
-		val, err := dbf.dataToValue(data[offset:offset+uint16(column.Length)], dbf.table.columns[i])
+		column := file.table.columns[i]
+		val, err := file.dataToValue(data[offset:offset+uint16(column.Length)], file.table.columns[i])
 		if err != nil {
 			return rec, newError("dbase-table-bytestorow-3", err)
 		}
@@ -481,14 +589,14 @@ func (dbf *DBF) BytesToRow(data []byte) (*Row, error) {
 }
 
 // Returns a new Row struct with the same column structure as the dbf and the next row pointer
-func (dbf *DBF) NewRow() *Row {
+func (file *File) NewRow() *Row {
 	row := &Row{
-		dbf:      dbf,
-		Position: dbf.header.RowsCount + 1,
+		handle:   file,
+		Position: file.header.RowsCount + 1,
 		Deleted:  false,
 		fields:   make([]*Field, 0),
 	}
-	for _, column := range dbf.table.columns {
+	for _, column := range file.table.columns {
 		row.fields = append(row.fields, &Field{
 			column: column,
 			value:  nil,
@@ -498,8 +606,8 @@ func (dbf *DBF) NewRow() *Row {
 }
 
 // Creates a new field with the given value and column
-func (dbf *DBF) NewField(pos int, value interface{}) (*Field, error) {
-	column := dbf.Column(pos)
+func (file *File) NewField(pos int, value interface{}) (*Field, error) {
+	column := file.Column(pos)
 	if column == nil {
 		return nil, newError("dbase-table-newfield-1", fmt.Errorf("column at position %v not found", pos))
 	}
@@ -510,12 +618,12 @@ func (dbf *DBF) NewField(pos int, value interface{}) (*Field, error) {
 }
 
 // Creates a new field with the given value and column specified by name
-func (dbf *DBF) NewFieldByName(name string, value interface{}) (*Field, error) {
-	pos := dbf.ColumnPosByName(name)
+func (file *File) NewFieldByName(name string, value interface{}) (*Field, error) {
+	pos := file.ColumnPosByName(name)
 	if pos < 0 {
 		return nil, newError("dbase-table-newfieldbyname-1", fmt.Errorf("column '%s' not found", name))
 	}
-	return dbf.NewField(pos, value)
+	return file.NewField(pos, value)
 }
 
 // Writes the row to the file at the row pointer position
@@ -525,7 +633,7 @@ func (row *Row) Write() error {
 
 // Increments the pointer s row to the end of the file
 func (row *Row) Add() error {
-	row.Position = row.dbf.header.RowsCount + 1
+	row.Position = row.handle.header.RowsCount + 1
 	return row.Write()
 }
 
@@ -545,7 +653,7 @@ func (row *Row) Value(pos int) interface{} {
 
 // Returns the value of a row at the given column name
 func (row *Row) ValueByName(name string) (interface{}, error) {
-	pos := row.dbf.ColumnPosByName(name)
+	pos := row.handle.ColumnPosByName(name)
 	if pos < 0 {
 		return nil, newError("dbase-table-valuebyname-1", fmt.Errorf("column %v not found", name))
 	}
@@ -567,7 +675,7 @@ func (row *Row) Field(pos int) *Field {
 
 // Returns the field of a row by name or nil if not found
 func (row *Row) FieldByName(name string) *Field {
-	return row.Field(row.dbf.ColumnPosByName(name))
+	return row.Field(row.handle.ColumnPosByName(name))
 }
 
 // SetValue allows to change the field value
@@ -607,7 +715,7 @@ func (field Field) Column() *Column {
 
 // Converts the row back to raw dbase data
 func (row *Row) ToBytes() ([]byte, error) {
-	data := make([]byte, row.dbf.header.RowLength)
+	data := make([]byte, row.handle.header.RowLength)
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 	if row.Deleted {
 		data[0] = byte(Deleted)
@@ -617,7 +725,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 	// deleted flag already read
 	offset := uint16(1)
 	for _, field := range row.fields {
-		val, err := row.dbf.valueToByteRepresentation(field, false)
+		val, err := row.handle.valueToByteRepresentation(field, false)
 		if err != nil {
 			return nil, newError("dbase-table-rowtobytes-1", err)
 		}
@@ -634,9 +742,14 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 	var err error
 	for i, field := range row.fields {
 		val := field.GetValue()
-		mod := row.dbf.table.mods[i]
+		mod := row.handle.table.mods[i]
+		if row.handle.config.TrimSpaces {
+			if str, ok := val.(string); ok {
+				val = strings.TrimSpace(str)
+			}
+		}
 		if mod != nil {
-			if row.dbf.config.TrimSpaces && mod.TrimSpaces || mod.TrimSpaces {
+			if mod.TrimSpaces {
 				if str, ok := val.(string); ok {
 					val = strings.TrimSpace(str)
 				}
@@ -685,11 +798,11 @@ func (row *Row) ToStruct(v interface{}) error {
 }
 
 // Converts a map of interfaces into the row representation
-func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
-	row := dbf.NewRow()
+func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
+	row := file.NewRow()
 	for i := range row.fields {
-		field := &Field{column: dbf.table.columns[i]}
-		mod := dbf.table.mods[i]
+		field := &Field{column: file.table.columns[i]}
+		mod := file.table.mods[i]
 		if mod != nil {
 			if len(mod.ExternalKey) != 0 {
 				if val, ok := m[mod.ExternalKey]; ok {
@@ -708,13 +821,13 @@ func (dbf *DBF) RowFromMap(m map[string]interface{}) (*Row, error) {
 }
 
 // Converts a JSON-encoded row into the row representation
-func (dbf *DBF) RowFromJSON(j []byte) (*Row, error) {
+func (file *File) RowFromJSON(j []byte) (*Row, error) {
 	m := make(map[string]interface{})
 	err := json.Unmarshal(j, &m)
 	if err != nil {
 		return nil, newError("dbase-table-fromjson-1", err)
 	}
-	row, err := dbf.RowFromMap(m)
+	row, err := file.RowFromMap(m)
 	if err != nil {
 		return nil, newError("dbase-table-fromjson-2", err)
 	}
@@ -722,12 +835,12 @@ func (dbf *DBF) RowFromJSON(j []byte) (*Row, error) {
 }
 
 // Converts a struct into the row representation
-func (dbf *DBF) RowFromStruct(v interface{}) (*Row, error) {
+func (file *File) RowFromStruct(v interface{}) (*Row, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
 		return nil, newError("dbase-table-fromstruct-1", err)
 	}
-	row, err := dbf.RowFromJSON(j)
+	row, err := file.RowFromJSON(j)
 	if err != nil {
 		return nil, newError("dbase-table-fromstruct-2", err)
 	}

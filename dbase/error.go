@@ -1,6 +1,9 @@
 package dbase
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	// Returned when the end of a dBase database file is reached
@@ -19,14 +22,26 @@ var (
 
 // Error is a wrapper for errors that occur in the dbase package
 type Error struct {
-	context string
+	context []string
 	err     error
 }
 
 // newError creates a new Error
 func newError(context string, err error) Error {
+	if err != nil {
+		var dbaseError Error
+		if errors.As(err, &dbaseError) {
+			ctx := dbaseError.Context()
+			ctx = append(ctx, context)
+			dbaseError = Error{
+				context: ctx,
+				err:     err,
+			}
+			return dbaseError
+		}
+	}
 	return Error{
-		context: context,
+		context: []string{context},
 		err:     err,
 	}
 }
@@ -37,6 +52,26 @@ func (e Error) Error() string {
 }
 
 // Context returns the context of the error in the dbase package
-func (e Error) Context() string {
+func (e Error) Context() []string {
 	return e.context
+}
+
+func (e Error) trace() string {
+	trace := ""
+	// append reverse order
+	for i := len(e.context) - 1; i >= 0; i-- {
+		trace += e.context[i] + ":"
+	}
+	return trace
+}
+
+func ErrorDetails(err error) error {
+	if err == nil {
+		return nil
+	}
+	var dbaseError Error
+	if errors.As(err, &dbaseError) {
+		return fmt.Errorf("%s%w", dbaseError.trace(), dbaseError)
+	}
+	return err
 }

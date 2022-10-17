@@ -48,8 +48,8 @@ func (c DefaultConverter) Encode(in []byte) ([]byte, error) {
 }
 
 // CodePageMark returns corresponding code page mark for the encoding
-func (d DefaultConverter) CodePageMark() byte {
-	switch d.encoding {
+func (c DefaultConverter) CodePageMark() byte {
+	switch c.encoding {
 	case charmap.CodePage437: // U.S. MS-DOS
 		return 0x01
 	case charmap.CodePage850: // International MS-DOS
