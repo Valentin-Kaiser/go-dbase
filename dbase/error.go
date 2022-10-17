@@ -28,15 +28,17 @@ type Error struct {
 
 // newError creates a new Error
 func newError(context string, err error) Error {
-	e, ok := err.(Error)
-	if ok {
-		ctx := e.Context()
-		ctx = append(ctx, context)
-		err = Error{
-			context: ctx,
-			err:     err,
+	if err != nil {
+		var dbaseError Error
+		if errors.As(err, &dbaseError) {
+			ctx := dbaseError.Context()
+			ctx = append(ctx, context)
+			dbaseError = Error{
+				context: ctx,
+				err:     err,
+			}
+			return dbaseError
 		}
-		return err.(Error)
 	}
 	return Error{
 		context: []string{context},
@@ -67,8 +69,9 @@ func ErrorDetails(err error) error {
 	if err == nil {
 		return nil
 	}
-	if e, ok := err.(Error); ok {
-		return fmt.Errorf("%s%s", e.trace(), e.Error())
+	var dbaseError Error
+	if errors.As(err, &dbaseError) {
+		return fmt.Errorf("%s%w", dbaseError.trace(), dbaseError)
 	}
 	return err
 }
