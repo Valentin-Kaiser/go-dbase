@@ -57,8 +57,9 @@ func OpenTable(config *Config) (*File, error) {
 	}
 	fileName := filepath.Clean(config.Filename)
 	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
-	if config.Converter == nil {
-		config.InterpretCodePage = true
+	fileName, err := findFile(fileName)
+	if err != nil {
+		return nil, newError("dbase-io-open-3", err)
 	}
 	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
 	if config.Exclusive {
@@ -74,7 +75,7 @@ func OpenTable(config *Config) (*File, error) {
 	}
 	file.handle = &fd
 	// Interpret the code page mark if needed
-	if config.InterpretCodePage {
+	if config.InterpretCodePage || config.Converter == nil {
 		file.config.Converter = NewDefaultConverterFromCodePage(file.header.CodePage)
 	}
 	// Check if the code page mark is matchin the converter
@@ -786,4 +787,18 @@ func (file *File) Deleted() (bool, error) {
 		return false, newError("dbase-io-deleted-4", ErrIncomplete)
 	}
 	return Marker(buf[0]) == Deleted, nil
+}
+
+func findFile(name string) (string, error) {
+	// Read all files in the directory
+	files, err := os.ReadDir(filepath.Dir(name))
+	if err != nil {
+		return "", newError("dbase-io-findfile-1", err)
+	}
+	for _, file := range files {
+		if strings.EqualFold(file.Name(), filepath.Base(name)) {
+			return filepath.Join(filepath.Dir(name), file.Name()), nil
+		}
+	}
+	return name, nil
 }
