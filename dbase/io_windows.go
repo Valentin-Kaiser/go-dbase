@@ -51,16 +51,16 @@ type File struct {
 // To close the file handle(s) call DBF.Close().
 func OpenTable(config *Config) (*File, error) {
 	if config == nil {
-		return nil, newError("dbase-io-open-1", fmt.Errorf("missing configuration"))
+		return nil, newError("dbase-io-opentable-1", fmt.Errorf("missing configuration"))
 	}
 	if len(strings.TrimSpace(config.Filename)) == 0 {
-		return nil, newError("dbase-io-open-2", fmt.Errorf("missing filename"))
+		return nil, newError("dbase-io-opentable-2", fmt.Errorf("missing filename"))
 	}
 	fileName := filepath.Clean(config.Filename)
 	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
 	fileName, err := findFile(fileName)
 	if err != nil {
-		return nil, newError("dbase-io-open-3", err)
+		return nil, newError("dbase-io-opentable-3", err)
 	}
 	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
 	if config.Exclusive {
@@ -68,11 +68,11 @@ func OpenTable(config *Config) (*File, error) {
 	}
 	fd, err := windows.Open(fileName, mode, 0644)
 	if err != nil {
-		return nil, newError("dbase-io-open-3", fmt.Errorf("opening DBF file %v failed with error: %w", fileName, err))
+		return nil, newError("dbase-io-opentable-3", fmt.Errorf("opening DBF file %v failed with error: %w", fileName, err))
 	}
 	file, err := prepareFile(fd, config)
 	if err != nil {
-		return nil, newError("dbase-io-open-4", err)
+		return nil, newError("dbase-io-opentable-4", err)
 	}
 	file.handle = &fd
 	// Interpret the code page mark if needed
@@ -81,7 +81,7 @@ func OpenTable(config *Config) (*File, error) {
 	}
 	// Check if the code page mark is matchin the converter
 	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePageMark() {
-		return nil, newError("dbase-io-open-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePageMark()))
+		return nil, newError("dbase-io-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePageMark()))
 	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
@@ -94,11 +94,11 @@ func OpenTable(config *Config) (*File, error) {
 		relatedFile := strings.TrimSuffix(fileName, path.Ext(fileName)) + string(ext)
 		fd, err := windows.Open(relatedFile, mode, 0644)
 		if err != nil {
-			return nil, newError("dbase-io-open-7", fmt.Errorf("opening related file %v failed with error: %w", relatedFile, err))
+			return nil, newError("dbase-io-opentable-7", fmt.Errorf("opening related file %v failed with error: %w", relatedFile, err))
 		}
 		err = file.prepareMemo(fd)
 		if err != nil {
-			return nil, newError("dbase-io-open-8", err)
+			return nil, newError("dbase-io-opentable-8", err)
 		}
 		file.relatedHandle = &fd
 	}
@@ -110,13 +110,13 @@ func (file *File) Close() error {
 	if file.handle != nil {
 		err := windows.Close(*file.handle)
 		if err != nil {
-			return newError("dbase-io-close-9", fmt.Errorf("closing DBF failed with error: %w", err))
+			return newError("dbase-io-close-1", fmt.Errorf("closing DBF failed with error: %w", err))
 		}
 	}
 	if file.relatedHandle != nil {
 		err := windows.Close(*file.relatedHandle)
 		if err != nil {
-			return newError("dbase-io-close-10", fmt.Errorf("closing FPT failed with error: %w", err))
+			return newError("dbase-io-close-2", fmt.Errorf("closing FPT failed with error: %w", err))
 		}
 	}
 	return nil
@@ -136,7 +136,7 @@ func create(file *File) (*File, error) {
 	}
 	dbfname, err := windows.UTF16FromString(file.config.Filename)
 	if err != nil {
-		return nil, newError("dbase-io-create-1", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
+		return nil, newError("dbase-io-create-2", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
 	}
 	// Check if file exists already
 	_, err = windows.GetFileAttributes(&dbfname[0])
@@ -146,18 +146,18 @@ func create(file *File) (*File, error) {
 	// Create the file
 	fd, err := windows.CreateFile(&dbfname[0], windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.CREATE_ALWAYS, windows.FILE_ATTRIBUTE_NORMAL, 0)
 	if err != nil {
-		return nil, newError("dbase-io-create-2", fmt.Errorf("creating DBF file failed with error: %w", err))
+		return nil, newError("dbase-io-create-4", fmt.Errorf("creating DBF file failed with error: %w", err))
 	}
 	file.handle = &fd
 	if file.memoHeader != nil {
 		// Create the memo file
 		fptname, err := windows.UTF16FromString(strings.TrimSuffix(file.config.Filename, filepath.Ext(file.config.Filename)) + ".FPT")
 		if err != nil {
-			return nil, newError("dbase-io-create-3", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
+			return nil, newError("dbase-io-create-5", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
 		}
 		fd, err := windows.CreateFile(&fptname[0], windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.CREATE_ALWAYS, windows.FILE_ATTRIBUTE_NORMAL, 0)
 		if err != nil {
-			return nil, newError("dbase-io-create-4", fmt.Errorf("creating FPT file failed with error: %w", err))
+			return nil, newError("dbase-io-create-6", fmt.Errorf("creating FPT file failed with error: %w", err))
 		}
 		file.relatedHandle = &fd
 	}
@@ -352,12 +352,12 @@ func (file *File) writeColumns() (err error) {
 	}
 	_, err = windows.Write(*file.handle, buf.Bytes())
 	if err != nil {
-		return newError("dbase-io-writecolumns-5", err)
+		return newError("dbase-io-writecolumns-6", err)
 	}
 	// Write the column terminator
 	_, err = windows.Write(*file.handle, []byte{byte(ColumnEnd)})
 	if err != nil {
-		return newError("dbase-io-writecolumns-6", err)
+		return newError("dbase-io-writecolumns-7", err)
 	}
 	// Write null till the end of the header
 	pos := file.header.FirstRow - uint16(len(file.table.columns)*32) - 32
@@ -366,7 +366,7 @@ func (file *File) writeColumns() (err error) {
 	}
 	_, err = windows.Write(*file.handle, make([]byte, pos))
 	if err != nil {
-		return newError("dbase-io-writecolumns-7", err)
+		return newError("dbase-io-writecolumns-8", err)
 	}
 	return nil
 }
@@ -697,7 +697,7 @@ func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
 	// convert the value to a string
 	val, err := file.valueToByteRepresentation(field, !exactMatch)
 	if err != nil {
-		return nil, newError("dbase-io-search-1", err)
+		return nil, newError("dbase-io-search-2", err)
 	}
 	// Search for the value
 	rows := make([]*Row, 0)
