@@ -98,6 +98,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 	if strings.ToUpper(filepath.Ext(config.Filename)) != string(DBC) {
 		return nil, newError("dbase-io-opendatabase-3", fmt.Errorf("invalid file name: %v", config.Filename))
 	}
+	debugf("Opening database: %v", config.Filename)
 	databaseTable, err := OpenTable(config)
 	if err != nil {
 		return nil, newError("dbase-io-opendatabase-4", fmt.Errorf("opening database table failed with error: %w", err))
@@ -126,6 +127,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 		if tableName == "" {
 			continue
 		}
+		debugf("Found table: %v in database", tableName)
 		// Replace underscores with spaces
 		tablePath := path.Join(filepath.Dir(config.Filename), strings.ReplaceAll(tableName, "_", " ")+string(DBF))
 		tableConfig := &Config{
@@ -183,6 +185,7 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 		dbaseMutex: &sync.Mutex{},
 		memoMutex:  &sync.Mutex{},
 	}
+	debugf("Creating new DBF file: %v - type: %v - year: %v - month: %v - day: %v - first row: %v - row length: %v - code page: %v - columns: %v", config.Filename, file.header.FileType, file.header.Year, file.header.Month, file.header.Day, file.header.FirstRow, file.header.RowLength, file.header.CodePage, len(columns))
 	// Determines how many bytes are needed for the _NullFlag field if needed
 	nullFlagLength := 0
 	// Check if we need a memo file
@@ -213,6 +216,7 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 			Unused:    [2]byte{0x00, 0x00},
 			BlockSize: memoBlockSize,
 		}
+		debugf("Initializing related memo file header - block size: %v", file.memoHeader.BlockSize)
 	}
 	// If there are nullable or variable length fields, add the null flag column
 	if nullFlagLength > 0 {
@@ -233,6 +237,7 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 		}
 		file.header.FirstRow += 32
 		file.header.RowLength += uint16(length)
+		debugf("Initializing null flag column - length: %v", length)
 	}
 	// Create the files
 	file, err := create(file)
@@ -279,6 +284,7 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 		Reserved:  [7]byte{},
 	}
 	copy(column.FieldName[:], []byte(strings.ToUpper(name))[:11])
+	debugf("Creating new column: %v - type: %v - length: %v - decimals: %v - nullable: %v - position: %v - flag: %v", name, dataType, length, decimals, nullable, column.Position, column.Flag)
 	// Set the appropriate flag for nullable fields
 	if nullable {
 		column.Flag = byte(NullableFlag)
@@ -487,6 +493,7 @@ func (file *File) SetColumnModification(position int, mod *Modification) {
 	if position < 0 || position >= len(file.table.columns) {
 		return
 	}
+	debugf("Modification set for column %d", position)
 	file.table.mods[position] = mod
 }
 
@@ -555,39 +562,6 @@ func (file *File) Row() (*Row, error) {
 	return file.BytesToRow(data)
 }
 
-// Converts raw row data to a Row struct
-// If the data points to a memo (FPT) file this file is also read
-func (file *File) BytesToRow(data []byte) (*Row, error) {
-	rec := &Row{}
-	rec.Position = file.table.rowPointer
-	rec.handle = file
-	rec.fields = make([]*Field, file.ColumnsCount())
-	if len(data) < int(file.header.RowLength) {
-		return nil, newError("dbase-table-bytestorow-1", fmt.Errorf("invalid row data size %v Bytes < %v Bytes", len(data), int(file.header.RowLength)))
-	}
-	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
-
-	rec.Deleted = Marker(data[0]) == Deleted
-	if !rec.Deleted && Marker(data[0]) != Active {
-		return nil, newError("dbase-table-bytestorow-2", fmt.Errorf("invalid row data, no delete flag found at beginning of row"))
-	}
-	// deleted flag already read
-	offset := uint16(1)
-	for i := 0; i < len(rec.fields); i++ {
-		column := file.table.columns[i]
-		val, err := file.dataToValue(data[offset:offset+uint16(column.Length)], file.table.columns[i])
-		if err != nil {
-			return rec, newError("dbase-table-bytestorow-3", err)
-		}
-		rec.fields[i] = &Field{
-			column: column,
-			value:  val,
-		}
-		offset += uint16(column.Length)
-	}
-	return rec, nil
-}
-
 // Returns a new Row struct with the same column structure as the dbf and the next row pointer
 func (file *File) NewRow() *Row {
 	row := &Row{
@@ -602,6 +576,7 @@ func (file *File) NewRow() *Row {
 			value:  nil,
 		})
 	}
+	debugf("Initiliazing new at position %d", row.Position)
 	return row
 }
 
@@ -611,10 +586,7 @@ func (file *File) NewField(pos int, value interface{}) (*Field, error) {
 	if column == nil {
 		return nil, newError("dbase-table-newfield-1", fmt.Errorf("column at position %v not found", pos))
 	}
-	return &Field{
-		column: column,
-		value:  value,
-	}, nil
+	return &Field{column: column, value: value}, nil
 }
 
 // Creates a new field with the given value and column specified by name
@@ -713,8 +685,42 @@ func (field Field) Column() *Column {
  *	################################################################
  */
 
+// Converts raw row data to a Row struct
+// If the data points to a memo (FPT) file this file is also read
+func (file *File) BytesToRow(data []byte) (*Row, error) {
+	debugf("Converting row data (%d bytes) to row struct...", len(data))
+	rec := &Row{}
+	rec.Position = file.table.rowPointer
+	rec.handle = file
+	rec.fields = make([]*Field, file.ColumnsCount())
+	if len(data) < int(file.header.RowLength) {
+		return nil, newError("dbase-table-bytestorow-1", fmt.Errorf("invalid row data size %v Bytes < %v Bytes", len(data), int(file.header.RowLength)))
+	}
+	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
+	rec.Deleted = Marker(data[0]) == Deleted
+	if !rec.Deleted && Marker(data[0]) != Active {
+		return nil, newError("dbase-table-bytestorow-2", fmt.Errorf("invalid row data, no delete flag found at beginning of row"))
+	}
+	// deleted flag already read
+	offset := uint16(1)
+	for i := 0; i < len(rec.fields); i++ {
+		column := file.table.columns[i]
+		val, err := file.dataToValue(data[offset:offset+uint16(column.Length)], file.table.columns[i])
+		if err != nil {
+			return rec, newError("dbase-table-bytestorow-3", err)
+		}
+		rec.fields[i] = &Field{
+			column: column,
+			value:  val,
+		}
+		offset += uint16(column.Length)
+	}
+	return rec, nil
+}
+
 // Converts the row back to raw dbase data
 func (row *Row) ToBytes() ([]byte, error) {
+	debugf("Converting row %v to row data (%d bytes)...", row.Position, row.handle.header.RowLength)
 	data := make([]byte, row.handle.header.RowLength)
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 	if row.Deleted {
@@ -738,6 +744,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 
 // Returns a complete row as a map.
 func (row *Row) ToMap() (map[string]interface{}, error) {
+	debugf("Converting row %v to map...", row.Position)
 	out := make(map[string]interface{})
 	var err error
 	for i, field := range row.fields {
@@ -745,22 +752,26 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 		mod := row.handle.table.mods[i]
 		if row.handle.config.TrimSpaces {
 			if str, ok := val.(string); ok {
+				debugf("Trimming spaces from field %v due to default settings", field.Name())
 				val = strings.TrimSpace(str)
 			}
 		}
 		if mod != nil {
 			if mod.TrimSpaces {
 				if str, ok := val.(string); ok {
+					debugf("Trimming spaces from field %v due to modification", field.Name())
 					val = strings.TrimSpace(str)
 				}
 			}
 			if mod.Convert != nil {
+				debugf("Converting field %v due to modification", field.Name())
 				val, err = mod.Convert(val)
 				if err != nil {
 					return nil, newError("dbase-table-tomap-1", err)
 				}
 			}
 			if len(mod.ExternalKey) != 0 {
+				debugf("Resolving external key %v for field %v due to modification", mod.ExternalKey, field.Name())
 				out[mod.ExternalKey] = val
 				continue
 			}
@@ -772,6 +783,7 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 
 // Returns a complete row as a JSON object.
 func (row *Row) ToJSON() ([]byte, error) {
+	debugf("Converting row %v to JSON...", row.Position)
 	m, err := row.ToMap()
 	if err != nil {
 		return nil, newError("dbase-table-tojson-1", err)
@@ -786,6 +798,7 @@ func (row *Row) ToJSON() ([]byte, error) {
 // Parses the row from map to JSON-encoded and from there to a struct and stores the result in the value pointed to by v.
 // Just a convenience function to avoid the intermediate JSON step.
 func (row *Row) ToStruct(v interface{}) error {
+	debugf("Converting row %v to struct...", row.Position)
 	jsonRow, err := row.ToJSON()
 	if err != nil {
 		return newError("dbase-table-tostruct-1", err)
@@ -799,6 +812,7 @@ func (row *Row) ToStruct(v interface{}) error {
 
 // Converts a map of interfaces into the row representation
 func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
+	debugf("Converting map to row...")
 	row := file.NewRow()
 	for i := range row.fields {
 		field := &Field{column: file.table.columns[i]}
@@ -806,6 +820,7 @@ func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
 		if mod != nil {
 			if len(mod.ExternalKey) != 0 {
 				if val, ok := m[mod.ExternalKey]; ok {
+					debugf("Resolving external key %v for field %v due to modification", mod.ExternalKey, field.Name())
 					field.value = val
 					row.fields[i] = field
 					continue
@@ -822,6 +837,7 @@ func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
 
 // Converts a JSON-encoded row into the row representation
 func (file *File) RowFromJSON(j []byte) (*Row, error) {
+	debugf("Converting JSON to row...")
 	m := make(map[string]interface{})
 	err := json.Unmarshal(j, &m)
 	if err != nil {
@@ -836,6 +852,7 @@ func (file *File) RowFromJSON(j []byte) (*Row, error) {
 
 // Converts a struct into the row representation
 func (file *File) RowFromStruct(v interface{}) (*Row, error) {
+	debugf("Converting struct to row...")
 	j, err := json.Marshal(v)
 	if err != nil {
 		return nil, newError("dbase-table-fromstruct-1", err)
