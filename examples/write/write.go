@@ -25,7 +25,6 @@ type Product struct {
 }
 
 func main() {
-
 	// Open debug log file so we see what's going on
 	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
