@@ -32,6 +32,11 @@ type MemoHeader struct {
 	BlockSize uint16  // Block size (bytes per block)
 }
 
+type Database struct {
+	file   *File
+	tables map[string]*File
+}
+
 // Table is a struct containing the table columns, modifications and the row pointer
 type Table struct {
 	columns    []*Column       // Columns defined in this table
@@ -181,6 +186,7 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 	return file, nil
 }
 
+// Create a new table column with the given name, type and length
 func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nullable bool) (*Column, error) {
 	if len(name) == 0 {
 		return nil, errors.New("no column name defined")
@@ -365,6 +371,35 @@ func (file *File) ColumnPos(column *Column) int {
 		}
 	}
 	return -1
+}
+
+/**
+ *	################################################################
+ *	#						Database helper
+ *	################################################################
+ */
+
+// Returns all table of the database
+func (db *Database) Tables() map[string]*File {
+	return db.tables
+}
+
+// Returns the names of every table in the database
+func (db *Database) Names() []string {
+	names := make([]string, 0)
+	for name := range db.tables {
+		names = append(names, name)
+	}
+	return names
+}
+
+// Returns the complete database schema
+func (db *Database) Schema() map[string][]*Column {
+	schema := make(map[string][]*Column)
+	for name, table := range db.tables {
+		schema[name] = table.Columns()
+	}
+	return schema
 }
 
 /**
