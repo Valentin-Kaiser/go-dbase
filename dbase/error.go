@@ -1,6 +1,9 @@
 package dbase
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	// Returned when the end of a dBase database file is reached
@@ -39,4 +42,14 @@ func (e Error) Error() string {
 // Context returns the context of the error in the dbase package
 func (e Error) Context() string {
 	return e.context
+}
+
+func ErrorDetails(err error) error {
+	if err == nil {
+		return nil
+	}
+	if e, ok := err.(Error); ok {
+		return fmt.Errorf("%s:%s", e.Context(), e.Error())
+	}
+	return err
 }
