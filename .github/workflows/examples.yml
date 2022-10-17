@@ -1,0 +1,38 @@
+---
+
+name: Run examples
+
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - master
+      - main
+  pull_request:
+
+jobs:
+  build-unix:
+    name: Unix build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.19
+      - name: Check out source code
+        uses: actions/checkout@v1
+      - name: Run examples
+        run: cd examples && make
+  build-windows:
+    name: Windows build
+    runs-on: windows-latest
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.19
+      - name: Check out source code
+        uses: actions/checkout@v1
+      - name: Run examples
+        run: cd examples && make
