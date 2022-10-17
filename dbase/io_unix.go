@@ -446,11 +446,11 @@ func (file *File) readNullFlag(rowPosition uint64, column *Column) (bool, bool, 
 	}
 
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
-		debugf("Read _NullFlag for column %s, at bit: %d => varlength: %v / null: %v", column.Name(), bitCount, nthBit(buf, bitCount), nthBit(buf, bitCount+1))
+		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), nthBit(buf, bitCount), nthBit(buf, bitCount+1))
 		return nthBit(buf, bitCount), nthBit(buf, bitCount+1), nil
 	}
 
-	debugf("Read _NullFlag for column %s, at bit: %d => varlength: %v ", column.Name(), bitCount, nthBit(buf, bitCount))
+	debugf("Read _NullFlag for column %s => varlength: %v", column.Name(), nthBit(buf, bitCount))
 	return nthBit(buf, bitCount), false, nil
 }
 
@@ -772,8 +772,9 @@ func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
 	position := uint64(file.header.FirstRow)
 	for i := uint32(0); i < file.header.RowsCount; i++ {
 		// Read the field value
-		debugf("Searching at position: %d", int64(position)+int64(field.column.Position))
-		_, err := file.handle.Seek(int64(position)+int64(field.column.Position), 0)
+		p := int64(position) + int64(field.column.Position)
+		debugf("Searching at position: %d", p)
+		_, err := file.handle.Seek(p, 0)
 		position += uint64(file.header.RowLength)
 		if err != nil {
 			continue
@@ -788,7 +789,7 @@ func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
 		}
 		// Check if the value matches
 		if bytes.Contains(buf, val) {
-			debugf("Found match at position: %d row: %v", position, i)
+			debugf("Found matching row %v at position: %d", i, p-int64(field.column.Position))
 			err := file.GoTo(i)
 			if err != nil {
 				continue
