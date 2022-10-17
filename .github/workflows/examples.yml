@@ -25,16 +25,16 @@ jobs:
         uses: actions/checkout@v1
       - name: Install dependencies
         run: go mod tidy
-      - name: Read table example
+      - name: Run read table example
         run: cd examples && make read_table
-      - name: Write table example
+      - name: Run write table example
         run: cd examples && make write_table
-      - name: Create table example
+      - name: Run create table example
         run: cd examples && make create_table
-      - name: Search table example
+      - name: Run search table example
         run: cd examples && make search_table
-      - name: Database example
-        run: cd examples && make database_tables
+      - name: Run database schema example
+        run: cd examples && make database_schema
   build-windows:
     name: Windows build
     runs-on: windows-latest
@@ -48,13 +48,13 @@ jobs:
         uses: actions/checkout@v1
       - name: Install dependencies
         run: go mod tidy
-      - name: Read table example
+      - name: Run read table example
         run: cd examples && make read_table
-      - name: Write table example
+      - name: Run write table example
         run: cd examples && make write_table
-      - name: Create table example
+      - name: Run create table example
         run: cd examples && make create_table
-      - name: Search table example
+      - name: Run search table example
         run: cd examples && make search_table
-      - name: Database example
-        run: cd examples && make database_tables
+      - name: Run database schema example
+        run: cd examples && make database_schema
