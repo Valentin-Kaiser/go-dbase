@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
@@ -38,20 +39,20 @@ func main() {
 	}
 	sort.Strings(keys)
 	for _, name := range keys {
-		output = append(output, fmt.Sprintf("## %v \n\n", name))
+		output = append(output, fmt.Sprintf("## %v \n\n", strings.ToUpper(name)))
 		output = append(output, fmt.Sprintf(
-			"- Fields: `%v` \n- Records: `%v` \n- File size: `%v B`  \n- First Row at: `%v B`  \n- Record Length: `%v` \n- Last modified: `%v` \n\n",
+			"- Fields: `%v` \n- Records: `%v` \n- First record: `%v`  \n- Record size: `%v` \n- File size: `%v`  \n- Last modified: `%v` \n\n",
 			tables[name].Header().ColumnsCount(),
 			tables[name].Header().RecordsCount(),
-			tables[name].Header().FileSize(),
-			tables[name].Header().FirstRow,
-			tables[name].Header().RowLength,
+			int(tables[name].Header().FirstRow),
+			ToByteString(int(tables[name].Header().RowLength)),
+			ToByteString(int(tables[name].Header().FileSize())),
 			tables[name].Header().Modified(),
 		))
-		output = append(output, "| Field | Type | Length | \n")
-		output = append(output, "| --- | --- | --- | \n")
+		output = append(output, "| Field | Field type | Golang type | Length | Comment | \n")
+		output = append(output, "| --- | --- | --- | --- | --- | \n")
 		for _, column := range schema[name] {
-			output = append(output, fmt.Sprintf("| *%v* | %v | %v | \n", column.Name(), column.Type(), column.Length))
+			output = append(output, fmt.Sprintf("| *%v* | %v | %v | %v |  | \n", column.Name(), column.Type(), column.Reflect(), column.Length))
 		}
 		output = append(output, "\n")
 	}
@@ -64,7 +65,7 @@ func main() {
 	}
 
 	// Write file headline
-	_, err = schemaFile.WriteString(fmt.Sprintf("## Database schema \n\n Generated in %v \n\n", duration))
+	_, err = schemaFile.WriteString(fmt.Sprintf("## Database schema \n\n Generated in %s \n\n", duration))
 	if err != nil {
 		panic(err)
 	}
@@ -76,4 +77,19 @@ func main() {
 			panic(err)
 		}
 	}
+}
+
+// ToByteString returns the number of bytes as a string with a unit
+func ToByteString(b int) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
 }

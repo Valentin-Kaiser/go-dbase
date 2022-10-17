@@ -1,86 +1,86 @@
 ## Database schema 
 
-Generated in 111.1118ms 
+ Generated in 135.8104ms 
 
-## employees 
+## EMPLOYEES 
 
 - Fields: `16` 
 - Records: `3` 
-- File size: `2377 B`  
-- First Row at: `808 B`  
-- Record Length: `523` 
+- First record: `808`  
+- Record size: `523 B` 
+- File size: `2.4 kB`  
 - Last modified: `2022-10-15 00:00:00 +0200 CEST` 
 
-| Field | Type | Length | 
-| --- | --- | --- | 
-| *EMPLOYEEID* | I | 4 | 
-| *DEPARTMENT* | C | 50 | 
-| *SOCIALSECU* | C | 30 | 
-| *EMPLOYEENU* | C | 30 | 
-| *FIRSTNAME* | C | 50 | 
-| *LASTNAME* | C | 50 | 
-| *TITLE* | C | 50 | 
-| *EMAILNAME* | C | 50 | 
-| *EXTENSION* | C | 30 | 
-| *ADDRESS* | M | 4 | 
-| *CITY* | C | 50 | 
-| *STATEORPRO* | C | 20 | 
-| *POSTALCODE* | C | 20 | 
-| *COUNTRY* | C | 50 | 
-| *WORKPHONE* | C | 30 | 
-| *NOTES* | M | 4 | 
+| Field | Field type | Golang type | Length | Comment | 
+| --- | --- | --- | --- | --- | 
+| *EMPLOYEEID* | I | int32 | 4 |  | 
+| *DEPARTMENT* | C | string | 50 |  | 
+| *SOCIALSECU* | C | string | 30 |  | 
+| *EMPLOYEENU* | C | string | 30 |  | 
+| *FIRSTNAME* | C | string | 50 |  | 
+| *LASTNAME* | C | string | 50 |  | 
+| *TITLE* | C | string | 50 |  | 
+| *EMAILNAME* | C | string | 50 |  | 
+| *EXTENSION* | C | string | 30 |  | 
+| *ADDRESS* | M | []uint8 | 4 |  | 
+| *CITY* | C | string | 50 |  | 
+| *STATEORPRO* | C | string | 20 |  | 
+| *POSTALCODE* | C | string | 20 |  | 
+| *COUNTRY* | C | string | 50 |  | 
+| *WORKPHONE* | C | string | 30 |  | 
+| *NOTES* | M | []uint8 | 4 |  | 
 
-## expense_categories 
+## EXPENSE_CATEGORIES 
 
 - Fields: `3` 
 - Records: `5` 
+- First record: `392`  
+- Record size: `59 B` 
 - File size: `687 B`  
-- First Row at: `392 B`  
-- Record Length: `59` 
 - Last modified: `2022-10-15 00:00:00 +0200 CEST` 
 
-| Field | Type | Length | 
-| --- | --- | --- | 
-| *EXPENSECAT* | I | 4 | 
-| *EXPENSECA2* | C | 50 | 
-| *EXPENSECA3* | I | 4 | 
+| Field | Field type | Golang type | Length | Comment | 
+| --- | --- | --- | --- | --- | 
+| *EXPENSECAT* | I | int32 | 4 |  | 
+| *EXPENSECA2* | C | string | 50 |  | 
+| *EXPENSECA3* | I | int32 | 4 |  | 
 
-## expense_details 
+## EXPENSE_DETAILS 
 
 - Fields: `6` 
 - Records: `6` 
+- First record: `488`  
+- Record size: `79 B` 
 - File size: `962 B`  
-- First Row at: `488 B`  
-- Record Length: `79` 
 - Last modified: `2022-10-15 00:00:00 +0200 CEST` 
 
-| Field | Type | Length | 
-| --- | --- | --- | 
-| *EXPENSEDET* | I | 4 | 
-| *EXPENSEREP* | I | 4 | 
-| *EXPENSECAT* | I | 4 | 
-| *EXPENSEITE* | Y | 8 | 
-| *EXPENSEIT2* | C | 50 | 
-| *EXPENSEDAT* | T | 8 | 
+| Field | Field type | Golang type | Length | Comment | 
+| --- | --- | --- | --- | --- | 
+| *EXPENSEDET* | I | int32 | 4 |  | 
+| *EXPENSEREP* | I | int32 | 4 |  | 
+| *EXPENSECAT* | I | int32 | 4 |  | 
+| *EXPENSEITE* | Y | float64 | 8 |  | 
+| *EXPENSEIT2* | C | string | 50 |  | 
+| *EXPENSEDAT* | T | time.Time | 8 |  | 
 
-## expense_reports 
+## EXPENSE_REPORTS 
 
 - Fields: `9` 
 - Records: `3` 
-- File size: `1004 B`  
-- First Row at: `584 B`  
-- Record Length: `140` 
+- First record: `584`  
+- Record size: `140 B` 
+- File size: `1.0 kB`  
 - Last modified: `2022-10-15 00:00:00 +0200 CEST` 
 
-| Field | Type | Length | 
-| --- | --- | --- | 
-| *EXPENSEREP* | I | 4 | 
-| *EMPLOYEEID* | I | 4 | 
-| *EXPENSETYP* | C | 50 | 
-| *EXPENSERPT* | C | 30 | 
-| *EXPENSERP2* | M | 4 | 
-| *DATESUBMIT* | T | 8 | 
-| *ADVANCEAMO* | Y | 8 | 
-| *DEPARTMENT* | C | 30 | 
-| *PAID* | L | 1 | 
+| Field | Field type | Golang type | Length | Comment | 
+| --- | --- | --- | --- | --- | 
+| *EXPENSEREP* | I | int32 | 4 |  | 
+| *EMPLOYEEID* | I | int32 | 4 |  | 
+| *EXPENSETYP* | C | string | 50 |  | 
+| *EXPENSERPT* | C | string | 30 |  | 
+| *EXPENSERP2* | M | []uint8 | 4 |  | 
+| *DATESUBMIT* | T | time.Time | 8 |  | 
+| *ADVANCEAMO* | Y | float64 | 8 |  | 
+| *DEPARTMENT* | C | string | 30 |  | 
+| *PAID* | L | bool | 1 |  | 
 
