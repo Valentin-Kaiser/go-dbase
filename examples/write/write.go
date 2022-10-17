@@ -31,8 +31,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	dbase.SetDebug(true)
-	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
+	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
 
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
@@ -41,7 +40,7 @@ func main() {
 		WriteLock:  true,
 	})
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 	defer table.Close()
 
@@ -56,25 +55,25 @@ func main() {
 	// Read the first row (rowPointer start at the first row).
 	row, err := table.Row()
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// Get the company name field by column name.
 	err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// Change a memo field value.
 	err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// Write the changed row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// === Modifications ===
@@ -101,20 +100,20 @@ func main() {
 
 	row, err = table.RowFromStruct(p)
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// Add the new row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// Print all rows.
 	for !table.EOF() {
 		row, err := table.Row()
 		if err != nil {
-			panic(dbase.ErrorDetails(err))
+			panic(dbase.GetErrorTrace(err))
 		}
 
 		// Increment the row pointer.

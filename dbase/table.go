@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -177,7 +178,7 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 			Day:       uint8(time.Now().Day()),
 			FirstRow:  296 + uint16(len(columns))*32,
 			RowLength: 1,
-			CodePage:  config.Converter.CodePageMark(),
+			CodePage:  config.Converter.CodePage(),
 		},
 		table: &Table{
 			columns: make([]*Column, 0),
@@ -525,6 +526,10 @@ func (c *Column) Name() string {
 // Returns the type of the column as string (length 1)
 func (c *Column) Type() string {
 	return string(c.DataType)
+}
+
+func (c *Column) Reflect() reflect.Type {
+	return DataType(c.DataType).Reflect()
 }
 
 /**

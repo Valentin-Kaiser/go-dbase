@@ -7,17 +7,17 @@ import (
 )
 
 var debug = false
-var out = os.Stdout
-var debugLogger = log.New(out, "[dbase] [DEBUG] ", log.LstdFlags)
-var errorLogger = log.New(out, "[dbase] [ERROR] ", log.LstdFlags)
+var debugLogger = log.New(os.Stdout, "[dbase] [DEBUG] ", log.LstdFlags)
+var errorLogger = log.New(os.Stdout, "[dbase] [ERROR] ", log.LstdFlags)
 
-func SetDebug(enabled bool) {
+// Debug the dbase package
+// If debug is true, debug messages will be printed to the defined io.Writter (default: os.Stdout)
+func Debug(enabled bool, out io.Writer) {
+	if out != nil {
+		debugLogger.SetOutput(out)
+		errorLogger.SetOutput(out)
+	}
 	debug = enabled
-}
-
-func SetDebugOutput(out io.Writer) {
-	debugLogger.SetOutput(out)
-	errorLogger.SetOutput(out)
 }
 
 func debugf(format string, v ...interface{}) {

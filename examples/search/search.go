@@ -15,15 +15,14 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	dbase.SetDebug(true)
-	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
+	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
 
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
 		Filename: "../test_data/table/TEST.DBF",
 	})
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 	defer table.Close()
 
@@ -39,13 +38,13 @@ func main() {
 	// Search for a product containing the word "test" in the name.
 	field, err := table.NewFieldByName("PRODNAME", "TEST")
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// Execute the search with an exact match.
 	records, err := table.Search(field, false)
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// Print all found records.
@@ -62,7 +61,7 @@ func main() {
 	// Execute the search without exact match.
 	records, err = table.Search(field, true)
 	if err != nil {
-		panic(dbase.ErrorDetails(err))
+		panic(dbase.GetErrorTrace(err))
 	}
 
 	// Print all found records.
