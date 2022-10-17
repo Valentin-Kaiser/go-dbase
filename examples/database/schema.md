@@ -1,15 +1,15 @@
 ## Database schema 
 
- Generated in 135.8104ms 
+ Exracted in 97.7957ms 
+
+| Table | Fields | Records | First record | Size | Modified |
+|---|---|---|---|---|---|
+| [employees](#employees) | 16 | 3 | 808 | 523 B | 2.4 kB | 2022-10-15 00:00:00 +0200 CEST |
+| [expense_categories](#expense_categories) | 3 | 5 | 392 | 59 B | 687 B | 2022-10-15 00:00:00 +0200 CEST |
+| [expense_details](#expense_details) | 6 | 6 | 488 | 79 B | 962 B | 2022-10-15 00:00:00 +0200 CEST |
+| [expense_reports](#expense_reports) | 9 | 3 | 584 | 140 B | 1.0 kB | 2022-10-15 00:00:00 +0200 CEST |
 
 ## EMPLOYEES 
-
-- Fields: `16` 
-- Records: `3` 
-- First record: `808`  
-- Record size: `523 B` 
-- File size: `2.4 kB`  
-- Last modified: `2022-10-15 00:00:00 +0200 CEST` 
 
 | Field | Field type | Golang type | Length | Comment | 
 | --- | --- | --- | --- | --- | 
@@ -32,13 +32,6 @@
 
 ## EXPENSE_CATEGORIES 
 
-- Fields: `3` 
-- Records: `5` 
-- First record: `392`  
-- Record size: `59 B` 
-- File size: `687 B`  
-- Last modified: `2022-10-15 00:00:00 +0200 CEST` 
-
 | Field | Field type | Golang type | Length | Comment | 
 | --- | --- | --- | --- | --- | 
 | *EXPENSECAT* | I | int32 | 4 |  | 
@@ -46,13 +39,6 @@
 | *EXPENSECA3* | I | int32 | 4 |  | 
 
 ## EXPENSE_DETAILS 
-
-- Fields: `6` 
-- Records: `6` 
-- First record: `488`  
-- Record size: `79 B` 
-- File size: `962 B`  
-- Last modified: `2022-10-15 00:00:00 +0200 CEST` 
 
 | Field | Field type | Golang type | Length | Comment | 
 | --- | --- | --- | --- | --- | 
@@ -64,13 +50,6 @@
 | *EXPENSEDAT* | T | time.Time | 8 |  | 
 
 ## EXPENSE_REPORTS 
-
-- Fields: `9` 
-- Records: `3` 
-- First record: `584`  
-- Record size: `140 B` 
-- File size: `1.0 kB`  
-- Last modified: `2022-10-15 00:00:00 +0200 CEST` 
 
 | Field | Field type | Golang type | Length | Comment | 
 | --- | --- | --- | --- | --- | 

@@ -33,29 +33,6 @@ func main() {
 	output := make([]string, 0)
 	schema := db.Schema()
 	tables := db.Tables()
-	keys := make([]string, 0)
-	for table := range schema {
-		keys = append(keys, table)
-	}
-	sort.Strings(keys)
-	for _, name := range keys {
-		output = append(output, fmt.Sprintf("## %v \n\n", strings.ToUpper(name)))
-		output = append(output, fmt.Sprintf(
-			"- Fields: `%v` \n- Records: `%v` \n- First record: `%v`  \n- Record size: `%v` \n- File size: `%v`  \n- Last modified: `%v` \n\n",
-			tables[name].Header().ColumnsCount(),
-			tables[name].Header().RecordsCount(),
-			int(tables[name].Header().FirstRow),
-			ToByteString(int(tables[name].Header().RowLength)),
-			ToByteString(int(tables[name].Header().FileSize())),
-			tables[name].Header().Modified(),
-		))
-		output = append(output, "| Field | Field type | Golang type | Length | Comment | \n")
-		output = append(output, "| --- | --- | --- | --- | --- | \n")
-		for _, column := range schema[name] {
-			output = append(output, fmt.Sprintf("| *%v* | %v | %v | %v |  | \n", column.Name(), column.Type(), column.Reflect(), column.Length))
-		}
-		output = append(output, "\n")
-	}
 	duration := time.Since(start)
 
 	// Open schema output file
@@ -65,12 +42,70 @@ func main() {
 	}
 
 	// Write file headline
-	_, err = schemaFile.WriteString(fmt.Sprintf("## Database schema \n\n Generated in %s \n\n", duration))
+	_, err = schemaFile.WriteString(fmt.Sprintf("## Database schema \n\n Exracted in %s \n\n", duration))
 	if err != nil {
 		panic(err)
 	}
 
-	// Write schema
+	keys := make([]string, 0)
+	for table := range schema {
+		keys = append(keys, table)
+	}
+	sort.Strings(keys)
+
+	// Print table infos
+	_, err = schemaFile.WriteString("| Table | Fields | Records | First record | Size | Modified |\n|---|---|---|---|---|---|\n")
+	if err != nil {
+		panic(err)
+	}
+
+	for _, name := range keys {
+		_, err = schemaFile.WriteString(fmt.Sprintf(
+			"| [%v](#%v) | %v | %v | %v | %v | %v | %v |\n",
+			name,
+			name,
+			tables[name].Header().ColumnsCount(),
+			tables[name].Header().RecordsCount(),
+			int(tables[name].Header().FirstRow),
+			ToByteString(int(tables[name].Header().RowLength)),
+			ToByteString(int(tables[name].Header().FileSize())),
+			tables[name].Header().Modified(),
+		))
+		if err != nil {
+			panic(err)
+		}
+	}
+	_, err = schemaFile.WriteString("\n")
+	if err != nil {
+		panic(err)
+	}
+
+	// Print table schemas
+	for _, name := range keys {
+		_, err = schemaFile.WriteString(fmt.Sprintf("## %v \n\n", strings.ToUpper(name)))
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = schemaFile.WriteString("| Field | Field type | Golang type | Length | Comment | \n| --- | --- | --- | --- | --- | \n")
+		if err != nil {
+			panic(err)
+		}
+
+		for _, column := range schema[name] {
+			_, err = schemaFile.WriteString(fmt.Sprintf("| *%v* | %v | %v | %v |  | \n", column.Name(), column.Type(), column.Reflect(), column.Length))
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		_, err = schemaFile.WriteString("\n")
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// Write table schema
 	for _, line := range output {
 		_, err = schemaFile.WriteString(line)
 		if err != nil {
