@@ -102,4 +102,10 @@ Projects using this package:
 
 ## Examples
 
-Examples can be found in the [examples](./examples/) directory.
+These examples can be found in the [examples](./examples/) directory:
+
+- [Read](./examples/read/read.go)
+- [Write](./examples/write/write.go)
+- [Search](./examples/search/search.go)
+- [Create](./examples/create/create.go)
+- [Database](./examples/database/database.go)
