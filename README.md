@@ -5,6 +5,7 @@
 [![Linters](https://github.com/Valentin-Kaiser/go-dbase/workflows/Linters/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
 [![CodeQL](https://github.com/Valentin-Kaiser/go-dbase/workflows/CodeQL/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
 [![Go Report](https://goreportcard.com/badge/github.com/Valentin-Kaiser/go-dbase)](https://goreportcard.com/report/github.com/Valentin-Kaiser/go-dbase)
+[![Examples](https://github.com/Valentin-Kaiser/go-dbase/workflows/Examples/badge.svg)](https://github.com/Valentin-Kaiser/go-dbase)
 
 **Golang package for reading and writing FoxPro dBase table and memo files.**
 

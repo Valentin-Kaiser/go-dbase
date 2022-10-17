@@ -1,6 +1,6 @@
 ---
 
-name: Run examples
+name: Examples
 
 on:
   push:
