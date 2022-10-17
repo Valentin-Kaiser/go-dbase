@@ -110,6 +110,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
@@ -131,13 +133,22 @@ type Product struct {
 }
 
 func main() {
+	// Open debug log file so we see what's going on
+	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	dbase.SetDebug(true)
+	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
+
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
 		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 	})
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 	defer table.Close()
 
@@ -158,7 +169,7 @@ func main() {
 	for !table.EOF() {
 		row, err := table.Row()
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		// Increment the row pointer.
@@ -202,7 +213,7 @@ func main() {
 		p := &Product{}
 		err = row.ToStruct(p)
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		fmt.Printf("Product: %v \n", p.Name)
@@ -219,6 +230,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
@@ -240,6 +253,15 @@ type Product struct {
 }
 
 func main() {
+	// Open debug log file so we see what's going on
+	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	dbase.SetDebug(true)
+	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
+
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
 		Filename:   "../test_data/table/TEST.DBF",
@@ -247,7 +269,7 @@ func main() {
 		WriteLock:  true,
 	})
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 	defer table.Close()
 
@@ -262,25 +284,25 @@ func main() {
 	// Read the first row (rowPointer start at the first row).
 	row, err := table.Row()
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Get the company name field by column name.
 	err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Change a memo field value.
 	err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Write the changed row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// === Modifications ===
@@ -307,20 +329,20 @@ func main() {
 
 	row, err = table.RowFromStruct(p)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Add the new row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Print all rows.
 	for !table.EOF() {
 		row, err := table.Row()
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		// Increment the row pointer.
@@ -340,20 +362,31 @@ func main() {
 </details>
 
 <details open>
-  <summary>Write</summary>
+  <summary>Database</summary>
 
 ```go
 package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
 
 func main() {
+	// Open debug log file so we see what's going on
+	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	dbase.SetDebug(true)
+	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
+
 	db, err := dbase.OpenDatabase(&dbase.Config{
-		Filename:   "Y:\\USER\\VK\\OMS Datenbanken\\KTI\\OMS.DBC",
+		Filename:   "../test_data/database/EXPENSES.DBC",
 		TrimSpaces: true,
 	})
 	if err != nil {
@@ -394,34 +427,45 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 	"golang.org/x/text/encoding/charmap"
 )
 
 func main() {
+	// Open debug log file so we see what's going on
+	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	dbase.SetDebug(true)
+	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
+
 	// Integer are allways 4 bytes long
 	idCol, err := dbase.NewColumn("ID", dbase.Integer, 0, 0, false)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Field name are always saved uppercase
 	nameCol, err := dbase.NewColumn("Name", dbase.Character, 20, 0, false)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Memo fields need no length the memo block size is defined as last parameter when calling New()
 	memoCol, err := dbase.NewColumn("Memo", dbase.Memo, 0, 0, false)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Some fields can be null this is defined by the last parameter
 	varCol, err := dbase.NewColumn("Var", dbase.Varchar, 64, 0, true)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// When creating a new table you need to define table type
@@ -442,7 +486,7 @@ func main() {
 		64,
 	)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 	defer file.Close()
 
@@ -464,34 +508,34 @@ func main() {
 
 	err = row.FieldByName("ID").SetValue(int32(1))
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	err = row.FieldByName("NAME").SetValue("TOTALLY_NEW_ROW")
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	err = row.FieldByName("MEMO").SetValue("This is a memo field")
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	err = row.FieldByName("VAR").SetValue("This is a varchar field")
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	err = row.Add()
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Read all records
 	for !file.EOF() {
 		row, err := file.Row()
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		// Increment the row pointer.
@@ -505,7 +549,7 @@ func main() {
 
 		name, err := row.ValueByName("NAME")
 		if err != nil {
-			panic(err)
+			panic(dbase.ErrorDetails(err))
 		}
 
 		fmt.Printf("Row at position: %v => %v \n", row.Position, name)
@@ -523,17 +567,28 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
 
 func main() {
+	// Open debug log file so we see what's going on
+	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	dbase.SetDebug(true)
+	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
+
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
 		Filename: "../test_data/table/TEST.DBF",
 	})
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 	defer table.Close()
 
@@ -549,13 +604,13 @@ func main() {
 	// Search for a product containing the word "test" in the name.
 	field, err := table.NewFieldByName("PRODNAME", "TEST")
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Execute the search with an exact match.
 	records, err := table.Search(field, false)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Print all found records.
@@ -572,7 +627,7 @@ func main() {
 	// Execute the search without exact match.
 	records, err = table.Search(field, true)
 	if err != nil {
-		panic(err)
+		panic(dbase.ErrorDetails(err))
 	}
 
 	// Print all found records.
