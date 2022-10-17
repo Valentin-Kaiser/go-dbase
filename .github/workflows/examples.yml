@@ -22,8 +22,16 @@ jobs:
           go-version: 1.19
       - name: Check out source code
         uses: actions/checkout@v1
-      - name: Run examples
-        run: cd examples && make
+      - name: Read table example
+        run: cd examples && make read_table
+      - name: Write table example
+        run: cd examples && make write_table
+      - name: Create table example
+        run: cd examples && make create_table
+      - name: Search table example
+        run: cd examples && make search_table
+      - name: Database example
+        run: cd examples && make database
   build-windows:
     name: Windows build
     runs-on: windows-latest
@@ -34,5 +42,13 @@ jobs:
           go-version: 1.19
       - name: Check out source code
         uses: actions/checkout@v1
-      - name: Run examples
-        run: cd examples && make
+      - name: Read table example
+        run: cd examples && make read_table
+      - name: Write table example
+        run: cd examples && make write_table
+      - name: Create table example
+        run: cd examples && make create_table
+      - name: Search table example
+        run: cd examples && make search_table
+      - name: Database example
+        run: cd examples && make database
