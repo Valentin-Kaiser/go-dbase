@@ -231,7 +231,7 @@ func (file *File) writeHeader() (err error) {
 		}
 		defer func() {
 			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(file.handle.Fd(), unix.F_ULOCK, flock)
+			ulockErr := unix.FcntlFlock(file.handle.Fd(), unix.F_SETLK, flock)
 			if ulockErr != nil {
 				err = newError("dbase-io-writeheader-2", ulockErr)
 			}
@@ -337,7 +337,7 @@ func (file *File) writeColumns() (err error) {
 		}
 		defer func() {
 			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(file.handle.Fd(), unix.F_ULOCK, flock)
+			ulockErr := unix.FcntlFlock(file.handle.Fd(), unix.F_SETLK, flock)
 			if ulockErr != nil {
 				err = newError("dbase-io-writecolumns-2", ulockErr)
 			}
@@ -557,7 +557,7 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 		}
 		defer func() {
 			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(file.handle.Fd(), unix.F_ULOCK, flock)
+			ulockErr := unix.FcntlFlock(file.handle.Fd(), unix.F_SETLK, flock)
 			if ulockErr != nil {
 				err = newError("dbase-io-writememo-4", ulockErr)
 			}
@@ -608,7 +608,7 @@ func (file *File) writeMemoHeader() (err error) {
 		}
 		defer func() {
 			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(file.handle.Fd(), unix.F_ULOCK, flock)
+			ulockErr := unix.FcntlFlock(file.handle.Fd(), unix.F_SETLK, flock)
 			if ulockErr != nil {
 				err = newError("dbase-io-writememoheader-3", ulockErr)
 			}
@@ -704,7 +704,7 @@ func (row *Row) writeRow() (err error) {
 		}
 		defer func() {
 			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(row.handle.handle.Fd(), unix.F_ULOCK, flock)
+			ulockErr := unix.FcntlFlock(row.handle.handle.Fd(), unix.F_SETLK, flock)
 			if ulockErr != nil {
 				err = newError("dbase-io-writerow-4", ulockErr)
 			}
