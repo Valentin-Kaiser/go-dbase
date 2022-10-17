@@ -15,7 +15,7 @@ func SetDebug(enabled bool) {
 	debug = enabled
 }
 
-func SetOutput(out io.Writer) {
+func SetDebugOutput(out io.Writer) {
 	debugLogger.SetOutput(out)
 	errorLogger.SetOutput(out)
 }

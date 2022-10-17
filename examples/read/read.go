@@ -32,7 +32,7 @@ func main() {
 		return
 	}
 	dbase.SetDebug(true)
-	dbase.SetOutput(io.MultiWriter(os.Stdout, f))
+	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
 
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{

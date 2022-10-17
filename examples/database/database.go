@@ -16,7 +16,7 @@ func main() {
 		return
 	}
 	dbase.SetDebug(true)
-	dbase.SetOutput(io.MultiWriter(os.Stdout, f))
+	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
 
 	db, err := dbase.OpenDatabase(&dbase.Config{
 		Filename:   "../test_data/database/EXPENSES.DBC",

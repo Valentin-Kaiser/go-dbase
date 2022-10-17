@@ -17,7 +17,7 @@ func main() {
 		return
 	}
 	dbase.SetDebug(true)
-	dbase.SetOutput(io.MultiWriter(os.Stdout, f))
+	dbase.SetDebugOutput(io.MultiWriter(os.Stdout, f))
 
 	// Integer are allways 4 bytes long
 	idCol, err := dbase.NewColumn("ID", dbase.Integer, 0, 0, false)
