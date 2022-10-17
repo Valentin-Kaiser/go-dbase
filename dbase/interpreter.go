@@ -95,6 +95,10 @@ func (file *File) dataToValue(raw []byte, column *Column) (interface{}, error) {
 // Converts column data to the byte representation
 // For M values the data has to be written to the memo file
 func (file *File) valueToByteRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
+	// if value is nil, return empty byte array
+	if field.GetValue() == nil {
+		return make([]byte, field.column.Length), nil
+	}
 	switch DataType(field.column.DataType) {
 	case Memo:
 		return file.getMemoRepresentation(field)
@@ -428,6 +432,10 @@ func (file *File) parseRaw(raw []byte, column *Column) (interface{}, error) {
 
 // Get the raw value as byte representation (only type check for []byte is performed)
 func (file *File) getRawRepresentation(field *Field) ([]byte, error) {
+	// If string is passed, convert to []byte
+	if s, ok := field.value.(string); ok {
+		return []byte(s), nil
+	}
 	raw, ok := field.value.([]byte)
 	if !ok {
 		return nil, newError("dbase-interpreter-getrawrepresentation-1", fmt.Errorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name()))
