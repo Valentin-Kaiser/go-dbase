@@ -8,7 +8,7 @@ import (
 
 func main() {
 	db, err := dbase.OpenDatabase(&dbase.Config{
-		Filename:   "../test_data/database/expenses.dbc",
+		Filename:   "../test_data/database/EXPENSES.DBC",
 		TrimSpaces: true,
 	})
 	if err != nil {
