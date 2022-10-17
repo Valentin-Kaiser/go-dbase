@@ -2,12 +2,23 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 	"golang.org/x/text/encoding/charmap"
 )
 
 func main() {
+	// Open debug log file so we see what's going on
+	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	dbase.SetDebug(true)
+	dbase.SetOutput(io.MultiWriter(os.Stdout, f))
+
 	// Integer are allways 4 bytes long
 	idCol, err := dbase.NewColumn("ID", dbase.Integer, 0, 0, false)
 	if err != nil {

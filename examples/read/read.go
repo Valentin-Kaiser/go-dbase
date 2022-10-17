@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
@@ -23,6 +25,15 @@ type Product struct {
 }
 
 func main() {
+	// Open debug log file so we see what's going on
+	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	dbase.SetDebug(true)
+	dbase.SetOutput(io.MultiWriter(os.Stdout, f))
+
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
 		Filename:   "../test_data/table/TEST.DBF",
