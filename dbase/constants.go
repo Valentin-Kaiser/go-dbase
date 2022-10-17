@@ -1,5 +1,10 @@
 package dbase
 
+import (
+	"reflect"
+	"time"
+)
+
 // Supported and testet file versions - other files may work but are not tested
 // The file version check has to be bypassed when opening a file type that is not supported
 // https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.71)
@@ -100,4 +105,22 @@ const (
 // Returns the type of the column as string
 func (t DataType) String() string {
 	return string(t)
+}
+
+func (t DataType) Reflect() reflect.Type {
+	switch t {
+	case Character:
+		return reflect.TypeOf("")
+	case Currency, Double, Float, Numeric:
+		return reflect.TypeOf(float64(0))
+	case Date, DateTime:
+		return reflect.TypeOf(time.Time{})
+	case Integer:
+		return reflect.TypeOf(int32(0))
+	case Logical:
+		return reflect.TypeOf(false)
+	case Memo, Blob, Varchar, Varbinary, General, Picture:
+		return reflect.TypeOf([]byte{})
+	}
+	return reflect.TypeOf("")
 }

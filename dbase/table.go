@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -525,6 +526,10 @@ func (c *Column) Name() string {
 // Returns the type of the column as string (length 1)
 func (c *Column) Type() string {
 	return string(c.DataType)
+}
+
+func (c *Column) Reflect() reflect.Type {
+	return DataType(c.DataType).Reflect()
 }
 
 /**
