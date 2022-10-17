@@ -23,6 +23,8 @@ jobs:
           check-latest: true
       - name: Check out source code
         uses: actions/checkout@v1
+      - name: Install dependencies
+        run: go mod tidy
       - name: Read table example
         run: cd examples && make read_table
       - name: Write table example
@@ -44,6 +46,8 @@ jobs:
           check-latest: true
       - name: Check out source code
         uses: actions/checkout@v1
+      - name: Install dependencies
+        run: go mod tidy
       - name: Read table example
         run: cd examples && make read_table
       - name: Write table example
