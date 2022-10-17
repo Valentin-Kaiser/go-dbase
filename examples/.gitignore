@@ -1,0 +1,7 @@
+*.DBF
+*.FPT
+
+*.log
+
+!test_data/*.DBF
+!test_data/*.FPT
