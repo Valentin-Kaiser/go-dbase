@@ -54,7 +54,7 @@ func main() {
 	sort.Strings(keys)
 
 	// Print table infos
-	_, err = schemaFile.WriteString("| Table | Fields | Records | First record | Row size | File size | Modified |\n|---|---|---|---|---|---|---|\n")
+	_, err = schemaFile.WriteString("| Table | Columns | Records | First record | Row size | File size | Modified |\n|---|---|---|---|---|---|---|\n")
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +87,7 @@ func main() {
 			panic(err)
 		}
 
-		_, err = schemaFile.WriteString("| Field | Field type | Golang type | Length | Comment | \n| --- | --- | --- | --- | --- | \n")
+		_, err = schemaFile.WriteString("| Name | Type | Golang type | Length | Comment | \n| --- | --- | --- | --- | --- | \n")
 		if err != nil {
 			panic(err)
 		}
