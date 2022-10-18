@@ -1,9 +1,9 @@
 ## Database schema 
 
- Exracted in 97.7957ms 
+ Exracted in 197.7461ms 
 
-| Table | Fields | Records | First record | Size | Modified |
-|---|---|---|---|---|---|
+| Table | Fields | Records | First record | Row size | File size | Modified |
+|---|---|---|---|---|---|---|
 | [employees](#employees) | 16 | 3 | 808 | 523 B | 2.4 kB | 2022-10-15 00:00:00 +0200 CEST |
 | [expense_categories](#expense_categories) | 3 | 5 | 392 | 59 B | 687 B | 2022-10-15 00:00:00 +0200 CEST |
 | [expense_details](#expense_details) | 6 | 6 | 488 | 79 B | 962 B | 2022-10-15 00:00:00 +0200 CEST |

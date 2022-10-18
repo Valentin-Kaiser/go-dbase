@@ -54,7 +54,7 @@ func main() {
 	sort.Strings(keys)
 
 	// Print table infos
-	_, err = schemaFile.WriteString("| Table | Fields | Records | First record | Size | Modified |\n|---|---|---|---|---|---|\n")
+	_, err = schemaFile.WriteString("| Table | Fields | Records | First record | Row size | File size | Modified |\n|---|---|---|---|---|---|---|\n")
 	if err != nil {
 		panic(err)
 	}
