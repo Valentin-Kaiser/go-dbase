@@ -618,7 +618,9 @@ func (row *Row) Add() error {
 func (row *Row) Values() []interface{} {
 	values := make([]interface{}, 0)
 	for _, field := range row.fields {
-		values = append(values, field.value)
+		if field != nil {
+			values = append(values, field.value)
+		}
 	}
 	return values
 }
@@ -697,7 +699,7 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 	rec := &Row{}
 	rec.Position = file.table.rowPointer
 	rec.handle = file
-	rec.fields = make([]*Field, file.ColumnsCount())
+	rec.fields = make([]*Field, 0)
 	if len(data) < int(file.header.RowLength) {
 		return nil, newError("dbase-table-bytestorow-1", fmt.Errorf("invalid row data size %v Bytes < %v Bytes", len(data), int(file.header.RowLength)))
 	}
@@ -708,16 +710,16 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 	}
 	// deleted flag already read
 	offset := uint16(1)
-	for i := 0; i < len(rec.fields); i++ {
+	for i := 0; i < int(file.ColumnsCount()); i++ {
 		column := file.table.columns[i]
 		val, err := file.dataToValue(data[offset:offset+uint16(column.Length)], file.table.columns[i])
 		if err != nil {
 			return rec, newError("dbase-table-bytestorow-3", err)
 		}
-		rec.fields[i] = &Field{
+		rec.fields = append(rec.fields, &Field{
 			column: column,
 			value:  val,
-		}
+		})
 		offset += uint16(column.Length)
 	}
 	return rec, nil
