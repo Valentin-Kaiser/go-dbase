@@ -32,7 +32,6 @@ func main() {
 	length := len(tables)
 
 	fmt.Println("Generating schema...")
-	fmt.Printf("Total tables: %v", len(tables))
 
 	// Open schema output file
 	schemaFile, err := os.OpenFile("schema.gen.go", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)

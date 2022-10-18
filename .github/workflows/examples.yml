@@ -37,7 +37,7 @@ jobs:
         run: cd examples && make database_export
       - name: Run database documentation example
         run: cd examples && make database_documentation
-      - name: Run database export example
+      - name: Run database schema example
         run: cd examples && make database_schema
   build-windows:
     name: Windows build
@@ -64,5 +64,5 @@ jobs:
         run: cd examples && make database_export
       - name: Run database documentation example
         run: cd examples && make database_documentation
-      - name: Run database export example
+      - name: Run database schema example
         run: cd examples && make database_schema
