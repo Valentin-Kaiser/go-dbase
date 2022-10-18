@@ -754,7 +754,7 @@ func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
 		}
 		// Check if the value matches
 		if bytes.Contains(buf, val) {
-			debugf("Found matching row %v at position: %d", i, p-int64(field.column.Position))
+			debugf("Found matching field at position: %d - Record %v position: %v ", p, i+1, p-int64(field.column.Position))
 			err := file.GoTo(i)
 			if err != nil {
 				continue
