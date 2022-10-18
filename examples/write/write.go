@@ -79,8 +79,15 @@ func main() {
 	// === Modifications ===
 
 	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-	table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
-	table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+	err = table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+	if err != nil {
+		panic(dbase.GetErrorTrace(err))
+	}
+
+	err = table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+	if err != nil {
+		panic(dbase.GetErrorTrace(err))
+	}
 
 	// Create a new row with the same structure as the database table.
 	p := Product{

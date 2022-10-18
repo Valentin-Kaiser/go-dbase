@@ -94,10 +94,21 @@ func main() {
 		// === Modifications ===
 
 		// Disable space trimming for the company name
-		table.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
+		err = table.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
+		if err != nil {
+			panic(dbase.GetErrorTrace(err))
+		}
+
 		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-		table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
-		table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+		err = table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+		if err != nil {
+			panic(dbase.GetErrorTrace(err))
+		}
+
+		err = table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+		if err != nil {
+			panic(dbase.GetErrorTrace(err))
+		}
 
 		// === Struct Conversion ===
 

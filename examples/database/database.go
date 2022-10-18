@@ -1,15 +1,43 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
+
+const path = "../test_data/database/EXPENSES.DBC"
+
+type DatabaseSchema struct {
+	Name      string
+	Tables    map[string]Table
+	Generated time.Duration
+}
+
+type Table struct {
+	Name      string
+	Columns   uint16
+	Records   uint32
+	FirstRow  int
+	RowLength string
+	FileSize  int64
+	Modified  time.Time
+	Fields    map[string]Field
+	Data      []map[string]interface{}
+}
+
+type Field struct {
+	Name   string
+	Type   string
+	GoType string
+	Length int
+}
 
 func main() {
 	// Open debug log file so we see what's going on
@@ -18,33 +46,24 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
+	dbase.Debug(true, f)
 
 	start := time.Now()
 	db, err := dbase.OpenDatabase(&dbase.Config{
-		Filename: "../test_data/database/EXPENSES.DBC",
+		Filename:   path,
+		TrimSpaces: true,
 	})
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}
 	defer db.Close()
 
-	// Print the database schema
-	output := make([]string, 0)
 	schema := db.Schema()
 	tables := db.Tables()
-	duration := time.Since(start)
-
-	// Open schema output file
-	schemaFile, err := os.OpenFile("schema.md", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		panic(err)
-	}
-
-	// Write file headline
-	_, err = schemaFile.WriteString(fmt.Sprintf("## Database schema \n\n Exracted in %s \n\n", duration))
-	if err != nil {
-		panic(err)
+	// length := len(tables)
+	databaseSchema := DatabaseSchema{
+		Name:   filepath.Base(path),
+		Tables: make(map[string]Table),
 	}
 
 	keys := make([]string, 0)
@@ -53,64 +72,61 @@ func main() {
 	}
 	sort.Strings(keys)
 
-	// Print table infos
-	_, err = schemaFile.WriteString("| Table | Columns | Records | First record | Row size | File size | Modified |\n|---|---|---|---|---|---|---|\n")
-	if err != nil {
-		panic(err)
-	}
-
-	for _, name := range keys {
-		_, err = schemaFile.WriteString(fmt.Sprintf(
-			"| [%v](#%v) | %v | %v | %v | %v | %v | %v |\n",
-			name,
-			name,
-			tables[name].Header().ColumnsCount(),
-			tables[name].Header().RecordsCount(),
-			int(tables[name].Header().FirstRow),
-			ToByteString(int(tables[name].Header().RowLength)),
-			ToByteString(int(tables[name].Header().FileSize())),
-			tables[name].Header().Modified(),
-		))
-		if err != nil {
-			panic(err)
-		}
-	}
-	_, err = schemaFile.WriteString("\n")
-	if err != nil {
-		panic(err)
-	}
-
-	// Print table schemas
-	for _, name := range keys {
-		_, err = schemaFile.WriteString(fmt.Sprintf("## %v \n\n", strings.ToUpper(name)))
-		if err != nil {
-			panic(err)
+	for _, tablename := range keys {
+		t := Table{
+			Name:     strings.ToUpper(tablename),
+			Columns:  tables[tablename].Header().ColumnsCount(),
+			Records:  tables[tablename].Header().RecordsCount(),
+			FileSize: tables[tablename].Header().FileSize(),
+			Modified: tables[tablename].Header().Modified(),
+			Fields:   make(map[string]Field),
+			Data:     make([]map[string]interface{}, 0),
 		}
 
-		_, err = schemaFile.WriteString("| Name | Type | Golang type | Length | Comment | \n| --- | --- | --- | --- | --- | \n")
-		if err != nil {
-			panic(err)
-		}
-
-		for _, column := range schema[name] {
-			_, err = schemaFile.WriteString(fmt.Sprintf("| *%v* | %v | %v | %v |  | \n", column.Name(), column.Type(), column.Reflect(), column.Length))
-			if err != nil {
-				panic(err)
+		for _, field := range schema[tablename] {
+			t.Fields[field.Name()] = Field{
+				Name:   field.Name(),
+				Type:   field.Type(),
+				GoType: field.Reflect().String(),
+				Length: int(field.Length),
 			}
 		}
 
-		_, err = schemaFile.WriteString("\n")
+		// Print table data
+		rows, err := tables[tablename].Rows(true, true)
 		if err != nil {
 			panic(err)
 		}
+
+		for _, row := range rows {
+			m, err := row.ToMap()
+			if err != nil {
+				panic(err)
+			}
+			t.Data = append(t.Data, m)
+		}
+
+		databaseSchema.Tables[strings.ToUpper(tablename)] = t
+	}
+	duration := time.Since(start)
+	databaseSchema.Generated = duration
+
+	// JSON encoding
+	b, err := json.MarshalIndent(databaseSchema, "", "    ")
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
-	// Write table schema
-	for _, line := range output {
-		_, err = schemaFile.WriteString(line)
-		if err != nil {
-			panic(err)
-		}
+	// Open schema output file
+	schemaFile, err := os.OpenFile("export.json", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = schemaFile.Write(b)
+	if err != nil {
+		panic(err)
 	}
 }
 

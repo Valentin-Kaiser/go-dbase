@@ -1,5 +1,7 @@
 run:
   timeout: 60s
+  skip-files:
+    - schema.gen.go
 
 linters:
   # start with everything

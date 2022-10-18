@@ -33,7 +33,11 @@ jobs:
         run: cd examples && make create_table
       - name: Run search table example
         run: cd examples && make search_table
-      - name: Run database schema example
+      - name: Run database export example
+        run: cd examples && make database_export
+      - name: Run database documentation example
+        run: cd examples && make database_documentation
+      - name: Run database export example
         run: cd examples && make database_schema
   build-windows:
     name: Windows build
@@ -56,5 +60,9 @@ jobs:
         run: cd examples && make create_table
       - name: Run search table example
         run: cd examples && make search_table
-      - name: Run database schema example
+      - name: Run database export example
+        run: cd examples && make database_export
+      - name: Run database documentation example
+        run: cd examples && make database_documentation
+      - name: Run database export example
         run: cd examples && make database_schema
