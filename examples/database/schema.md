@@ -1,6 +1,6 @@
 ## Database schema 
 
- Exracted in 197.7461ms 
+ Exracted in 45.4051ms 
 
 | Table | Fields | Records | First record | Row size | File size | Modified |
 |---|---|---|---|---|---|---|
