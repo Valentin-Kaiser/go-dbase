@@ -114,7 +114,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 		return nil, newError("dbase-io-opendatabase-6", fmt.Errorf("searching for type field failed with error: %w", err))
 	}
 	// Try to load the table files
-	tables := make(map[string]*File)
+	tables := make(map[string]*File, 0)
 	for _, row := range rows {
 		objectName, err := row.ValueByName("OBJECTNAME")
 		if err != nil {
@@ -146,7 +146,9 @@ func OpenDatabase(config *Config) (*Database, error) {
 		if err != nil {
 			return nil, newError("dbase-io-opendatabase-9", fmt.Errorf("opening table failed with error: %w", err))
 		}
-		tables[tableName] = table
+		if table != nil {
+			tables[tableName] = table
+		}
 	}
 	return &Database{file: databaseTable, tables: tables}, nil
 }
@@ -544,7 +546,10 @@ func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 	for !file.EOF() {
 		// This reads the complete row
 		row, err := file.Row()
-		if err != nil && !skipInvalid {
+		if err != nil {
+			if skipInvalid {
+				continue
+			}
 			return nil, newError("dbase-table-rows-1", err)
 		}
 		// Increment the row pointer
