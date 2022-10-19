@@ -1,0 +1,56 @@
+{
+  "Name": "EXPENSE_CATEGORIES",
+  "Columns": 3,
+  "Records": 5,
+  "FirstRow": 0,
+  "RowLength": "",
+  "FileSize": 687,
+  "Modified": "2022-10-15T00:00:00+02:00",
+  "Fields": {
+    "EXPENSECA2": {
+      "Name": "EXPENSECA2",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "EXPENSECA3": {
+      "Name": "EXPENSECA3",
+      "Type": "I",
+      "GoType": "int32",
+      "Length": 4
+    },
+    "EXPENSECAT": {
+      "Name": "EXPENSECAT",
+      "Type": "I",
+      "GoType": "int32",
+      "Length": 4
+    }
+  },
+  "Data": [
+    {
+      "EXPENSECA2": "Meals",
+      "EXPENSECA3": 500,
+      "EXPENSECAT": 1
+    },
+    {
+      "EXPENSECA2": "Transportation",
+      "EXPENSECA3": 1000,
+      "EXPENSECAT": 2
+    },
+    {
+      "EXPENSECA2": "Lodging",
+      "EXPENSECA3": 2000,
+      "EXPENSECAT": 3
+    },
+    {
+      "EXPENSECA2": "Entertainment",
+      "EXPENSECA3": 670,
+      "EXPENSECAT": 4
+    },
+    {
+      "EXPENSECA2": "Miscellaneous",
+      "EXPENSECA3": 560,
+      "EXPENSECAT": 5
+    }
+  ]
+}

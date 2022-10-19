@@ -1,0 +1,100 @@
+{
+  "Name": "EXPENSE_REPORTS",
+  "Columns": 9,
+  "Records": 3,
+  "FirstRow": 0,
+  "RowLength": "",
+  "FileSize": 1004,
+  "Modified": "2022-10-15T00:00:00+02:00",
+  "Fields": {
+    "ADVANCEAMO": {
+      "Name": "ADVANCEAMO",
+      "Type": "Y",
+      "GoType": "float64",
+      "Length": 8
+    },
+    "DATESUBMIT": {
+      "Name": "DATESUBMIT",
+      "Type": "T",
+      "GoType": "time.Time",
+      "Length": 8
+    },
+    "DEPARTMENT": {
+      "Name": "DEPARTMENT",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 30
+    },
+    "EMPLOYEEID": {
+      "Name": "EMPLOYEEID",
+      "Type": "I",
+      "GoType": "int32",
+      "Length": 4
+    },
+    "EXPENSEREP": {
+      "Name": "EXPENSEREP",
+      "Type": "I",
+      "GoType": "int32",
+      "Length": 4
+    },
+    "EXPENSERP2": {
+      "Name": "EXPENSERP2",
+      "Type": "M",
+      "GoType": "[]uint8",
+      "Length": 4
+    },
+    "EXPENSERPT": {
+      "Name": "EXPENSERPT",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 30
+    },
+    "EXPENSETYP": {
+      "Name": "EXPENSETYP",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "PAID": {
+      "Name": "PAID",
+      "Type": "L",
+      "GoType": "bool",
+      "Length": 1
+    }
+  },
+  "Data": [
+    {
+      "ADVANCEAMO": 0,
+      "DATESUBMIT": "1995-03-01T00:00:00Z",
+      "DEPARTMENT": "",
+      "EMPLOYEEID": 1,
+      "EXPENSEREP": 1,
+      "EXPENSERP2": "Expenses during sales trip.",
+      "EXPENSERPT": "Feb. '95 Sales Trip",
+      "EXPENSETYP": "",
+      "PAID": false
+    },
+    {
+      "ADVANCEAMO": 45,
+      "DATESUBMIT": "1995-01-31T00:00:00Z",
+      "DEPARTMENT": "",
+      "EMPLOYEEID": 2,
+      "EXPENSEREP": 2,
+      "EXPENSERP2": "Professional Membership.",
+      "EXPENSERPT": "Northwind Traders Annual Dues",
+      "EXPENSETYP": "",
+      "PAID": false
+    },
+    {
+      "ADVANCEAMO": 2500,
+      "DATESUBMIT": "1995-04-05T00:00:00Z",
+      "DEPARTMENT": "",
+      "EMPLOYEEID": 3,
+      "EXPENSEREP": 3,
+      "EXPENSERP2": "Expenses associated with Press Tour '95.",
+      "EXPENSERPT": "Press Tour '95",
+      "EXPENSETYP": "",
+      "PAID": false
+    }
+  ]
+}

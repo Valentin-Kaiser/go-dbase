@@ -1,0 +1,163 @@
+{
+  "Name": "EMPLOYEES",
+  "Columns": 16,
+  "Records": 3,
+  "FirstRow": 0,
+  "RowLength": "",
+  "FileSize": 2377,
+  "Modified": "2022-10-15T00:00:00+02:00",
+  "Fields": {
+    "ADDRESS": {
+      "Name": "ADDRESS",
+      "Type": "M",
+      "GoType": "[]uint8",
+      "Length": 4
+    },
+    "CITY": {
+      "Name": "CITY",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "COUNTRY": {
+      "Name": "COUNTRY",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "DEPARTMENT": {
+      "Name": "DEPARTMENT",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "EMAILNAME": {
+      "Name": "EMAILNAME",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "EMPLOYEEID": {
+      "Name": "EMPLOYEEID",
+      "Type": "I",
+      "GoType": "int32",
+      "Length": 4
+    },
+    "EMPLOYEENU": {
+      "Name": "EMPLOYEENU",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 30
+    },
+    "EXTENSION": {
+      "Name": "EXTENSION",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 30
+    },
+    "FIRSTNAME": {
+      "Name": "FIRSTNAME",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "LASTNAME": {
+      "Name": "LASTNAME",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "NOTES": {
+      "Name": "NOTES",
+      "Type": "M",
+      "GoType": "[]uint8",
+      "Length": 4
+    },
+    "POSTALCODE": {
+      "Name": "POSTALCODE",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 20
+    },
+    "SOCIALSECU": {
+      "Name": "SOCIALSECU",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 30
+    },
+    "STATEORPRO": {
+      "Name": "STATEORPRO",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 20
+    },
+    "TITLE": {
+      "Name": "TITLE",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "WORKPHONE": {
+      "Name": "WORKPHONE",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 30
+    }
+  },
+  "Data": [
+    {
+      "ADDRESS": "908 W. Capital Way",
+      "CITY": "Tacoma",
+      "COUNTRY": "USA",
+      "DEPARTMENT": "Sales",
+      "EMAILNAME": "Nancyd",
+      "EMPLOYEEID": 1,
+      "EMPLOYEENU": "11-11-1112",
+      "EXTENSION": "65432",
+      "FIRSTNAME": "Nancy",
+      "LASTNAME": "Davolio",
+      "NOTES": "",
+      "POSTALCODE": "98401",
+      "SOCIALSECU": "",
+      "STATEORPRO": "WA",
+      "TITLE": "Salesperson",
+      "WORKPHONE": "5045554455"
+    },
+    {
+      "ADDRESS": "722 Moss Bay Blvd.",
+      "CITY": "Kirkland",
+      "COUNTRY": "USA",
+      "DEPARTMENT": "Purchasing",
+      "EMAILNAME": "Janetl",
+      "EMPLOYEEID": 2,
+      "EMPLOYEENU": "11-11-1113",
+      "EXTENSION": "45678",
+      "FIRSTNAME": "Janet",
+      "LASTNAME": "Leverling",
+      "NOTES": "",
+      "POSTALCODE": "98033",
+      "SOCIALSECU": "",
+      "STATEORPRO": "WA",
+      "TITLE": "Buyer",
+      "WORKPHONE": "5045557788"
+    },
+    {
+      "ADDRESS": "4726 - 11th Ave. N.E.",
+      "CITY": "Seattle",
+      "COUNTRY": "USA",
+      "DEPARTMENT": "Marketing",
+      "EMAILNAME": "Steveb",
+      "EMPLOYEEID": 3,
+      "EMPLOYEENU": "11-11-1115",
+      "EXTENSION": "23456",
+      "FIRSTNAME": "Steven",
+      "LASTNAME": "Buchanan",
+      "NOTES": "",
+      "POSTALCODE": "98105",
+      "SOCIALSECU": "",
+      "STATEORPRO": "WA",
+      "TITLE": "Marketing Manager",
+      "WORKPHONE": "5045552346"
+    }
+  ]
+}

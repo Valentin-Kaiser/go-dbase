@@ -14,9 +14,11 @@ import (
 
 const path = "../test_data/database/EXPENSES.DBC"
 
+const exportPath = "export/"
+
 type DatabaseSchema struct {
 	Name      string
-	Tables    map[string]Table
+	Tables    map[string]string
 	Generated time.Duration
 }
 
@@ -60,10 +62,11 @@ func main() {
 
 	schema := db.Schema()
 	tables := db.Tables()
+
 	// length := len(tables)
 	databaseSchema := DatabaseSchema{
-		Name:   filepath.Base(path),
-		Tables: make(map[string]Table),
+		Name:   strings.Trim(filepath.Base(path), filepath.Ext(path)),
+		Tables: make(map[string]string),
 	}
 
 	keys := make([]string, 0)
@@ -72,7 +75,8 @@ func main() {
 	}
 	sort.Strings(keys)
 
-	for _, tablename := range keys {
+	for it, tablename := range keys {
+		fmt.Printf("Exporting table %v (%v/%v)...\n", tablename, it+1, len(keys))
 		t := Table{
 			Name:     strings.ToUpper(tablename),
 			Columns:  tables[tablename].Header().ColumnsCount(),
@@ -98,15 +102,27 @@ func main() {
 			panic(err)
 		}
 
-		for _, row := range rows {
+		for ir, row := range rows {
 			m, err := row.ToMap()
 			if err != nil {
 				panic(err)
 			}
 			t.Data = append(t.Data, m)
+			fmt.Printf("Exported %v/%v tables %v/%v records \n", it+1, len(keys), ir+1, t.Records)
 		}
 
-		databaseSchema.Tables[strings.ToUpper(tablename)] = t
+		// Write table to file
+		b, err := json.MarshalIndent(t, "", "  ")
+		if err != nil {
+			panic(err)
+		}
+		err = os.WriteFile(fmt.Sprintf("%v%v.json", exportPath, t.Name), b, 0644)
+		if err != nil {
+			panic(err)
+		}
+
+		databaseSchema.Tables[strings.ToUpper(tablename)] = t.Name
+		fmt.Printf("Export %v/%v table completed \n", it+1, len(tables))
 	}
 	duration := time.Since(start)
 	databaseSchema.Generated = duration
@@ -119,7 +135,7 @@ func main() {
 	}
 
 	// Open schema output file
-	schemaFile, err := os.OpenFile("export.json", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	schemaFile, err := os.OpenFile(fmt.Sprintf("%v%v.json", exportPath, databaseSchema.Name), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		panic(err)
 	}

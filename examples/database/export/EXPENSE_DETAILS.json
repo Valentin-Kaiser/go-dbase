@@ -1,0 +1,97 @@
+{
+  "Name": "EXPENSE_DETAILS",
+  "Columns": 6,
+  "Records": 6,
+  "FirstRow": 0,
+  "RowLength": "",
+  "FileSize": 962,
+  "Modified": "2022-10-15T00:00:00+02:00",
+  "Fields": {
+    "EXPENSECAT": {
+      "Name": "EXPENSECAT",
+      "Type": "I",
+      "GoType": "int32",
+      "Length": 4
+    },
+    "EXPENSEDAT": {
+      "Name": "EXPENSEDAT",
+      "Type": "T",
+      "GoType": "time.Time",
+      "Length": 8
+    },
+    "EXPENSEDET": {
+      "Name": "EXPENSEDET",
+      "Type": "I",
+      "GoType": "int32",
+      "Length": 4
+    },
+    "EXPENSEIT2": {
+      "Name": "EXPENSEIT2",
+      "Type": "C",
+      "GoType": "string",
+      "Length": 50
+    },
+    "EXPENSEITE": {
+      "Name": "EXPENSEITE",
+      "Type": "Y",
+      "GoType": "float64",
+      "Length": 8
+    },
+    "EXPENSEREP": {
+      "Name": "EXPENSEREP",
+      "Type": "I",
+      "GoType": "int32",
+      "Length": 4
+    }
+  },
+  "Data": [
+    {
+      "EXPENSECAT": 2,
+      "EXPENSEDAT": "1995-02-01T00:00:00Z",
+      "EXPENSEDET": 1,
+      "EXPENSEIT2": "Plane ticket",
+      "EXPENSEITE": 431,
+      "EXPENSEREP": 1
+    },
+    {
+      "EXPENSECAT": 1,
+      "EXPENSEDAT": "1995-02-02T00:00:00Z",
+      "EXPENSEDET": 2,
+      "EXPENSEIT2": "Breakfast meeting with Tom",
+      "EXPENSEITE": 33,
+      "EXPENSEREP": 1
+    },
+    {
+      "EXPENSECAT": 5,
+      "EXPENSEDAT": "1995-01-31T00:00:00Z",
+      "EXPENSEDET": 3,
+      "EXPENSEIT2": "Annual Dues - Northwind Traders",
+      "EXPENSEITE": 45,
+      "EXPENSEREP": 2
+    },
+    {
+      "EXPENSECAT": 1,
+      "EXPENSEDAT": "1995-01-31T00:00:00Z",
+      "EXPENSEDET": 4,
+      "EXPENSEIT2": "Northwind Traders Lunch",
+      "EXPENSEITE": 25,
+      "EXPENSEREP": 2
+    },
+    {
+      "EXPENSECAT": 1,
+      "EXPENSEDAT": "1995-04-05T00:00:00Z",
+      "EXPENSEDET": 5,
+      "EXPENSEIT2": "Lunch for press tour",
+      "EXPENSEITE": 1500,
+      "EXPENSEREP": 3
+    },
+    {
+      "EXPENSECAT": 4,
+      "EXPENSEDAT": "1995-04-05T00:00:00Z",
+      "EXPENSEDET": 6,
+      "EXPENSEIT2": "Magician for press (entertainment)",
+      "EXPENSEITE": 750,
+      "EXPENSEREP": 3
+    }
+  ]
+}

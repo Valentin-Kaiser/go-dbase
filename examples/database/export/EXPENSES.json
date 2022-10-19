@@ -1,0 +1,10 @@
+{
+    "Name": "EXPENSES",
+    "Tables": {
+        "EMPLOYEES": "EMPLOYEES",
+        "EXPENSE_CATEGORIES": "EXPENSE_CATEGORIES",
+        "EXPENSE_DETAILS": "EXPENSE_DETAILS",
+        "EXPENSE_REPORTS": "EXPENSE_REPORTS"
+    },
+    "Generated": 68408300
+}

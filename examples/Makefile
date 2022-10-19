@@ -8,7 +8,7 @@ create_table:
 search_table: 
 	cd search && go run search.go
 database_export:
-	cd database && go run database.go
+	cd database && go run export.go
 database_schema:
 	cd schema && go run schema.go
 database_documentation:
