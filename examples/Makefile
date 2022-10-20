@@ -1,4 +1,4 @@
-all: read_table write_table create_table search_table database_export database_schema  database_documentation
+all: clean read_table write_table create_table search_table database_export database_schema  database_documentation
 read_table:
 	cd read && go run ./read.go
 write_table:
@@ -13,3 +13,11 @@ database_schema:
 	cd schema && go run schema.go
 database_documentation:
 	cd documentation && go run documentation.go
+clean:
+	cd read && rm -f debug.log
+	cd write && rm -f debug.log
+	cd create && rm -f debug.log rm -f TEST.DBF && rm -f TEST.FPT
+	cd search && rm -f debug.log
+	cd database && rm -f debug.log
+	cd schema && rm -f debug.log
+	cd documentation && rm -f debug.log
