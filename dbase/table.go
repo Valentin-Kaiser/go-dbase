@@ -546,14 +546,14 @@ func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 	for !file.EOF() {
 		// This reads the complete row
 		row, err := file.Row()
+		file.Skip(1)
 		if err != nil {
 			if skipInvalid {
 				continue
 			}
 			return nil, newError("dbase-table-rows-1", err)
 		}
-		// Increment the row pointer
-		file.Skip(1)
+
 		// skip deleted rows
 		if row.Deleted && skipDeleted {
 			continue
@@ -717,7 +717,7 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 	offset := uint16(1)
 	for i := 0; i < int(file.ColumnsCount()); i++ {
 		column := file.table.columns[i]
-		val, err := file.dataToValue(data[offset:offset+uint16(column.Length)], file.table.columns[i])
+		val, err := file.interpret(data[offset:offset+uint16(column.Length)], file.table.columns[i])
 		if err != nil {
 			return rec, newError("dbase-table-bytestorow-3", err)
 		}
@@ -743,7 +743,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 	// deleted flag already read
 	offset := uint16(1)
 	for _, field := range row.fields {
-		val, err := row.handle.valueToByteRepresentation(field, false)
+		val, err := row.handle.getRepresentation(field, false)
 		if err != nil {
 			return nil, newError("dbase-table-rowtobytes-1", err)
 		}
@@ -764,14 +764,12 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 		mod := row.handle.table.mods[i]
 		if row.handle.config.TrimSpaces {
 			if str, ok := val.(string); ok {
-				debugf("Trimming spaces from field %v due to default settings", field.Name())
 				val = strings.TrimSpace(str)
 			}
 		}
 		if mod != nil {
 			if mod.TrimSpaces {
 				if str, ok := val.(string); ok {
-					debugf("Trimming spaces from field %v due to modification", field.Name())
 					val = strings.TrimSpace(str)
 				}
 			}

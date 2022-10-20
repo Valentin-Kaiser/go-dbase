@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -17,7 +18,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	dbase.Debug(true, f)
+	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
 
 	start := time.Now()
 	db, err := dbase.OpenDatabase(&dbase.Config{

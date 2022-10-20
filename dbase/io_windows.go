@@ -728,7 +728,7 @@ func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
 	}
 	debugf("Searching for value: %v in field: %s", field.GetValue(), field.column.Name())
 	// convert the value to bytes
-	val, err := file.valueToByteRepresentation(field, !exactMatch)
+	val, err := file.getRepresentation(field, !exactMatch)
 	if err != nil {
 		return nil, newError("dbase-io-search-2", err)
 	}
