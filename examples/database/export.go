@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -48,7 +49,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	dbase.Debug(true, f)
+	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
 
 	start := time.Now()
 	db, err := dbase.OpenDatabase(&dbase.Config{
