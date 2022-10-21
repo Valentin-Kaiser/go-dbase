@@ -544,9 +544,7 @@ func (c *Column) Reflect() reflect.Type {
 func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 	rows := make([]*Row, 0)
 	for !file.EOF() {
-		// This reads the complete row
-		row, err := file.Row()
-		file.Skip(1)
+		row, err := file.Next()
 		if err != nil {
 			if skipInvalid {
 				continue
@@ -561,6 +559,16 @@ func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 		rows = append(rows, row)
 	}
 	return rows, nil
+}
+
+// Reads the row and increments the row pointer by one
+func (file *File) Next() (*Row, error) {
+	row, err := file.Row()
+	if err != nil {
+		return nil, newError("dbase-table-next-1", err)
+	}
+	file.Skip(1)
+	return row, err
 }
 
 // Returns the requested row at file.rowPointer.
