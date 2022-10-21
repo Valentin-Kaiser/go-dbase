@@ -563,8 +563,8 @@ func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 
 // Reads the row and increments the row pointer by one
 func (file *File) Next() (*Row, error) {
-	file.Skip(1)
 	row, err := file.Row()
+	file.Skip(1)
 	if err != nil {
 		return nil, newError("dbase-table-next-1", err)
 	}
