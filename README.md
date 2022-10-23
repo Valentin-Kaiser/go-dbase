@@ -98,7 +98,8 @@ go get github.com/Valentin-Kaiser/go-dbase/dbase
 
 Projects using this package:
 
-[👻 G(h)oST](https://github.com/Plaenkler/GoST)
+- [👻 G(h)oST](https://github.com/Plaenkler/GoST)
+- [🦊 Exporter](https://github.com/Valentin-Kaiser/go-dbase-export)
 
 ## Examples
 
