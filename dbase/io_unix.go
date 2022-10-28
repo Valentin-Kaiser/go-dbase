@@ -537,6 +537,9 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	if file.relatedHandle == nil {
 		return nil, newError("dbase-io-writememo-1", ErrNoFPT)
 	}
+	if length > int(file.memoHeader.BlockSize-8) {
+		return nil, newError("dbase-io-writememo-2", fmt.Errorf("memo data too large for block size %d", file.memoHeader.BlockSize))
+	}
 	// Get the block position
 	blockPosition := file.memoHeader.NextFree
 	// Write the memo header
