@@ -533,9 +533,6 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	if file.relatedHandle == nil {
 		return nil, newError("dbase-io-writememo-1", ErrNoFPT)
 	}
-	if length > int(file.memoHeader.BlockSize-8) {
-		return nil, newError("dbase-io-writememo-2", fmt.Errorf("memo data too large for block size %d", file.memoHeader.BlockSize))
-	}
 	// Get the block position
 	blockPosition := file.memoHeader.NextFree
 	// Write the memo header
@@ -563,12 +560,12 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 		}
 		err = windows.LockFileEx(*file.relatedHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
 		if err != nil {
-			return nil, newError("dbase-io-writememo-3", err)
+			return nil, newError("dbase-io-writememo-2", err)
 		}
 		defer func() {
 			ulockErr := windows.UnlockFileEx(*file.relatedHandle, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
 			if err != nil {
-				err = newError("dbase-io-writememoheader-4", ulockErr)
+				err = newError("dbase-io-writememoheader-3", ulockErr)
 			}
 		}()
 	}
@@ -577,17 +574,17 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	// Seek to new the next free block
 	_, err = windows.Seek(*file.relatedHandle, position, 0)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-5", err)
+		return nil, newError("dbase-io-writememo-4", err)
 	}
 	// Write the memo data
 	_, err = windows.Write(*file.relatedHandle, block)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-6", err)
+		return nil, newError("dbase-io-writememo-5", err)
 	}
 	// Convert the block number to []byte
 	address, err := toBinary(blockPosition)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-7", err)
+		return nil, newError("dbase-io-writememo-6", err)
 	}
 	return address, nil
 }
