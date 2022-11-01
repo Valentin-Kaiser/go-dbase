@@ -545,17 +545,17 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 		return nil, newError("dbase-io-writememo-2", err)
 	}
 	// Put the block data together
-	block := make([]byte, length+8)
+	data := make([]byte, 8)
 	// The first 4 bytes are the signature, 1 for text, 0 for binary(image)
 	if text {
-		binary.BigEndian.PutUint32(block[:4], 1)
+		binary.BigEndian.PutUint32(data[:4], 1)
 	} else {
-		binary.BigEndian.PutUint32(block[:4], 0)
+		binary.BigEndian.PutUint32(data[:4], 0)
 	}
 	// The next 4 bytes are the length of the data
-	binary.BigEndian.PutUint32(block[4:8], uint32(length))
+	binary.BigEndian.PutUint32(data[4:8], uint32(length))
 	// The rest is the data
-	copy(block[8:], raw)
+	data = append(data, raw...)
 	// Lock the block we are writing to
 	if file.config.WriteLock {
 		o := &windows.Overlapped{
@@ -581,7 +581,7 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 		return nil, newError("dbase-io-writememo-4", err)
 	}
 	// Write the memo data
-	_, err = windows.Write(*file.relatedHandle, block)
+	_, err = windows.Write(*file.relatedHandle, data)
 	if err != nil {
 		return nil, newError("dbase-io-writememo-5", err)
 	}
