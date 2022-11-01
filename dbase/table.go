@@ -259,7 +259,7 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 	}
 	// Write the memo header
 	if file.memoHeader != nil {
-		err = file.writeMemoHeader()
+		err = file.writeMemoHeader(0)
 		if err != nil {
 			return nil, err
 		}

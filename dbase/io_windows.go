@@ -533,28 +533,29 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	if file.relatedHandle == nil {
 		return nil, newError("dbase-io-writememo-1", ErrNoFPT)
 	}
-	if length > int(file.memoHeader.BlockSize-8) {
-		return nil, newError("dbase-io-writememo-2", fmt.Errorf("memo data too large for block size %d", file.memoHeader.BlockSize))
-	}
 	// Get the block position
 	blockPosition := file.memoHeader.NextFree
+	blocks := length / int(file.memoHeader.BlockSize)
+	if length%int(file.memoHeader.BlockSize) > 0 {
+		blocks++
+	}
 	// Write the memo header
-	err := file.writeMemoHeader()
+	err := file.writeMemoHeader(blocks)
 	if err != nil {
 		return nil, newError("dbase-io-writememo-2", err)
 	}
 	// Put the block data together
-	block := make([]byte, file.memoHeader.BlockSize)
+	data := make([]byte, 8)
 	// The first 4 bytes are the signature, 1 for text, 0 for binary(image)
 	if text {
-		binary.BigEndian.PutUint32(block[:4], 1)
+		binary.BigEndian.PutUint32(data[:4], 1)
 	} else {
-		binary.BigEndian.PutUint32(block[:4], 0)
+		binary.BigEndian.PutUint32(data[:4], 0)
 	}
 	// The next 4 bytes are the length of the data
-	binary.BigEndian.PutUint32(block[4:8], uint32(length))
+	binary.BigEndian.PutUint32(data[4:8], uint32(length))
 	// The rest is the data
-	copy(block[8:], raw)
+	data = append(data, raw...)
 	// Lock the block we are writing to
 	if file.config.WriteLock {
 		o := &windows.Overlapped{
@@ -563,12 +564,12 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 		}
 		err = windows.LockFileEx(*file.relatedHandle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
 		if err != nil {
-			return nil, newError("dbase-io-writememo-3", err)
+			return nil, newError("dbase-io-writememo-2", err)
 		}
 		defer func() {
 			ulockErr := windows.UnlockFileEx(*file.relatedHandle, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
 			if err != nil {
-				err = newError("dbase-io-writememoheader-4", ulockErr)
+				err = newError("dbase-io-writememoheader-3", ulockErr)
 			}
 		}()
 	}
@@ -577,23 +578,24 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	// Seek to new the next free block
 	_, err = windows.Seek(*file.relatedHandle, position, 0)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-5", err)
+		return nil, newError("dbase-io-writememo-4", err)
 	}
 	// Write the memo data
-	_, err = windows.Write(*file.relatedHandle, block)
+	_, err = windows.Write(*file.relatedHandle, data)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-6", err)
+		return nil, newError("dbase-io-writememo-5", err)
 	}
 	// Convert the block number to []byte
 	address, err := toBinary(blockPosition)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-7", err)
+		return nil, newError("dbase-io-writememo-6", err)
 	}
 	return address, nil
 }
 
 // writeMemoHeader writes the memo header to the memo file.
-func (file *File) writeMemoHeader() (err error) {
+// Size is the number of blocks the new memo data will take up.
+func (file *File) writeMemoHeader(size int) (err error) {
 	if file.relatedHandle == nil {
 		return newError("dbase-io-writememoheader-1", ErrNoFPT)
 	}
@@ -621,7 +623,7 @@ func (file *File) writeMemoHeader() (err error) {
 		return newError("dbase-io-writememoheader-4", err)
 	}
 	// Calculate the next free block
-	file.memoHeader.NextFree++
+	file.memoHeader.NextFree += uint32(size)
 	// Write the memo header
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint32(buf[:4], file.memoHeader.NextFree)
