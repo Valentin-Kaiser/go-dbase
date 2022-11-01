@@ -539,13 +539,17 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	}
 	// Get the block position
 	blockPosition := file.memoHeader.NextFree
+	blocks := length / int(file.memoHeader.BlockSize)
+	if length%int(file.memoHeader.BlockSize) > 0 {
+		blocks++
+	}
 	// Write the memo header
-	err := file.writeMemoHeader()
+	err := file.writeMemoHeader(blocks)
 	if err != nil {
 		return nil, newError("dbase-io-writememo-2", err)
 	}
 	// Put the block data together
-	block := make([]byte, file.memoHeader.BlockSize)
+	block := make([]byte, length+8)
 	// The first 4 bytes are the signature, 1 for text, 0 for binary(image)
 	if text {
 		binary.BigEndian.PutUint32(block[:4], 1)
@@ -603,7 +607,8 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 }
 
 // writeMemoHeader writes the memo header to the memo file.
-func (file *File) writeMemoHeader() (err error) {
+// Size is the number of blocks the new memo data will take up.
+func (file *File) writeMemoHeader(size int) (err error) {
 	if file.relatedHandle == nil {
 		return newError("dbase-io-writememoheader-1", ErrNoFPT)
 	}
@@ -642,7 +647,7 @@ func (file *File) writeMemoHeader() (err error) {
 		return newError("dbase-io-writememoheader-4", err)
 	}
 	// Calculate the next free block
-	file.memoHeader.NextFree++
+	file.memoHeader.NextFree += uint32(size)
 	// Write the memo header
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint32(buf[:4], file.memoHeader.NextFree)
