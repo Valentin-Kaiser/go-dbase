@@ -99,7 +99,7 @@ go get github.com/Valentin-Kaiser/go-dbase/dbase
 Projects using this package:
 
 - [👻 G(h)oST](https://github.com/Plaenkler/GoST)
-- [🦊 Exporter](https://github.com/Valentin-Kaiser/go-dbase-export)
+- [🦊 Exporter](https://github.com/LaKiS-GbR/go-dbase-export)
 
 ## Examples
 
