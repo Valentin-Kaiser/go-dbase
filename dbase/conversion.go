@@ -32,7 +32,7 @@ func jd2ymd(date int) (int, int, int) {
 
 // parseDate parses a date string from a byte slice and returns a time.Time
 func parseDate(raw []byte) (time.Time, error) {
-	if len(strings.TrimSpace(string(raw))) == 0 {
+	if len(sanitizeString(raw)) == 0 {
 		return time.Time{}, nil
 	}
 	t, err := time.Parse("20060102", string(raw))
@@ -63,7 +63,7 @@ func parseDateTime(raw []byte) (time.Time, error) {
 
 // parseNumericInt parses a string as byte array to int64
 func parseNumericInt(raw []byte) (int64, error) {
-	trimmed := strings.TrimSpace(string(raw))
+	trimmed := strings.TrimSpace(string(sanitizeString(raw)))
 	if len(trimmed) == 0 {
 		return int64(0), nil
 	}
@@ -76,7 +76,7 @@ func parseNumericInt(raw []byte) (int64, error) {
 
 // parseFloat parses a string as byte array to float64
 func parseFloat(raw []byte) (float64, error) {
-	trimmed := strings.TrimSpace(string(raw))
+	trimmed := strings.TrimSpace(string(sanitizeString(raw)))
 	if len(trimmed) == 0 {
 		return float64(0), nil
 	}
@@ -137,6 +137,10 @@ func prependSpaces(raw []byte, length int) []byte {
 		return append(result, raw...)
 	}
 	return raw
+}
+
+func sanitizeString(raw []byte) []byte {
+	return bytes.Replace(raw, []byte{0x00}, []byte{}, -1)
 }
 
 // nthBit returns the nth bit of a byte slice
