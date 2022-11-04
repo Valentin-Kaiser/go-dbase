@@ -3,6 +3,7 @@ package dbase
 import (
 	"bytes"
 	"encoding/binary"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -151,4 +152,17 @@ func nthBit(bytes []byte, n int) bool {
 	byteIndex := n / 8 // byte index
 	bitIndex := n % 8  // bit index
 	return bytes[byteIndex]&(1<<bitIndex) == (1 << bitIndex)
+}
+
+func dynamicCast(v interface{}, t reflect.Type) interface{} {
+	if v == nil {
+		return nil
+	}
+	if reflect.TypeOf(v) == t {
+		return v
+	}
+	if reflect.TypeOf(v).ConvertibleTo(t) {
+		return reflect.ValueOf(v).Convert(t).Interface()
+	}
+	return v
 }

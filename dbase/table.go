@@ -851,6 +851,7 @@ func setStructField(obj interface{}, name string, value interface{}) error {
 		return newError("dbase-table-setstructfield-2", fmt.Errorf("cannot set %s field value", name))
 	}
 	structFieldType := structFieldValue.Type()
+	value = dynamicCast(value, structFieldType)
 	val := reflect.ValueOf(value)
 	if structFieldType != val.Type() {
 		return newError("dbase-table-setstructfield-3", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
