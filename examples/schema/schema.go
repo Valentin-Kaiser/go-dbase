@@ -62,7 +62,7 @@ func main() {
 			if column.DataType == byte(dbase.Date) || column.DataType == byte(dbase.DateTime) {
 				timeImport = true
 			}
-			tableStructSchema += fmt.Sprintf("\t%-12.12s %-12.12s `json:\"%v\"`\n", column.Name(), column.Reflect(), column.Name())
+			tableStructSchema += fmt.Sprintf("\t%-12.12s %-12.12s `dbase:\"%v\"`\n", column.Name(), column.Reflect(), column.Name())
 		}
 		tableStructSchema += "}\n\n"
 		tablesStructs = append(tablesStructs, tableStructSchema)

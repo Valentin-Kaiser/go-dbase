@@ -10,18 +10,18 @@ import (
 )
 
 type Product struct {
-	ID          int32     `json:"PRODUCTID"`
-	Name        string    `json:"PRODNAME"`
-	Price       float64   `json:"PRICE"`
-	Tax         float64   `json:"TAX"`
-	Stock       int64     `json:"STOCK"`
-	Date        time.Time `json:"DATE"`
-	DateTime    time.Time `json:"DATETIME"`
-	Description string    `json:"DESCRIPTION"`
-	Active      bool      `json:"ACTIVE"`
-	Float       float64   `json:"FLOAT"`
-	Integer     int64     `json:"INTEGER"`
-	Double      float64   `json:"DOUBLE"`
+	ID          int32     `dbase:"PRODUCTID"`
+	Name        string    `dbase:"PRODNAME"`
+	Price       float64   `dbase:"PRICE"`
+	Tax         float64   `dbase:"TAX"`
+	Stock       int64     `dbase:"STOCK"`
+	Date        time.Time `dbase:"DATE"`
+	DateTime    time.Time `dbase:"DATETIME"`
+	Description string    `dbase:"DESCRIPTION"`
+	Active      bool      `dbase:"ACTIVE"`
+	Float       float64   `dbase:"FLOAT"`
+	Integer     int32     `dbase:"INTEGER"`
+	Double      float64   `dbase:"DOUBLE"`
 }
 
 func main() {
@@ -114,11 +114,11 @@ func main() {
 
 		// Read the row into a struct.
 		p := &Product{}
-		err = row.ToStruct(p)
+		err = row.Struct(p)
 		if err != nil {
 			panic(dbase.GetErrorTrace(err))
 		}
 
-		fmt.Printf("Product: %v \n", p.Name)
+		fmt.Printf("Product: %+v \n", p)
 	}
 }

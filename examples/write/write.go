@@ -10,18 +10,18 @@ import (
 )
 
 type Product struct {
-	ID          int32     `json:"PRODUCTID"`
-	Name        string    `json:"PRODNAME"`
-	Price       float64   `json:"PRICE"`
-	Tax         float64   `json:"TAX"`
-	Stock       int64     `json:"INSTOCK"`
-	Date        time.Time `json:"DATE"`
-	DateTime    time.Time `json:"DATETIME"`
-	Description string    `json:"DESC"`
-	Active      bool      `json:"ACTIVE"`
-	Float       float64   `json:"FLOAT"`
-	Integer     int64     `json:"INTEGER"`
-	Double      float64   `json:"DOUBLE"`
+	ID          int32     `dbase:"PRODUCTID"`
+	Name        string    `dbase:"PRODNAME"`
+	Price       float64   `dbase:"PRICE"`
+	Tax         float64   `dbase:"TAX"`
+	Stock       int64     `dbase:"INSTOCK"`
+	Date        time.Time `dbase:"DATE"`
+	DateTime    time.Time `dbase:"DATETIME"`
+	Description string    `dbase:"DESC"`
+	Active      bool      `dbase:"ACTIVE"`
+	Float       float64   `dbase:"FLOAT"`
+	Integer     int32     `dbase:"INTEGER"`
+	Double      float64   `dbase:"DOUBLE"`
 }
 
 func main() {
