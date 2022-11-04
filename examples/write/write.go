@@ -13,15 +13,19 @@ type Product struct {
 	ID          int32     `dbase:"PRODUCTID"`
 	Name        string    `dbase:"PRODNAME"`
 	Price       float64   `dbase:"PRICE"`
-	Tax         float64   `dbase:"TAX"`
-	Stock       int64     `dbase:"INSTOCK"`
+	Double      float64   `dbase:"DOUBLE"`
 	Date        time.Time `dbase:"DATE"`
 	DateTime    time.Time `dbase:"DATETIME"`
-	Description string    `dbase:"DESC"`
-	Active      bool      `dbase:"ACTIVE"`
-	Float       float64   `dbase:"FLOAT"`
 	Integer     int32     `dbase:"INTEGER"`
-	Double      float64   `dbase:"DOUBLE"`
+	Float       float64   `dbase:"FLOAT"`
+	Active      bool      `dbase:"ACTIVE"`
+	Description string    `dbase:"DESC"`
+	Tax         float64   `dbase:"TAX"`
+	Stock       int64     `dbase:"INSTOCK"`
+	Blob        []byte    `dbase:"BLOB"`
+	Varbinary   []byte    `dbase:"VARBIN_NIL"`
+	Varchar     string    `dbase:"VAR_NIL"`
+	Var         string    `dbase:"VAR"`
 }
 
 func main() {
