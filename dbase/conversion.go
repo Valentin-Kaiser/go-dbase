@@ -140,7 +140,7 @@ func prependSpaces(raw []byte, length int) []byte {
 }
 
 func sanitizeString(raw []byte) []byte {
-	return bytes.Replace(raw, []byte{0x00}, []byte{}, -1)
+	return bytes.ReplaceAll(raw, []byte{0x00}, []byte{})
 }
 
 // nthBit returns the nth bit of a byte slice
