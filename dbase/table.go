@@ -750,15 +750,50 @@ func (row *Row) ToBytes() ([]byte, error) {
 	}
 	// deleted flag already read
 	offset := uint16(1)
+	varPos := 0
+	nullFlag := make([]byte, 1)
 	for _, field := range row.fields {
 		val, err := row.handle.getRepresentation(field, false)
 		if err != nil {
 			return nil, newError("dbase-table-rowtobytes-1", err)
 		}
+		// Get null and length if variable length field
+		if field.column.DataType == byte(Varbinary) || field.column.DataType == byte(Varchar) {
+			length := len(val)
+			// Not null and not full size
+			if length < int(field.column.Length) && length > 0 {
+				debugf("Variable length field %v is not null and not full size (%v < %v)", field.column.Name(), length, field.column.Length)
+				// Set last byte as length
+				buf := make([]byte, field.column.Length)
+				copy(buf, val)
+				buf[field.column.Length-1] = byte(length)
+				val = buf
+				// Set full size flag
+				byteIndex := varPos / 8
+				bitIndex := varPos % 8
+				nullFlag[byteIndex] = setNthBit(nullFlag[byteIndex], bitIndex)
+			} else if length == 0 { // Null
+				debugf("Variable length field %v is null", field.column.Name())
+				// Set null flag
+				byteIndex := varPos / 8
+				bitIndex := varPos % 8
+				nullFlag[byteIndex] = setNthBit(nullFlag[byteIndex], bitIndex+1)
+			}
+			// Increase variable field in nullFlag position
+			if field.column.Flag == byte(NullableFlag) || field.column.Flag == byte(NullableFlag|BinaryFlag) {
+				varPos += 2
+			} else {
+				varPos++
+			}
+		}
 		copy(data[offset:offset+uint16(field.column.Length)], val)
 		offset += uint16(field.column.Length)
 	}
-
+	// Append null flag column at the end of the row
+	if row.handle.nullFlagColumn != nil {
+		debugf("Appending null flag column at the end of the row => %b", nullFlag)
+		copy(data[offset:offset+uint16(row.handle.nullFlagColumn.Length)], nullFlag)
+	}
 	return data, nil
 }
 
