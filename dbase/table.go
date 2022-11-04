@@ -831,55 +831,9 @@ func (row *Row) Struct(v interface{}) error {
 	return nil
 }
 
-func setStructField(obj interface{}, name string, value interface{}) error {
-	rt := reflect.TypeOf(obj)
-	if rt.Kind() != reflect.Ptr {
-		return newError("dbase-table-setstructfield-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
-	}
-	fieldName, err := getStructFieldByTag(obj, name)
-	if err == nil {
-		debugf("found field %v by tag %v", fieldName, name)
-		name = fieldName
-	}
-	structValue := reflect.ValueOf(obj).Elem()
-	structFieldValue := structValue.FieldByName(name)
-	if !structFieldValue.IsValid() {
-		debugf("no such field: %s in obj", name)
-		return nil
-	}
-	if !structFieldValue.CanSet() {
-		return newError("dbase-table-setstructfield-2", fmt.Errorf("cannot set %s field value", name))
-	}
-	structFieldType := structFieldValue.Type()
-	value = dynamicCast(value, structFieldType)
-	val := reflect.ValueOf(value)
-	if structFieldType != val.Type() {
-		return newError("dbase-table-setstructfield-3", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
-	}
-	structFieldValue.Set(val)
-	return nil
-}
-
-func getStructFieldByTag(obj interface{}, tag string) (string, error) {
-	rt := reflect.TypeOf(obj)
-	if rt.Kind() != reflect.Ptr {
-		return "", newError("dbase-table-getstructfieldbytag-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
-	}
-
-	structValue := reflect.ValueOf(obj).Elem()
-
-	for i := 0; i < structValue.NumField(); i++ {
-		field := structValue.Type().Field(i)
-		if field.Tag.Get("dbase") == tag {
-			return field.Name, nil
-		}
-	}
-	return "", newError("dbase-table-getstructfieldbytag-2", fmt.Errorf("no such field with tag: %s in obj", tag))
-}
-
 /**
  *	################################################################
- *	#					To row Conversions
+ *	#					Row conversions
  *	################################################################
  */
 

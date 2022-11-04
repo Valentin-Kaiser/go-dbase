@@ -3,6 +3,7 @@ package dbase
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -152,6 +153,58 @@ func nthBit(bytes []byte, n int) bool {
 	byteIndex := n / 8 // byte index
 	bitIndex := n % 8  // bit index
 	return bytes[byteIndex]&(1<<bitIndex) == (1 << bitIndex)
+}
+
+/**
+ *	################################################################
+ *	#					Row conversion helper
+ *	################################################################
+ */
+
+func setStructField(obj interface{}, name string, value interface{}) error {
+	rt := reflect.TypeOf(obj)
+	if rt.Kind() != reflect.Ptr {
+		return newError("dbase-conversion-setstructfield-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
+	}
+	fieldName, err := getStructFieldByTag(obj, name)
+	if err == nil {
+		debugf("found field %v by tag %v", fieldName, name)
+		name = fieldName
+	}
+	structValue := reflect.ValueOf(obj).Elem()
+	structFieldValue := structValue.FieldByName(name)
+	if !structFieldValue.IsValid() {
+		debugf("no such field: %s in obj", name)
+		return nil
+	}
+	if !structFieldValue.CanSet() {
+		return newError("dbase-conversion-setstructfield-2", fmt.Errorf("cannot set %s field value", name))
+	}
+	structFieldType := structFieldValue.Type()
+	value = dynamicCast(value, structFieldType)
+	val := reflect.ValueOf(value)
+	if structFieldType != val.Type() {
+		return newError("dbase-conversion-setstructfield-3", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
+	}
+	structFieldValue.Set(val)
+	return nil
+}
+
+func getStructFieldByTag(obj interface{}, tag string) (string, error) {
+	rt := reflect.TypeOf(obj)
+	if rt.Kind() != reflect.Ptr {
+		return "", newError("dbase-conversion-getstructfieldbytag-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
+	}
+
+	structValue := reflect.ValueOf(obj).Elem()
+
+	for i := 0; i < structValue.NumField(); i++ {
+		field := structValue.Type().Field(i)
+		if field.Tag.Get("dbase") == tag {
+			return field.Name, nil
+		}
+	}
+	return "", newError("dbase-conversion-getstructfieldbytag-2", fmt.Errorf("no such field with tag: %s in obj", tag))
 }
 
 func dynamicCast(v interface{}, t reflect.Type) interface{} {
