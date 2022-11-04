@@ -161,6 +161,7 @@ func nthBit(bytes []byte, n int) bool {
  *	################################################################
  */
 
+// setStructField sets the field with the key or dbase tag of name of the struct obj to the given value
 func setStructField(obj interface{}, name string, value interface{}) error {
 	rt := reflect.TypeOf(obj)
 	if rt.Kind() != reflect.Ptr {
@@ -190,14 +191,13 @@ func setStructField(obj interface{}, name string, value interface{}) error {
 	return nil
 }
 
+// getStructFieldByTag returns the field name of the struct obj with the given tag
 func getStructFieldByTag(obj interface{}, tag string) (string, error) {
 	rt := reflect.TypeOf(obj)
 	if rt.Kind() != reflect.Ptr {
 		return "", newError("dbase-conversion-getstructfieldbytag-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
 	}
-
 	structValue := reflect.ValueOf(obj).Elem()
-
 	for i := 0; i < structValue.NumField(); i++ {
 		field := structValue.Type().Field(i)
 		if field.Tag.Get("dbase") == tag {
@@ -207,6 +207,7 @@ func getStructFieldByTag(obj interface{}, tag string) (string, error) {
 	return "", newError("dbase-conversion-getstructfieldbytag-2", fmt.Errorf("no such field with tag: %s in obj", tag))
 }
 
+// dynamicCast casts the given value to the given type if possible
 func dynamicCast(v interface{}, t reflect.Type) interface{} {
 	if v == nil {
 		return nil
