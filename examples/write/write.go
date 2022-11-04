@@ -107,6 +107,7 @@ func main() {
 		Float:       105.67,
 		Integer:     104,
 		Double:      103.45,
+		Varchar:     "VARCHAR",
 	}
 
 	row, err = table.RowFromStruct(p)

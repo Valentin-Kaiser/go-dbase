@@ -437,12 +437,10 @@ func (file *File) readNullFlag(rowPosition uint64, column *Column) (bool, bool, 
 	if n != int(file.nullFlagColumn.Length) {
 		return false, false, newError("dbase-io-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, file.nullFlagColumn.Length))
 	}
-
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
 		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), nthBit(buf, bitCount), nthBit(buf, bitCount+1))
 		return nthBit(buf, bitCount), nthBit(buf, bitCount+1), nil
 	}
-
 	debugf("Read _NullFlag for column %s => varlength: %v ", column.Name(), nthBit(buf, bitCount))
 	return nthBit(buf, bitCount), false, nil
 }

@@ -155,6 +155,11 @@ func nthBit(bytes []byte, n int) bool {
 	return bytes[byteIndex]&(1<<bitIndex) == (1 << bitIndex)
 }
 
+func setNthBit(b byte, n int) byte {
+	b |= 1 << n
+	return b
+}
+
 /**
  *	################################################################
  *	#					Row conversion helper
