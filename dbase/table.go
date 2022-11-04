@@ -813,20 +813,74 @@ func (row *Row) ToJSON() ([]byte, error) {
 	return j, nil
 }
 
-// Parses the row from map to JSON-encoded and from there to a struct and stores the result in the value pointed to by v.
-// Just a convenience function to avoid the intermediate JSON step.
-func (row *Row) ToStruct(v interface{}) error {
+// Converts a row to a struct.
+// The struct must have the same field names as the columns in the table or the dbase tag must be set.
+// The dbase tag can be used to name the field. For example: `dbase:"my_field_name"`
+func (row *Row) Struct(v interface{}) error {
 	debugf("Converting row %v to struct...", row.Position)
-	jsonRow, err := row.ToJSON()
+	m, err := row.ToMap()
 	if err != nil {
 		return newError("dbase-table-tostruct-1", err)
 	}
-	err = json.Unmarshal(jsonRow, v)
-	if err != nil {
-		return newError("dbase-table-tostruct-2", err)
+	for k, val := range m {
+		err := setStructField(v, k, val)
+		if err != nil {
+			return newError("dbase-table-tostruct-2", err)
+		}
 	}
 	return nil
 }
+
+func setStructField(obj interface{}, name string, value interface{}) error {
+	rt := reflect.TypeOf(obj)
+	if rt.Kind() != reflect.Ptr {
+		return newError("dbase-table-setstructfield-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
+	}
+	fieldName, err := getStructFieldByTag(obj, name)
+	if err == nil {
+		debugf("found field %v by tag %v", fieldName, name)
+		name = fieldName
+	}
+	structValue := reflect.ValueOf(obj).Elem()
+	structFieldValue := structValue.FieldByName(name)
+	if !structFieldValue.IsValid() {
+		debugf("no such field: %s in obj", name)
+		return nil
+	}
+	if !structFieldValue.CanSet() {
+		return newError("dbase-table-setstructfield-2", fmt.Errorf("cannot set %s field value", name))
+	}
+	structFieldType := structFieldValue.Type()
+	val := reflect.ValueOf(value)
+	if structFieldType != val.Type() {
+		return newError("dbase-table-setstructfield-3", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
+	}
+	structFieldValue.Set(val)
+	return nil
+}
+
+func getStructFieldByTag(obj interface{}, tag string) (string, error) {
+	rt := reflect.TypeOf(obj)
+	if rt.Kind() != reflect.Ptr {
+		return "", newError("dbase-table-getstructfieldbytag-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
+	}
+
+	structValue := reflect.ValueOf(obj).Elem()
+
+	for i := 0; i < structValue.NumField(); i++ {
+		field := structValue.Type().Field(i)
+		if field.Tag.Get("dbase") == tag {
+			return field.Name, nil
+		}
+	}
+	return "", newError("dbase-table-getstructfieldbytag-2", fmt.Errorf("no such field with tag: %s in obj", tag))
+}
+
+/**
+ *	################################################################
+ *	#					To row Conversions
+ *	################################################################
+ */
 
 // Converts a map of interfaces into the row representation
 func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
@@ -869,15 +923,30 @@ func (file *File) RowFromJSON(j []byte) (*Row, error) {
 }
 
 // Converts a struct into the row representation
+// The struct must have the same field names as the columns in the table or the dbase tag must be set.
+// The dbase tag can be used to name the field. For example: `dbase:"my_field_name"`
 func (file *File) RowFromStruct(v interface{}) (*Row, error) {
 	debugf("Converting struct to row...")
-	j, err := json.Marshal(v)
+	m := make(map[string]interface{})
+	rt := reflect.TypeOf(v)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		tag := field.Tag.Get("dbase")
+		if len(tag) == 0 {
+			tag = field.Name
+		}
+		m[tag] = rv.Field(i).Interface()
+	}
+	row, err := file.RowFromMap(m)
 	if err != nil {
 		return nil, newError("dbase-table-fromstruct-1", err)
-	}
-	row, err := file.RowFromJSON(j)
-	if err != nil {
-		return nil, newError("dbase-table-fromstruct-2", err)
 	}
 	return row, nil
 }
