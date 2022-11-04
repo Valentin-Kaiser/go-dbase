@@ -3,6 +3,8 @@ package dbase
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +34,7 @@ func jd2ymd(date int) (int, int, int) {
 
 // parseDate parses a date string from a byte slice and returns a time.Time
 func parseDate(raw []byte) (time.Time, error) {
-	if len(strings.TrimSpace(string(raw))) == 0 {
+	if len(sanitizeString(raw)) == 0 {
 		return time.Time{}, nil
 	}
 	t, err := time.Parse("20060102", string(raw))
@@ -63,7 +65,7 @@ func parseDateTime(raw []byte) (time.Time, error) {
 
 // parseNumericInt parses a string as byte array to int64
 func parseNumericInt(raw []byte) (int64, error) {
-	trimmed := strings.TrimSpace(string(raw))
+	trimmed := strings.TrimSpace(string(sanitizeString(raw)))
 	if len(trimmed) == 0 {
 		return int64(0), nil
 	}
@@ -76,7 +78,7 @@ func parseNumericInt(raw []byte) (int64, error) {
 
 // parseFloat parses a string as byte array to float64
 func parseFloat(raw []byte) (float64, error) {
-	trimmed := strings.TrimSpace(string(raw))
+	trimmed := strings.TrimSpace(string(sanitizeString(raw)))
 	if len(trimmed) == 0 {
 		return float64(0), nil
 	}
@@ -139,6 +141,10 @@ func prependSpaces(raw []byte, length int) []byte {
 	return raw
 }
 
+func sanitizeString(raw []byte) []byte {
+	return bytes.ReplaceAll(raw, []byte{0x00}, []byte{})
+}
+
 // nthBit returns the nth bit of a byte slice
 func nthBit(bytes []byte, n int) bool {
 	if n > len(bytes)*8 {
@@ -147,4 +153,70 @@ func nthBit(bytes []byte, n int) bool {
 	byteIndex := n / 8 // byte index
 	bitIndex := n % 8  // bit index
 	return bytes[byteIndex]&(1<<bitIndex) == (1 << bitIndex)
+}
+
+/**
+ *	################################################################
+ *	#					Row conversion helper
+ *	################################################################
+ */
+
+// setStructField sets the field with the key or dbase tag of name of the struct obj to the given value
+func setStructField(obj interface{}, name string, value interface{}) error {
+	rt := reflect.TypeOf(obj)
+	if rt.Kind() != reflect.Ptr {
+		return newError("dbase-conversion-setstructfield-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
+	}
+	fieldName, err := getStructFieldByTag(obj, name)
+	if err == nil {
+		debugf("found field %v by tag %v", fieldName, name)
+		name = fieldName
+	}
+	structValue := reflect.ValueOf(obj).Elem()
+	structFieldValue := structValue.FieldByName(name)
+	if !structFieldValue.IsValid() {
+		debugf("no such field: %s in obj", name)
+		return nil
+	}
+	if !structFieldValue.CanSet() {
+		return newError("dbase-conversion-setstructfield-2", fmt.Errorf("cannot set %s field value", name))
+	}
+	structFieldType := structFieldValue.Type()
+	value = dynamicCast(value, structFieldType)
+	val := reflect.ValueOf(value)
+	if structFieldType != val.Type() {
+		return newError("dbase-conversion-setstructfield-3", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
+	}
+	structFieldValue.Set(val)
+	return nil
+}
+
+// getStructFieldByTag returns the field name of the struct obj with the given tag
+func getStructFieldByTag(obj interface{}, tag string) (string, error) {
+	rt := reflect.TypeOf(obj)
+	if rt.Kind() != reflect.Ptr {
+		return "", newError("dbase-conversion-getstructfieldbytag-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
+	}
+	structValue := reflect.ValueOf(obj).Elem()
+	for i := 0; i < structValue.NumField(); i++ {
+		field := structValue.Type().Field(i)
+		if field.Tag.Get("dbase") == tag {
+			return field.Name, nil
+		}
+	}
+	return "", newError("dbase-conversion-getstructfieldbytag-2", fmt.Errorf("no such field with tag: %s in obj", tag))
+}
+
+// dynamicCast casts the given value to the given type if possible
+func dynamicCast(v interface{}, t reflect.Type) interface{} {
+	if v == nil {
+		return nil
+	}
+	if reflect.TypeOf(v) == t {
+		return v
+	}
+	if reflect.TypeOf(v).ConvertibleTo(t) {
+		return reflect.ValueOf(v).Convert(t).Interface()
+	}
+	return v
 }

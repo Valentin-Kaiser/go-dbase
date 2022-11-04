@@ -813,20 +813,29 @@ func (row *Row) ToJSON() ([]byte, error) {
 	return j, nil
 }
 
-// Parses the row from map to JSON-encoded and from there to a struct and stores the result in the value pointed to by v.
-// Just a convenience function to avoid the intermediate JSON step.
-func (row *Row) ToStruct(v interface{}) error {
+// Converts a row to a struct.
+// The struct must have the same field names as the columns in the table or the dbase tag must be set.
+// The dbase tag can be used to name the field. For example: `dbase:"my_field_name"`
+func (row *Row) Struct(v interface{}) error {
 	debugf("Converting row %v to struct...", row.Position)
-	jsonRow, err := row.ToJSON()
+	m, err := row.ToMap()
 	if err != nil {
 		return newError("dbase-table-tostruct-1", err)
 	}
-	err = json.Unmarshal(jsonRow, v)
-	if err != nil {
-		return newError("dbase-table-tostruct-2", err)
+	for k, val := range m {
+		err := setStructField(v, k, val)
+		if err != nil {
+			return newError("dbase-table-tostruct-2", err)
+		}
 	}
 	return nil
 }
+
+/**
+ *	################################################################
+ *	#					Row conversions
+ *	################################################################
+ */
 
 // Converts a map of interfaces into the row representation
 func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
@@ -869,15 +878,30 @@ func (file *File) RowFromJSON(j []byte) (*Row, error) {
 }
 
 // Converts a struct into the row representation
+// The struct must have the same field names as the columns in the table or the dbase tag must be set.
+// The dbase tag can be used to name the field. For example: `dbase:"my_field_name"`
 func (file *File) RowFromStruct(v interface{}) (*Row, error) {
 	debugf("Converting struct to row...")
-	j, err := json.Marshal(v)
+	m := make(map[string]interface{})
+	rt := reflect.TypeOf(v)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		tag := field.Tag.Get("dbase")
+		if len(tag) == 0 {
+			tag = field.Name
+		}
+		m[tag] = rv.Field(i).Interface()
+	}
+	row, err := file.RowFromMap(m)
 	if err != nil {
 		return nil, newError("dbase-table-fromstruct-1", err)
-	}
-	row, err := file.RowFromJSON(j)
-	if err != nil {
-		return nil, newError("dbase-table-fromstruct-2", err)
 	}
 	return row, nil
 }
