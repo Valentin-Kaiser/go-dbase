@@ -910,7 +910,10 @@ func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
 		}
 		row.fields[i] = field
 	}
-	row.Increment()
+	err := row.Increment()
+	if err != nil {
+		return nil, newError("dbase-file-rowfrommap-1", err)
+	}
 	return row, nil
 }
 
