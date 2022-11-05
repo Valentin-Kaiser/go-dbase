@@ -621,7 +621,9 @@ func (row *Row) Write() error {
 	return row.writeRow()
 }
 
-// Increments the autoincrement field
+// Increment increases set the value of the auto increment Column to the Next value
+// Also increases the Next value by the amount of Step
+// Rewrites the columns header
 func (row *Row) Increment() error {
 	for _, field := range row.fields {
 		if field.column.Flag == byte(AutoincrementFlag) {
