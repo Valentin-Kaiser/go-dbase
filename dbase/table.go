@@ -622,14 +622,19 @@ func (row *Row) Write() error {
 }
 
 // Increments the autoincrement field
-func (row *Row) Increment() {
+func (row *Row) Increment() error {
 	for _, field := range row.fields {
 		if field.column.Flag == byte(AutoincrementFlag) {
-			field.value = field.value.(int32) + int32(field.column.Next)
+			field.value = int32(field.column.Next)
 			field.column.Next += uint32(field.column.Step)
 			debugf("Incrementing autoincrement field %s to %v (Step: %v)", field.column.Name(), field.value, field.column.Step)
 		}
 	}
+	err := row.handle.writeColumns()
+	if err != nil {
+		return newError("dbase-table-row-increment-1", err)
+	}
+	return nil
 }
 
 // Increments the pointer s row to the end of the file
