@@ -28,7 +28,7 @@ type Error struct {
 
 // newError creates a new Error
 func newError(context string, err error) Error {
-	errorf("%s:%s", context, err.Error())
+	errorf("%s:%s", context, GetErrorTrace(err))
 	if err != nil {
 		var dbaseError Error
 		if errors.As(err, &dbaseError) {
