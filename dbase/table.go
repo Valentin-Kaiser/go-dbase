@@ -621,6 +621,17 @@ func (row *Row) Write() error {
 	return row.writeRow()
 }
 
+// Increments the autoincrement field
+func (row *Row) Increment() {
+	for _, field := range row.fields {
+		if field.column.Flag == byte(AutoincrementFlag) {
+			field.value = field.value.(int32) + int32(field.column.Next)
+			field.column.Next += uint32(field.column.Step)
+			debugf("Incrementing autoincrement field %s to %v (Step: %v)", field.column.Name(), field.value, field.column.Step)
+		}
+	}
+}
+
 // Increments the pointer s row to the end of the file
 func (row *Row) Add() error {
 	row.Position = row.handle.header.RowsCount + 1
@@ -894,6 +905,7 @@ func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
 		}
 		row.fields[i] = field
 	}
+	row.Increment()
 	return row, nil
 }
 
