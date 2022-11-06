@@ -639,7 +639,7 @@ func (row *Row) Increment() error {
 	return nil
 }
 
-// Increments the pointer s row to the end of the file
+// Appends the row as a new entry to the file
 func (row *Row) Add() error {
 	row.Position = row.handle.header.RowsCount + 1
 	return row.Write()
