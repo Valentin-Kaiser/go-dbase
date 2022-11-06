@@ -117,7 +117,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		err = os.WriteFile(fmt.Sprintf("%v%v.json", exportPath, t.Name), b, 0644)
+		err = os.WriteFile(fmt.Sprintf("%v%v.json", exportPath, t.Name), b, 0600)
 		if err != nil {
 			panic(err)
 		}
