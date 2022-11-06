@@ -393,7 +393,7 @@ func (file *File) writeColumns() (err error) {
 		return newError("dbase-io-writecolumns-7", err)
 	}
 	// Write null till the end of the header
-	pos := file.header.FirstRow - uint16(len(file.table.columns)*32) - 32
+	pos := file.header.FirstRow - uint16(len(file.table.columns)*32) - 33
 	if file.nullFlagColumn != nil {
 		pos -= 32
 	}

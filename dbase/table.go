@@ -621,6 +621,24 @@ func (row *Row) Write() error {
 	return row.writeRow()
 }
 
+// Increment increases set the value of the auto increment Column to the Next value
+// Also increases the Next value by the amount of Step
+// Rewrites the columns header
+func (row *Row) Increment() error {
+	for _, field := range row.fields {
+		if field.column.Flag == byte(AutoincrementFlag) {
+			field.value = int32(field.column.Next)
+			field.column.Next += uint32(field.column.Step)
+			debugf("Incrementing autoincrement field %s to %v (Step: %v)", field.column.Name(), field.value, field.column.Step)
+		}
+	}
+	err := row.handle.writeColumns()
+	if err != nil {
+		return newError("dbase-table-row-increment-1", err)
+	}
+	return nil
+}
+
 // Increments the pointer s row to the end of the file
 func (row *Row) Add() error {
 	row.Position = row.handle.header.RowsCount + 1
@@ -893,6 +911,10 @@ func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
 			field.value = val
 		}
 		row.fields[i] = field
+	}
+	err := row.Increment()
+	if err != nil {
+		return nil, newError("dbase-file-rowfrommap-1", err)
 	}
 	return row, nil
 }
