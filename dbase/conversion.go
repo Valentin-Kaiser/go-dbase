@@ -34,7 +34,8 @@ func jd2ymd(date int) (int, int, int) {
 
 // parseDate parses a date string from a byte slice and returns a time.Time
 func parseDate(raw []byte) (time.Time, error) {
-	if len(sanitizeString(raw)) == 0 {
+	raw = sanitizeString(raw)
+	if len(raw) == 0 {
 		return time.Time{}, nil
 	}
 	t, err := time.Parse("20060102", string(raw))
@@ -46,6 +47,7 @@ func parseDate(raw []byte) (time.Time, error) {
 
 // parseDateTIme parses a date and time string from a byte slice and returns a time.Time
 func parseDateTime(raw []byte) (time.Time, error) {
+	raw = sanitizeString(raw)
 	if len(raw) != 8 {
 		return time.Time{}, newError("dbase-conversion-parsedate-1", ErrInvalidPosition)
 	}
@@ -65,7 +67,7 @@ func parseDateTime(raw []byte) (time.Time, error) {
 
 // parseNumericInt parses a string as byte array to int64
 func parseNumericInt(raw []byte) (int64, error) {
-	trimmed := strings.TrimSpace(string(sanitizeString(raw)))
+	trimmed := string(sanitizeString(raw))
 	if len(trimmed) == 0 {
 		return int64(0), nil
 	}
