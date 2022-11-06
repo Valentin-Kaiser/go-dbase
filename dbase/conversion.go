@@ -49,7 +49,7 @@ func parseDate(raw []byte) (time.Time, error) {
 func parseDateTime(raw []byte) (time.Time, error) {
 	raw = sanitizeString(raw)
 	if len(raw) != 8 {
-		return time.Time{}, newError("dbase-conversion-parsedate-1", ErrInvalidPosition)
+		return time.Time{}, nil
 	}
 	julDat := int(binary.LittleEndian.Uint32(raw[:4]))
 	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
