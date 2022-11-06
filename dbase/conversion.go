@@ -46,23 +46,23 @@ func parseDate(raw []byte) (time.Time, error) {
 }
 
 // parseDateTIme parses a date and time string from a byte slice and returns a time.Time
-func parseDateTime(raw []byte) (time.Time, error) {
+func parseDateTime(raw []byte) time.Time {
 	raw = sanitizeString(raw)
 	if len(raw) != 8 {
-		return time.Time{}, nil
+		return time.Time{}
 	}
 	julDat := int(binary.LittleEndian.Uint32(raw[:4]))
 	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
 	// Determine year, month, day
 	y, m, d := jd2ymd(julDat)
 	if y < 0 || y > 9999 {
-		return time.Time{}, nil
+		return time.Time{}
 	}
 	// Calculate whole seconds and use the remainder as nanosecond resolution
 	nSec := mSec / 1000
 	mSec -= (nSec * 1000)
 	// Create time using ymd and nanosecond timestamp
-	return time.Date(y, time.Month(m), d, 0, 0, nSec, mSec*int(time.Millisecond), time.UTC), nil
+	return time.Date(y, time.Month(m), d, 0, 0, nSec, mSec*int(time.Millisecond), time.UTC)
 }
 
 // parseNumericInt parses a string as byte array to int64
@@ -171,49 +171,40 @@ func setNthBit(b byte, n int) byte {
  */
 
 // setStructField sets the field with the key or dbase tag of name of the struct obj to the given value
-func setStructField(obj interface{}, name string, value interface{}) error {
-	rt := reflect.TypeOf(obj)
-	if rt.Kind() != reflect.Ptr {
-		return newError("dbase-conversion-setstructfield-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
-	}
-	fieldName, err := getStructFieldByTag(obj, name)
-	if err == nil {
-		debugf("found field %v by tag %v", fieldName, name)
+func setStructField(tags map[string]string, obj interface{}, name string, value interface{}) error {
+	if fieldName, ok := tags[name]; ok {
 		name = fieldName
 	}
 	structValue := reflect.ValueOf(obj).Elem()
 	structFieldValue := structValue.FieldByName(name)
 	if !structFieldValue.IsValid() {
-		debugf("no such field: %s in obj", name)
 		return nil
 	}
 	if !structFieldValue.CanSet() {
-		return newError("dbase-conversion-setstructfield-2", fmt.Errorf("cannot set %s field value", name))
+		return newError("dbase-conversion-setstructfield-1", fmt.Errorf("cannot set %s field value", name))
 	}
 	structFieldType := structFieldValue.Type()
 	value = dynamicCast(value, structFieldType)
 	val := reflect.ValueOf(value)
 	if structFieldType != val.Type() {
-		return newError("dbase-conversion-setstructfield-3", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
+		return newError("dbase-conversion-setstructfield-2", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
 	}
 	structFieldValue.Set(val)
 	return nil
 }
 
-// getStructFieldByTag returns the field name of the struct obj with the given tag
-func getStructFieldByTag(obj interface{}, tag string) (string, error) {
-	rt := reflect.TypeOf(obj)
-	if rt.Kind() != reflect.Ptr {
-		return "", newError("dbase-conversion-getstructfieldbytag-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
-	}
-	structValue := reflect.ValueOf(obj).Elem()
+// structTags extracts the dbase tag from the struct fields
+func structTags(v interface{}) map[string]string {
+	tags := make(map[string]string)
+	structValue := reflect.ValueOf(v).Elem()
 	for i := 0; i < structValue.NumField(); i++ {
 		field := structValue.Type().Field(i)
-		if field.Tag.Get("dbase") == tag {
-			return field.Name, nil
+		tag := field.Tag.Get("dbase")
+		if len(tag) > 0 {
+			tags[tag] = field.Name
 		}
 	}
-	return "", newError("dbase-conversion-getstructfieldbytag-2", fmt.Errorf("no such field with tag: %s in obj", tag))
+	return tags
 }
 
 // dynamicCast casts the given value to the given type if possible

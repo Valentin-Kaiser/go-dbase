@@ -869,14 +869,19 @@ func (row *Row) ToJSON() ([]byte, error) {
 // Converts a row to a struct.
 // The struct must have the same field names as the columns in the table or the dbase tag must be set.
 // The dbase tag can be used to name the field. For example: `dbase:"my_field_name"`
-func (row *Row) Struct(v interface{}) error {
+func (row *Row) ToStruct(v interface{}) error {
+	rt := reflect.TypeOf(v)
+	if rt.Kind() != reflect.Ptr {
+		return newError("dbase-table-struct-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
+	}
 	debugf("Converting row %v to struct...", row.Position)
 	m, err := row.ToMap()
 	if err != nil {
-		return newError("dbase-table-tostruct-1", err)
+		return newError("dbase-table-struct-2", err)
 	}
+	tags := structTags(v)
 	for k, val := range m {
-		err := setStructField(v, k, val)
+		err := setStructField(tags, v, k, val)
 		if err != nil {
 			return newError("dbase-table-tostruct-2", err)
 		}

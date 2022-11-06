@@ -118,7 +118,7 @@ func main() {
 
 		// Read the row into a struct.
 		p := &Product{}
-		err = row.Struct(p)
+		err = row.ToStruct(p)
 		if err != nil {
 			panic(dbase.GetErrorTrace(err))
 		}

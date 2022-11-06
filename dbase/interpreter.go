@@ -59,7 +59,7 @@ func (file *File) interpret(raw []byte, column *Column) (interface{}, error) {
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
-		return file.parseDateTime(raw, column)
+		return file.parseDateTime(raw)
 	case Logical:
 		// L values are stored as strings T or F, we only check for T, the rest is false...
 		return file.parseLogical(raw)
@@ -366,12 +366,8 @@ func (file *File) getDateRepresentation(field *Field) ([]byte, error) {
 }
 
 // Returns the value as time.Time
-func (file *File) parseDateTime(raw []byte, column *Column) (interface{}, error) {
-	dateTime, err := parseDateTime(raw)
-	if err != nil {
-		return dateTime, newError("dbase-interpreter-parsedatetime-1", fmt.Errorf("parsing date time at column field: %v failed with error: %w", column.Name(), err))
-	}
-	return dateTime, nil
+func (file *File) parseDateTime(raw []byte) (interface{}, error) {
+	return parseDateTime(raw), nil
 }
 
 // Get the time.Time value as byte representation consisting of 4 bytes for julian date and 4 bytes for time
