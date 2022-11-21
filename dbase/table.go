@@ -13,6 +13,21 @@ import (
 	"time"
 )
 
+// Configures the file you want to open.
+// The filename is mandatory. The other fields are optional and are false by default.
+// If Converter and InterpretCodePage are both not set the package will try to interpret the code page mark.
+// To open untested files set Untested to true. Tested files are defined in the constants.go file.
+type Config struct {
+	Filename          string            // The filename of the DBF file.
+	Converter         EncodingConverter // The encoding converter to use.
+	Exclusive         bool              // If true the file is opened in exclusive mode.
+	Untested          bool              // If true the file version is not checked.
+	TrimSpaces        bool              // Trimspaces default value
+	WriteLock         bool              // Whether or not the write operations should lock the record
+	ValidateCodePage  bool              // Whether or not the code page mark should be validated.
+	InterpretCodePage bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.
+}
+
 // Containing DBF header information like dBase FileType, last change and rows count.
 // https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80)#table-header-record-structure
 type Header struct {

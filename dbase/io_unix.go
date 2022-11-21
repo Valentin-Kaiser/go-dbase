@@ -18,17 +18,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type Config struct {
-	Filename          string            // The filename of the DBF file.
-	Converter         EncodingConverter // The encoding converter to use.
-	Exclusive         bool              // If true the file is opened in exclusive mode.
-	Untested          bool              // If true the file version is not checked.
-	TrimSpaces        bool              // Trimspaces default value
-	WriteLock         bool              // Whether or not the write operations should lock the record
-	ValidateCodePage  bool              // Whether or not the code page mark should be validated.
-	InterpretCodePage bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.
-}
-
 // DBF is the main struct to handle a dBase file.
 type File struct {
 	config         *Config     // The config used when working with the DBF file.
@@ -50,7 +39,7 @@ type File struct {
 
 // Opens a dBase database file (and the memo file if needed) from disk.
 // To close the embedded file handle(s) call DBF.Close().
-func OpenTable(config *Config) (*File, error) {
+func _openTable(config *Config) (*File, error) {
 	if config == nil {
 		return nil, newError("dbase-io-opentable-1", fmt.Errorf("missing configuration"))
 	}
@@ -60,7 +49,7 @@ func OpenTable(config *Config) (*File, error) {
 	}
 	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
 	fileName := filepath.Clean(config.Filename)
-	fileName, err := findFile(fileName)
+	fileName, err := _findFile(fileName)
 	if err != nil {
 		return nil, newError("dbase-io-opentable-3", err)
 	}
@@ -72,7 +61,7 @@ func OpenTable(config *Config) (*File, error) {
 	if err != nil {
 		return nil, newError("dbase-io-opentable-4", fmt.Errorf("opening file failed with error: %w", err))
 	}
-	file, err := prepareFile(handle, config)
+	file, err := _prepareFile(handle, config)
 	if err != nil {
 		return nil, newError("dbase-io-opentable-5", err)
 	}
@@ -104,7 +93,7 @@ func OpenTable(config *Config) (*File, error) {
 		if err != nil {
 			return nil, newError("dbase-io-opentable-7", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
-		err = file.readMemoHeader(relatedHandle)
+		err = file._readMemoHeader(relatedHandle)
 		if err != nil {
 			return nil, newError("dbase-io-opentable-8", err)
 		}
@@ -114,7 +103,7 @@ func OpenTable(config *Config) (*File, error) {
 }
 
 // Closes the file handlers.
-func (file *File) Close() error {
+func (file *File) _close() error {
 	if file.handle != nil {
 		debugf("Closing file: %s", file.config.Filename)
 		err := file.handle.Close()
@@ -138,7 +127,7 @@ func (file *File) Close() error {
  *	################################################################
  */
 
-func create(file *File) (*File, error) {
+func _create(file *File) (*File, error) {
 	file.config.Filename = strings.ToUpper(strings.TrimSpace(file.config.Filename))
 	// Check for valid file name
 	if len(file.config.Filename) == 0 {
@@ -173,8 +162,8 @@ func create(file *File) (*File, error) {
 
 // Returns a DBF object pointer
 // Reads the DBF Header, the column infos and validates file version.
-func prepareFile(handle *os.File, config *Config) (*File, error) {
-	header, err := readHeader(handle)
+func _prepareFile(handle *os.File, config *Config) (*File, error) {
+	header, err := _readHeader(handle)
 	if err != nil {
 		return nil, newError("dbase-io-preparedbf-1", err)
 	}
@@ -182,7 +171,7 @@ func prepareFile(handle *os.File, config *Config) (*File, error) {
 	if err := validateFileVersion(header.FileType, config.Untested); err != nil {
 		return nil, newError("dbase-io-preparedbf-2", err)
 	}
-	columns, nullFlag, err := readColumns(handle)
+	columns, nullFlag, err := _readColumns(handle)
 	if err != nil {
 		return nil, newError("dbase-io-preparedbf-3", err)
 	}
@@ -202,7 +191,7 @@ func prepareFile(handle *os.File, config *Config) (*File, error) {
 }
 
 // Reads the DBF header from the file handle.
-func readHeader(handle *os.File) (*Header, error) {
+func _readHeader(handle *os.File) (*Header, error) {
 	debugf("Reading header...")
 	h := &Header{}
 	if _, err := handle.Seek(0, 0); err != nil {
@@ -222,7 +211,7 @@ func readHeader(handle *os.File) (*Header, error) {
 }
 
 // writeHeader writes the header to the dbase file
-func (file *File) writeHeader() (err error) {
+func (file *File) _writeHeader() (err error) {
 	debugf("Writing header - exclusive writing: %v", file.config.WriteLock)
 	// Lock the block we are writing to
 	if file.config.WriteLock {
@@ -274,7 +263,7 @@ func (file *File) writeHeader() (err error) {
 }
 
 // Check if the file version is supported
-func validateFileVersion(version byte, untested bool) error {
+func _validateFileVersion(version byte, untested bool) error {
 	if untested {
 		return nil
 	}
@@ -288,7 +277,7 @@ func validateFileVersion(version byte, untested bool) error {
 }
 
 // Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
-func readColumns(handle *os.File) ([]*Column, *Column, error) {
+func _readColumns(handle *os.File) ([]*Column, *Column, error) {
 	debugf("Reading columns...")
 	var nullFlag *Column
 	columns := make([]*Column, 0)
@@ -332,7 +321,7 @@ func readColumns(handle *os.File) ([]*Column, *Column, error) {
 	return columns, nullFlag, nil
 }
 
-func (file *File) writeColumns() (err error) {
+func (file *File) _writeColumns() (err error) {
 	debugf("Writing columns - exclusive writing: %v", file.config.WriteLock)
 	// Lock the block we are writing to
 	position := uint32(32)
@@ -409,7 +398,7 @@ func (file *File) writeColumns() (err error) {
 // If varlength is true, the field is variable length and the length is stored in the last byte
 // If varlength is false, we read the complete field
 // If the field is null, we return true as second return value
-func (file *File) readNullFlag(rowPosition uint64, column *Column) (bool, bool, error) {
+func (file *File) _readNullFlag(rowPosition uint64, column *Column) (bool, bool, error) {
 	if file.nullFlagColumn == nil {
 		return false, false, fmt.Errorf("null flag column missing")
 	}
@@ -461,7 +450,7 @@ func (file *File) readNullFlag(rowPosition uint64, column *Column) (bool, bool, 
  */
 
 // readMemoHeader reads the memo header from the given file handle.
-func (file *File) readMemoHeader(relatedHandle *os.File) error {
+func (file *File) _readMemoHeader(relatedHandle *os.File) error {
 	debugf("Reading memo header...")
 	h := &MemoHeader{}
 	if _, err := relatedHandle.Seek(0, 0); err != nil {
@@ -484,7 +473,7 @@ func (file *File) readMemoHeader(relatedHandle *os.File) error {
 
 // Reads one or more blocks from the FPT file, called for each memo column.
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
-func (file *File) readMemo(blockdata []byte) ([]byte, bool, error) {
+func (file *File) _readMemo(blockdata []byte) ([]byte, bool, error) {
 	if file.relatedHandle == nil {
 		return nil, false, newError("dbase-io-readmemo-1", ErrNoFPT)
 	}
@@ -531,7 +520,7 @@ func (file *File) readMemo(blockdata []byte) ([]byte, bool, error) {
 }
 
 // writeMemo writes a memo to the memo file and returns the address of the memo.
-func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
+func (file *File) _writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()
 	if file.relatedHandle == nil {
@@ -544,7 +533,7 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 		blocks++
 	}
 	// Write the memo header
-	err := file.writeMemoHeader(blocks)
+	err := file._writeMemoHeader(blocks)
 	if err != nil {
 		return nil, newError("dbase-io-writememo-2", err)
 	}
@@ -608,7 +597,7 @@ func (file *File) writeMemo(raw []byte, text bool, length int) ([]byte, error) {
 
 // writeMemoHeader writes the memo header to the memo file.
 // Size is the number of blocks the new memo data will take up.
-func (file *File) writeMemoHeader(size int) (err error) {
+func (file *File) _writeMemoHeader(size int) (err error) {
 	if file.relatedHandle == nil {
 		return newError("dbase-io-writememoheader-1", ErrNoFPT)
 	}
@@ -672,7 +661,7 @@ func (file *File) writeMemoHeader(size int) (err error) {
  */
 
 // Reads raw row data of one row at rowPosition
-func (file *File) readRow(rowPosition uint32) ([]byte, error) {
+func (file *File) _readRow(rowPosition uint32) ([]byte, error) {
 	if rowPosition >= file.header.RowsCount {
 		return nil, newError("dbase-io-readrow-1", ErrEOF)
 	}
@@ -694,7 +683,7 @@ func (file *File) readRow(rowPosition uint32) ([]byte, error) {
 }
 
 // writeRow writes raw row data to the given row position
-func (row *Row) writeRow() (err error) {
+func (row *Row) _writeRow() (err error) {
 	debugf("Writing row: %d ...", row.Position)
 	row.handle.dbaseMutex.Lock()
 	defer row.handle.dbaseMutex.Unlock()
@@ -709,7 +698,7 @@ func (row *Row) writeRow() (err error) {
 		position = int64(row.handle.header.FirstRow) + (int64(row.Position-1) * int64(row.handle.header.RowLength))
 		row.handle.header.RowsCount++
 	}
-	err = row.handle.writeHeader()
+	err = row.handle._writeHeader()
 	if err != nil {
 		return newError("dbase-io-writerow-2", err)
 	}
@@ -762,7 +751,7 @@ func (row *Row) writeRow() (err error) {
  */
 
 // Search searches for a row with the given value in the given field
-func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
+func (file *File) _search(field *Field, exactMatch bool) ([]*Row, error) {
 	if field.column.DataType == 'M' {
 		return nil, newError("dbase-io-search-1", fmt.Errorf("searching memo fields is not supported"))
 	}
@@ -817,7 +806,7 @@ func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
 
 // GoTo sets the internal row pointer to row rowNumber
 // Returns and EOF error if at EOF and positions the pointer at lastRow+1
-func (file *File) GoTo(rowNumber uint32) error {
+func (file *File) _goTo(rowNumber uint32) error {
 	if rowNumber > file.header.RowsCount {
 		file.table.rowPointer = file.header.RowsCount
 		return newError("dbase-io-goto-1", fmt.Errorf("%w, go to %v > %v", ErrEOF, rowNumber, file.header.RowsCount))
@@ -831,7 +820,7 @@ func (file *File) GoTo(rowNumber uint32) error {
 // If at end of file positions the pointer at lastRow+1
 // If the row pointer would be become negative positions the pointer at 0
 // Does not skip deleted rows
-func (file *File) Skip(offset int64) {
+func (file *File) _skip(offset int64) {
 	newval := int64(file.table.rowPointer) + offset
 	if newval >= int64(file.header.RowsCount) {
 		file.table.rowPointer = file.header.RowsCount
@@ -844,13 +833,13 @@ func (file *File) Skip(offset int64) {
 }
 
 // Whether or not the write operations should lock the record
-func (file *File) WriteLock(enabled bool) {
+func (file *File) _writeLock(enabled bool) {
 	debugf("Setting write lock to: %v", enabled)
 	file.config.WriteLock = enabled
 }
 
 // Returns if the row at internal row pointer is deleted
-func (file *File) Deleted() (bool, error) {
+func (file *File) _deleted() (bool, error) {
 	if file.table.rowPointer >= file.header.RowsCount {
 		return false, newError("dbase-io-deleted-1", ErrEOF)
 	}
@@ -869,7 +858,7 @@ func (file *File) Deleted() (bool, error) {
 	return buf[0] == byte(Deleted), nil
 }
 
-func findFile(name string) (string, error) {
+func _findFile(name string) (string, error) {
 	debugf("Searching for file: %s", name)
 	// Read all files in the directory
 	files, err := os.ReadDir(filepath.Dir(name))
