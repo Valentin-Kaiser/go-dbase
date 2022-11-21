@@ -168,7 +168,7 @@ func _prepareFile(handle *os.File, config *Config) (*File, error) {
 		return nil, newError("dbase-io-preparedbf-1", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(header.FileType, config.Untested); err != nil {
+	if err := _validateFileVersion(header.FileType, config.Untested); err != nil {
 		return nil, newError("dbase-io-preparedbf-2", err)
 	}
 	columns, nullFlag, err := _readColumns(handle)
