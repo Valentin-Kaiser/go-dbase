@@ -201,6 +201,16 @@ func (file *File) Deleted() (bool, error) {
 	return file.io.Deleted(file)
 }
 
+// Returns the used IO implementation
+func (file *File) GetIO() IO {
+	return file.io
+}
+
+// Returns the used file handle (DBF,FPT)
+func (file *File) GetHandle() (interface{}, interface{}) {
+	return file.handle, file.relatedHandle
+}
+
 // Check if the file version is tested
 func ValidateFileVersion(version byte, untested bool) error {
 	if untested {
