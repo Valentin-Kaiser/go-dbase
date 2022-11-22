@@ -20,16 +20,9 @@ import (
 
 var defaultIO UnixIO
 
+// UnixIO implements the IO interface for unix systems.
 type UnixIO struct{}
 
-/**
- *	################################################################
- *	#					IO Functions
- *	################################################################
- */
-
-// Opens a dBase database file (and the memo file if needed) from disk.
-// To close the embedded file handle(s) call DBF.Close().
 func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	if config == nil {
 		return nil, newError("dbase-io-unix-opentable-1", fmt.Errorf("missing configuration"))
@@ -59,15 +52,15 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 		dbaseMutex: &sync.Mutex{},
 		memoMutex:  &sync.Mutex{},
 	}
-	err = u.ReadHeader(file)
+	err = file.ReadHeader()
 	if err != nil {
 		return nil, newError("dbase-io-unix-preparedbf-1", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(file.header.FileType, config.Untested); err != nil {
+	if err := ValidateFileVersion(file.header.FileType, config.Untested); err != nil {
 		return nil, newError("dbase-io-unix-preparedbf-2", err)
 	}
-	columns, nullFlag, err := u.ReadColumns(file)
+	columns, nullFlag, err := file.ReadColumns()
 	if err != nil {
 		return nil, newError("dbase-io-unix-preparedbf-3", err)
 	}
@@ -112,7 +105,6 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	return file, nil
 }
 
-// Closes the file handlers.
 func (u UnixIO) Close(file *File) error {
 	if file.handle != nil {
 		handle, ok := file.handle.(*os.File)
@@ -140,12 +132,6 @@ func (u UnixIO) Close(file *File) error {
 	}
 	return nil
 }
-
-/**
- *	################################################################
- *	#				dBase database file IO handler
- *	################################################################
- */
 
 func (u UnixIO) Create(file *File) error {
 	file.config.Filename = strings.ToUpper(strings.TrimSpace(file.config.Filename))
@@ -180,7 +166,6 @@ func (u UnixIO) Create(file *File) error {
 	return nil
 }
 
-// Reads the DBF header from the file handle.
 func (u UnixIO) ReadHeader(file *File) error {
 	debugf("Reading header...")
 	handle, ok := file.handle.(*os.File)
@@ -205,7 +190,6 @@ func (u UnixIO) ReadHeader(file *File) error {
 	return nil
 }
 
-// writeHeader writes the header to the dbase file
 func (u UnixIO) WriteHeader(file *File) (err error) {
 	debugf("Writing header - exclusive writing: %v", file.config.WriteLock)
 	handle, ok := file.handle.(*os.File)
@@ -261,7 +245,6 @@ func (u UnixIO) WriteHeader(file *File) (err error) {
 	return nil
 }
 
-// Reads column infos from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
 func (u UnixIO) ReadColumns(file *File) ([]*Column, *Column, error) {
 	debugf("Reading columns...")
 	handle, ok := file.handle.(*os.File)
@@ -386,11 +369,6 @@ func (u UnixIO) WriteColumns(file *File) (err error) {
 	return nil
 }
 
-// Read the nullFlag field at the end of the row
-// The nullFlag field indicates if the field has a variable length
-// If varlength is true, the field is variable length and the length is stored in the last byte
-// If varlength is false, we read the complete field
-// If the field is null, we return true as second return value
 func (u UnixIO) ReadNullFlag(file *File, rowPosition uint64, column *Column) (bool, bool, error) {
 	handle, ok := file.handle.(*os.File)
 	if !ok {
@@ -440,13 +418,6 @@ func (u UnixIO) ReadNullFlag(file *File, rowPosition uint64, column *Column) (bo
 	return nthBit(buf, bitCount), false, nil
 }
 
-/**
- *	################################################################
- *	#				Memo file IO handler
- *	################################################################
- */
-
-// readMemoHeader reads the memo header from the given file handle.
 func (u UnixIO) ReadMemoHeader(file *File) error {
 	debugf("Reading memo header...")
 	relatedHandle, ok := file.relatedHandle.(*os.File)
@@ -472,8 +443,6 @@ func (u UnixIO) ReadMemoHeader(file *File) error {
 	return nil
 }
 
-// Reads one or more blocks from the FPT file, called for each memo column.
-// the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (u UnixIO) ReadMemo(file *File, blockdata []byte) ([]byte, bool, error) {
 	if file.relatedHandle == nil {
 		return nil, false, newError("dbase-io-unix-readmemo-1", ErrNoFPT)
@@ -524,7 +493,6 @@ func (u UnixIO) ReadMemo(file *File, blockdata []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
-// writeMemo writes a memo to the memo file and returns the address of the memo.
 func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte, error) {
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()
@@ -604,8 +572,6 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 	return address, nil
 }
 
-// writeMemoHeader writes the memo header to the memo file.
-// Size is the number of blocks the new memo data will take up.
 func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
 	if file.relatedHandle == nil {
 		return newError("dbase-io-unix-writememoheader-1", ErrNoFPT)
@@ -667,13 +633,6 @@ func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
 	return nil
 }
 
-/**
- *	################################################################
- *	#				Row and Field IO handler
- *	################################################################
- */
-
-// Reads raw row data of one row at rowPosition
 func (u UnixIO) ReadRow(file *File, position uint32) ([]byte, error) {
 	handle, ok := file.handle.(*os.File)
 	if !ok {
@@ -699,7 +658,6 @@ func (u UnixIO) ReadRow(file *File, position uint32) ([]byte, error) {
 	return buf, nil
 }
 
-// writeRow writes raw row data to the given row position
 func (u UnixIO) WriteRow(file *File, row *Row) (err error) {
 	debugf("Writing row: %d ...", row.Position)
 	row.handle.dbaseMutex.Lock()
@@ -765,13 +723,6 @@ func (u UnixIO) WriteRow(file *File, row *Row) (err error) {
 	return nil
 }
 
-/**
- *	################################################################
- *	#						Search
- *	################################################################
- */
-
-// Search searches for a row with the given value in the given field
 func (u UnixIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, error) {
 	if field.column.DataType == 'M' {
 		return nil, newError("dbase-io-unix-search-1", fmt.Errorf("searching memo fields is not supported"))
@@ -823,14 +774,6 @@ func (u UnixIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, error
 	return rows, nil
 }
 
-/**
- *	################################################################
- *	#				General DBF handler
- *	################################################################
- */
-
-// GoTo sets the internal row pointer to row rowNumber
-// Returns and EOF error if at EOF and positions the pointer at lastRow+1
 func (u UnixIO) GoTo(file *File, row uint32) error {
 	if row > file.header.RowsCount {
 		file.table.rowPointer = file.header.RowsCount
@@ -841,10 +784,6 @@ func (u UnixIO) GoTo(file *File, row uint32) error {
 	return nil
 }
 
-// Skip adds offset to the internal row pointer
-// If at end of file positions the pointer at lastRow+1
-// If the row pointer would be become negative positions the pointer at 0
-// Does not skip deleted rows
 func (u UnixIO) Skip(file *File, offset int64) {
 	newval := int64(file.table.rowPointer) + offset
 	if newval >= int64(file.header.RowsCount) {
@@ -857,7 +796,6 @@ func (u UnixIO) Skip(file *File, offset int64) {
 	debugf("Skipping %d row/s, new position: %d", offset, file.table.rowPointer)
 }
 
-// Returns if the row at internal row pointer is deleted
 func (u UnixIO) Deleted(file *File) (bool, error) {
 	if file.table.rowPointer >= file.header.RowsCount {
 		return false, newError("dbase-io-unix-deleted-1", ErrEOF)

@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// GenericIO implements the IO interface for generic io.ReadWriteSeeker.
+// Handle is the main file handle, relatedHandle is the memo file handle.
 type GenericIO struct {
 	Handle        io.ReadWriteSeeker
 	RelatedHandle io.ReadWriteSeeker
@@ -27,15 +29,15 @@ func (g GenericIO) OpenTable(config *Config) (*File, error) {
 		dbaseMutex:    &sync.Mutex{},
 		memoMutex:     &sync.Mutex{},
 	}
-	err := g.ReadHeader(file)
+	err := file.ReadHeader()
 	if err != nil {
 		return nil, newError("dbase-io-generic-preparedbf-2", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(file.header.FileType, config.Untested); err != nil {
+	if err := ValidateFileVersion(file.header.FileType, config.Untested); err != nil {
 		return nil, newError("dbase-io-generic-preparedbf-3", err)
 	}
-	columns, nullFlag, err := g.ReadColumns(file)
+	columns, nullFlag, err := file.ReadColumns()
 	if err != nil {
 		return nil, newError("dbase-io-generic-preparedbf-4", err)
 	}

@@ -19,16 +19,9 @@ import (
 
 var defaultIO WindowsIO
 
+// WindowsIO implements the IO interface for Windows systems.
 type WindowsIO struct{}
 
-/**
- *	################################################################
- *	#					IO Functions
- *	################################################################
- */
-
-// Opens a dBase database file (and the memo file if needed) from disk.
-// To close the file handle(s) call DBF.Close().
 func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	if config == nil {
 		return nil, newError("dbase-io-windows-opentable-1", fmt.Errorf("missing configuration"))
@@ -58,15 +51,15 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 		dbaseMutex: &sync.Mutex{},
 		memoMutex:  &sync.Mutex{},
 	}
-	err = w.ReadHeader(file)
+	err = file.ReadHeader()
 	if err != nil {
 		return nil, newError("dbase-io-windows-preparedbf-1", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := validateFileVersion(file.header.FileType, config.Untested); err != nil {
+	if err := ValidateFileVersion(file.header.FileType, config.Untested); err != nil {
 		return nil, newError("dbase-io-windows-preparedbf-2", err)
 	}
-	columns, nullFlag, err := w.ReadColumns(file)
+	columns, nullFlag, err := file.ReadColumns()
 	if err != nil {
 		return nil, newError("dbase-io-windows-preparedbf-3", err)
 	}
@@ -111,7 +104,6 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	return file, nil
 }
 
-// Closes the file handlers.
 func (w WindowsIO) Close(file *File) error {
 	if file.handle != nil {
 		handle, ok := file.handle.(*windows.Handle)
@@ -139,12 +131,6 @@ func (w WindowsIO) Close(file *File) error {
 	}
 	return nil
 }
-
-/**
- *	################################################################
- *	#				dBase database file IO handler
- *	################################################################
- */
 
 func (w WindowsIO) Create(file *File) error {
 	file.config.Filename = strings.ToUpper(strings.TrimSpace(file.config.Filename))
@@ -184,7 +170,6 @@ func (w WindowsIO) Create(file *File) error {
 	return nil
 }
 
-// Reads the DBF header from the file handle.
 func (w WindowsIO) ReadHeader(file *File) error {
 	debugf("Reading header...")
 	handle, ok := file.handle.(*windows.Handle)
@@ -209,7 +194,6 @@ func (w WindowsIO) ReadHeader(file *File) error {
 	return nil
 }
 
-// writeHeader writes the header to the dbase file
 func (w WindowsIO) WriteHeader(file *File) (err error) {
 	debugf("Writing header - exclusive writing: %v", file.config.WriteLock)
 	handle, ok := file.handle.(*windows.Handle)
@@ -258,7 +242,6 @@ func (w WindowsIO) WriteHeader(file *File) (err error) {
 	return nil
 }
 
-// Reads columns from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
 func (w WindowsIO) ReadColumns(file *File) ([]*Column, *Column, error) {
 	debugf("Reading columns...")
 	handle, ok := file.handle.(*windows.Handle)
@@ -375,11 +358,6 @@ func (w WindowsIO) WriteColumns(file *File) (err error) {
 	return nil
 }
 
-// Read the nullFlag field at the end of the row
-// The nullFlag field indicates if the field has a variable length
-// If varlength is true, the field is variable length and the length is stored in the last byte
-// If varlength is false, we read the complete field
-// If the field is null, we return true as second return value
 func (w WindowsIO) ReadNullFlag(file *File, position uint64, column *Column) (bool, bool, error) {
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
@@ -427,13 +405,6 @@ func (w WindowsIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 	return nthBit(buf, bitCount), false, nil
 }
 
-/**
- *	################################################################
- *	#				Memo file IO handler
- *	################################################################
- */
-
-// readMemoHeader reads the memo header from the given file handle.
 func (w WindowsIO) ReadMemoHeader(file *File) error {
 	debugf("Reading memo header...")
 	relatedHandle, ok := file.relatedHandle.(*windows.Handle)
@@ -459,8 +430,6 @@ func (w WindowsIO) ReadMemoHeader(file *File) error {
 	return nil
 }
 
-// Reads one or more blocks from the FPT file, called for each memo column.
-// the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	if file.relatedHandle == nil {
 		return nil, false, newError("dbase-io-windows-readmemo-1", ErrNoFPT)
@@ -514,7 +483,6 @@ func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
-// writeMemo writes a memo to the memo file and returns the address of the memo.
 func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte, error) {
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()
@@ -587,8 +555,6 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	return address, nil
 }
 
-// writeMemoHeader writes the memo header to the memo file.
-// Size is the number of blocks the new memo data will take up.
 func (w WindowsIO) WriteMemoHeader(file *File, size int) (err error) {
 	if file.relatedHandle == nil {
 		return newError("dbase-io-windows-writememoheader-1", ErrNoFPT)
@@ -639,13 +605,6 @@ func (w WindowsIO) WriteMemoHeader(file *File, size int) (err error) {
 	return nil
 }
 
-/**
- *	################################################################
- *	#				Row and Field IO handler
- *	################################################################
- */
-
-// Reads raw row data of one row at rowPosition
 func (w WindowsIO) ReadRow(file *File, position uint32) ([]byte, error) {
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
@@ -726,13 +685,6 @@ func (w WindowsIO) WriteRow(file *File, row *Row) (err error) {
 	return nil
 }
 
-/**
- *	################################################################
- *	#						Search
- *	################################################################
- */
-
-// Search searches for a row with the given value in the given field
 func (w WindowsIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, error) {
 	if field.column.DataType == 'M' {
 		return nil, newError("dbase-io-windows-search-1", fmt.Errorf("searching memo fields is not supported"))
@@ -784,14 +736,6 @@ func (w WindowsIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, er
 	return rows, nil
 }
 
-/**
- *	################################################################
- *	#				General DBF handler
- *	################################################################
- */
-
-// GoTo sets the internal row pointer to row rowNumber
-// Returns and EOF error if at EOF and positions the pointer at lastRow+1
 func (w WindowsIO) GoTo(file *File, row uint32) error {
 	if row > file.header.RowsCount {
 		file.table.rowPointer = file.header.RowsCount
