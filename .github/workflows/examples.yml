@@ -31,6 +31,8 @@ jobs:
         run: cd examples && make write_table
       - name: Run create table example
         run: cd examples && make create_table
+      - name: Run open table custom
+        run: cd examples && make open_table_custom
       - name: Run search table example
         run: cd examples && make search_table
       - name: Run database export example
@@ -58,6 +60,8 @@ jobs:
         run: cd examples && make write_table
       - name: Run create table example
         run: cd examples && make create_table
+      - name: Run open table custom
+        run: cd examples && make open_table_custom
       - name: Run search table example
         run: cd examples && make search_table
       - name: Run database export example
