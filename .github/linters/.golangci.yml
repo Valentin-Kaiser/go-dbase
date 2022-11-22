@@ -39,15 +39,15 @@ linters:
     - gci
     - gofmt
     - goimports
+    - makezero
+    - wrapcheck
+    - interfacebloat
 
     # disabled because of generics
     - rowserrcheck
     - sqlclosecheck
     - structcheck
     - wastedassign
-
-    # should not block
-    - nonamedreturns
 
 linters-settings:
   wsl:
