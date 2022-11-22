@@ -31,17 +31,17 @@ type WindowsIO struct{}
 // To close the file handle(s) call DBF.Close().
 func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	if config == nil {
-		return nil, newError("dbase-io-opentable-1", fmt.Errorf("missing configuration"))
+		return nil, newError("dbase-io-windows-opentable-1", fmt.Errorf("missing configuration"))
 	}
 	debugf("Opening table: %s - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
 	if len(strings.TrimSpace(config.Filename)) == 0 {
-		return nil, newError("dbase-io-opentable-2", fmt.Errorf("missing filename"))
+		return nil, newError("dbase-io-windows-opentable-2", fmt.Errorf("missing filename"))
 	}
 	fileName := filepath.Clean(config.Filename)
 	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
 	fileName, err := _findFile(fileName)
 	if err != nil {
-		return nil, newError("dbase-io-opentable-3", err)
+		return nil, newError("dbase-io-windows-opentable-3", err)
 	}
 	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
 	if config.Exclusive {
@@ -49,7 +49,7 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	}
 	fd, err := windows.Open(fileName, mode, 0644)
 	if err != nil {
-		return nil, newError("dbase-io-opentable-3", fmt.Errorf("opening DBF file %v failed with error: %w", fileName, err))
+		return nil, newError("dbase-io-windows-opentable-3", fmt.Errorf("opening DBF file %v failed with error: %w", fileName, err))
 	}
 	file := &File{
 		config:     config,
@@ -60,15 +60,15 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	}
 	err = w.ReadHeader(file)
 	if err != nil {
-		return nil, newError("dbase-io-preparedbf-1", err)
+		return nil, newError("dbase-io-windows-preparedbf-1", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
 	if err := validateFileVersion(file.header.FileType, config.Untested); err != nil {
-		return nil, newError("dbase-io-preparedbf-2", err)
+		return nil, newError("dbase-io-windows-preparedbf-2", err)
 	}
 	columns, nullFlag, err := w.ReadColumns(file)
 	if err != nil {
-		return nil, newError("dbase-io-preparedbf-3", err)
+		return nil, newError("dbase-io-windows-preparedbf-3", err)
 	}
 	file.nullFlagColumn = nullFlag
 	file.table = &Table{
@@ -86,7 +86,7 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	}
 	// Check if the code page mark is matchin the converter
 	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePage() {
-		return nil, newError("dbase-io-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
+		return nil, newError("dbase-io-windows-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
 	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
@@ -100,12 +100,12 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 		debugf("Opening related file: %s\n", relatedFile)
 		fd, err := windows.Open(relatedFile, mode, 0644)
 		if err != nil {
-			return nil, newError("dbase-io-opentable-7", fmt.Errorf("opening related file %v failed with error: %w", relatedFile, err))
+			return nil, newError("dbase-io-windows-opentable-7", fmt.Errorf("opening related file %v failed with error: %w", relatedFile, err))
 		}
 		file.relatedHandle = &fd
 		err = file.ReadMemoHeader()
 		if err != nil {
-			return nil, newError("dbase-io-opentable-8", err)
+			return nil, newError("dbase-io-windows-opentable-8", err)
 		}
 	}
 	return file, nil
@@ -116,25 +116,25 @@ func (w WindowsIO) Close(file *File) error {
 	if file.handle != nil {
 		handle, ok := file.handle.(*windows.Handle)
 		if !ok {
-			return newError("dbase-io-close-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+			return newError("dbase-io-windows-close-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 		}
 
 		debugf("Closing file: %s", file.config.Filename)
 		err := windows.Close(*handle)
 		if err != nil {
-			return newError("dbase-io-close-2", fmt.Errorf("closing DBF failed with error: %w", err))
+			return newError("dbase-io-windows-close-2", fmt.Errorf("closing DBF failed with error: %w", err))
 		}
 	}
 	if file.relatedHandle != nil {
 		handle, ok := file.relatedHandle.(*windows.Handle)
 		if !ok {
-			return newError("dbase-io-close-3", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+			return newError("dbase-io-windows-close-3", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 		}
 
 		debugf("Closing related file: %s", file.config.Filename)
 		err := windows.Close(*handle)
 		if err != nil {
-			return newError("dbase-io-close-4", fmt.Errorf("closing FPT failed with error: %w", err))
+			return newError("dbase-io-windows-close-4", fmt.Errorf("closing FPT failed with error: %w", err))
 		}
 	}
 	return nil
@@ -150,22 +150,22 @@ func (w WindowsIO) Create(file *File) error {
 	file.config.Filename = strings.ToUpper(strings.TrimSpace(file.config.Filename))
 	// Check for valid file name
 	if len(file.config.Filename) == 0 {
-		return newError("dbase-io-create-1", fmt.Errorf("missing filename"))
+		return newError("dbase-io-windows-create-1", fmt.Errorf("missing filename"))
 	}
 	dbfname, err := windows.UTF16FromString(file.config.Filename)
 	if err != nil {
-		return newError("dbase-io-create-2", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
+		return newError("dbase-io-windows-create-2", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
 	}
 	// Check if file exists already
 	_, err = windows.GetFileAttributes(&dbfname[0])
 	if err == nil {
-		return newError("dbase-io-create-3", fmt.Errorf("file already exists"))
+		return newError("dbase-io-windows-create-3", fmt.Errorf("file already exists"))
 	}
 	// Create the file
 	debugf("Creating file: %s", file.config.Filename)
 	fd, err := windows.CreateFile(&dbfname[0], windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.CREATE_ALWAYS, windows.FILE_ATTRIBUTE_NORMAL, 0)
 	if err != nil {
-		return newError("dbase-io-create-4", fmt.Errorf("creating DBF file failed with error: %w", err))
+		return newError("dbase-io-windows-create-4", fmt.Errorf("creating DBF file failed with error: %w", err))
 	}
 	file.handle = &fd
 	if file.memoHeader != nil {
@@ -173,11 +173,11 @@ func (w WindowsIO) Create(file *File) error {
 		// Create the memo file
 		fptname, err := windows.UTF16FromString(strings.TrimSuffix(file.config.Filename, filepath.Ext(file.config.Filename)) + ".FPT")
 		if err != nil {
-			return newError("dbase-io-create-5", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
+			return newError("dbase-io-windows-create-5", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
 		}
 		fd, err := windows.CreateFile(&fptname[0], windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.CREATE_ALWAYS, windows.FILE_ATTRIBUTE_NORMAL, 0)
 		if err != nil {
-			return newError("dbase-io-create-6", fmt.Errorf("creating FPT file failed with error: %w", err))
+			return newError("dbase-io-windows-create-6", fmt.Errorf("creating FPT file failed with error: %w", err))
 		}
 		file.relatedHandle = &fd
 	}
@@ -189,21 +189,21 @@ func (w WindowsIO) ReadHeader(file *File) error {
 	debugf("Reading header...")
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
-		return newError("dbase-io-readheader-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return newError("dbase-io-windows-readheader-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	h := &Header{}
 	if _, err := windows.Seek(*handle, 0, 0); err != nil {
-		return newError("dbase-io-readheader-1", err)
+		return newError("dbase-io-windows-readheader-1", err)
 	}
 	b := make([]byte, 30)
 	n, err := windows.Read(*handle, b)
 	if err != nil {
-		return newError("dbase-io-readheader-2", err)
+		return newError("dbase-io-windows-readheader-2", err)
 	}
 	// LittleEndian - Integers in table files are stored with the least significant byte first.
 	err = binary.Read(bytes.NewReader(b[:n]), binary.LittleEndian, h)
 	if err != nil {
-		return newError("dbase-io-readheader-3", err)
+		return newError("dbase-io-windows-readheader-3", err)
 	}
 	file.header = h
 	return nil
@@ -214,7 +214,7 @@ func (w WindowsIO) WriteHeader(file *File) (err error) {
 	debugf("Writing header - exclusive writing: %v", file.config.WriteLock)
 	handle, ok := file.relatedHandle.(*windows.Handle)
 	if !ok {
-		return newError("dbase-io-writeheader-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return newError("dbase-io-windows-writeheader-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	// Lock the block we are writing to
 	position := uint32(0)
@@ -226,19 +226,19 @@ func (w WindowsIO) WriteHeader(file *File) (err error) {
 	if file.config.WriteLock {
 		err = windows.LockFileEx(*handle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, position, position+uint32(file.header.FirstRow), o)
 		if err != nil {
-			return newError("dbase-io-writeheader-2", err)
+			return newError("dbase-io-windows-writeheader-2", err)
 		}
 		defer func() {
 			ulockErr := windows.UnlockFileEx(*handle, 0, position, position+uint32(file.header.FirstRow), o)
 			if err != nil {
-				err = newError("dbase-io-writeheader-3", ulockErr)
+				err = newError("dbase-io-windows-writeheader-3", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
 	_, err = windows.Seek(*handle, 0, 0)
 	if err != nil {
-		return newError("dbase-io-writeheader-4", err)
+		return newError("dbase-io-windows-writeheader-4", err)
 	}
 	// Change the last modification date to the current date
 	file.header.Year = uint8(time.Now().Year() - 2000)
@@ -249,11 +249,11 @@ func (w WindowsIO) WriteHeader(file *File) (err error) {
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.LittleEndian, file.header)
 	if err != nil {
-		return newError("dbase-io-writeheader-5", err)
+		return newError("dbase-io-windows-writeheader-5", err)
 	}
 	_, err = windows.Write(*handle, buf.Bytes())
 	if err != nil {
-		return newError("dbase-io-writeheader-6", err)
+		return newError("dbase-io-windows-writeheader-6", err)
 	}
 	return nil
 }
@@ -263,7 +263,7 @@ func (w WindowsIO) ReadColumns(file *File) ([]*Column, *Column, error) {
 	debugf("Reading columns...")
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
-		return nil, nil, newError("dbase-io-readcolumns-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return nil, nil, newError("dbase-io-windows-readcolumns-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	var nullFlag *Column
 	columns := make([]*Column, 0)
@@ -272,27 +272,27 @@ func (w WindowsIO) ReadColumns(file *File) ([]*Column, *Column, error) {
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
 		if _, err := windows.Seek(*handle, offset, 0); err != nil {
-			return nil, nil, newError("dbase-io-readcolumns-1", err)
+			return nil, nil, newError("dbase-io-windows-readcolumns-1", err)
 		}
 		if _, err := windows.Read(*handle, b); err != nil {
-			return nil, nil, newError("dbase-io-readcolumns-2", err)
+			return nil, nil, newError("dbase-io-windows-readcolumns-2", err)
 		}
 		if Marker(b[0]) == ColumnEnd {
 			break
 		}
 		// Position back one byte and read the column
 		if _, err := windows.Seek(*handle, -1, 1); err != nil {
-			return nil, nil, newError("dbase-io-readcolumns-3", err)
+			return nil, nil, newError("dbase-io-windows-readcolumns-3", err)
 		}
 		buf := make([]byte, 33)
 		n, err := windows.Read(*handle, buf)
 		if err != nil {
-			return nil, nil, newError("dbase-io-readcolumns-4", err)
+			return nil, nil, newError("dbase-io-windows-readcolumns-4", err)
 		}
 		column := &Column{}
 		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
-			return nil, nil, newError("dbase-io-readcolumns-5", err)
+			return nil, nil, newError("dbase-io-windows-readcolumns-5", err)
 		}
 		if column.Name() == "_NullFlags" {
 			debugf("Found null flag column: %s", column.Name())
@@ -311,7 +311,7 @@ func (w WindowsIO) WriteColumns(file *File) (err error) {
 	debugf("Writing columns - exclusive writing: %v", file.config.WriteLock)
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
-		return newError("dbase-io-writecolumns-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return newError("dbase-io-windows-writecolumns-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 
 	// Lock the block we are writing to
@@ -324,19 +324,19 @@ func (w WindowsIO) WriteColumns(file *File) (err error) {
 	if file.config.WriteLock {
 		err = windows.LockFileEx(*handle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, position, position+uint32(file.header.FirstRow), o)
 		if err != nil {
-			return newError("dbase-io-writecolumns-2", err)
+			return newError("dbase-io-windows-writecolumns-2", err)
 		}
 		defer func() {
 			ulockErr := windows.UnlockFileEx(*handle, 0, position, position+uint32(file.header.FirstRow), o)
 			if err != nil {
-				err = newError("dbase-io-writecolumns-3", ulockErr)
+				err = newError("dbase-io-windows-writecolumns-3", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
 	_, err = windows.Seek(*handle, 32, 0)
 	if err != nil {
-		return newError("dbase-io-writecolumns-4", err)
+		return newError("dbase-io-windows-writecolumns-4", err)
 	}
 	// Write the columns
 	buf := new(bytes.Buffer)
@@ -344,24 +344,24 @@ func (w WindowsIO) WriteColumns(file *File) (err error) {
 		debugf("Writing column: %+v", column)
 		err = binary.Write(buf, binary.LittleEndian, column)
 		if err != nil {
-			return newError("dbase-io-writecolumns-5", err)
+			return newError("dbase-io-windows-writecolumns-5", err)
 		}
 	}
 	if file.nullFlagColumn != nil {
 		debugf("Writing null flag column: %s", file.nullFlagColumn.Name())
 		err = binary.Write(buf, binary.LittleEndian, file.nullFlagColumn)
 		if err != nil {
-			return newError("dbase-io-writecolumns-6", err)
+			return newError("dbase-io-windows-writecolumns-6", err)
 		}
 	}
 	_, err = windows.Write(*handle, buf.Bytes())
 	if err != nil {
-		return newError("dbase-io-writecolumns-7", err)
+		return newError("dbase-io-windows-writecolumns-7", err)
 	}
 	// Write the column terminator
 	_, err = windows.Write(*handle, []byte{byte(ColumnEnd)})
 	if err != nil {
-		return newError("dbase-io-writecolumns-8", err)
+		return newError("dbase-io-windows-writecolumns-8", err)
 	}
 	// Write null till the end of the header
 	pos := file.header.FirstRow - uint16(len(file.table.columns)*32) - 33
@@ -370,7 +370,7 @@ func (w WindowsIO) WriteColumns(file *File) (err error) {
 	}
 	_, err = windows.Write(*handle, make([]byte, pos))
 	if err != nil {
-		return newError("dbase-io-writecolumns-9", err)
+		return newError("dbase-io-windows-writecolumns-9", err)
 	}
 	return nil
 }
@@ -383,13 +383,13 @@ func (w WindowsIO) WriteColumns(file *File) (err error) {
 func (w WindowsIO) ReadNullFlag(file *File, position uint64, column *Column) (bool, bool, error) {
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
-		return false, false, newError("dbase-io-readnullflag-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return false, false, newError("dbase-io-windows-readnullflag-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	if file.nullFlagColumn == nil {
-		return false, false, newError("dbase-io-readnullflag-2", fmt.Errorf("null flag column is nil"))
+		return false, false, newError("dbase-io-windows-readnullflag-2", fmt.Errorf("null flag column is nil"))
 	}
 	if column.DataType != byte(Varchar) && column.DataType != byte(Varbinary) {
-		return false, false, newError("dbase-io-readnullflag-3", fmt.Errorf("column is not of type varchar or varbinary"))
+		return false, false, newError("dbase-io-windows-readnullflag-3", fmt.Errorf("column is not of type varchar or varbinary"))
 	}
 	// count what number of varchar field this field is
 	bitCount := 0
@@ -409,15 +409,15 @@ func (w WindowsIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 	pos := uint64(file.header.FirstRow) + position*uint64(file.header.RowLength) + uint64(file.nullFlagColumn.Position)
 	_, err := windows.Seek(*handle, int64(pos), 0)
 	if err != nil {
-		return false, false, newError("dbase-io-readnullflag-1", err)
+		return false, false, newError("dbase-io-windows-readnullflag-1", err)
 	}
 	buf := make([]byte, file.nullFlagColumn.Length)
 	n, err := windows.Read(*handle, buf)
 	if err != nil {
-		return false, false, newError("dbase-io-readnullflag-2", err)
+		return false, false, newError("dbase-io-windows-readnullflag-2", err)
 	}
 	if n != int(file.nullFlagColumn.Length) {
-		return false, false, newError("dbase-io-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, file.nullFlagColumn.Length))
+		return false, false, newError("dbase-io-windows-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, file.nullFlagColumn.Length))
 	}
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
 		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), nthBit(buf, bitCount), nthBit(buf, bitCount+1))
@@ -438,20 +438,20 @@ func (w WindowsIO) ReadMemoHeader(file *File) error {
 	debugf("Reading memo header...")
 	handle, ok := file.relatedHandle.(*windows.Handle)
 	if !ok {
-		return newError("dbase-io-readmemoheader-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.relatedHandle))
+		return newError("dbase-io-windows-readmemoheader-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.relatedHandle))
 	}
 	if _, err := windows.Seek(*handle, 0, 0); err != nil {
-		return newError("dbase-io-readmemoheader-1", err)
+		return newError("dbase-io-windows-readmemoheader-1", err)
 	}
 	b := make([]byte, 8)
 	n, err := windows.Read(*handle, b)
 	if err != nil {
-		return newError("dbase-io-readmemoheader-2", err)
+		return newError("dbase-io-windows-readmemoheader-2", err)
 	}
 	h := &MemoHeader{}
 	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
 	if err != nil {
-		return newError("dbase-io-readmemoheader-3", err)
+		return newError("dbase-io-windows-readmemoheader-3", err)
 	}
 	debugf("Memo header: %+v", h)
 	file.relatedHandle = handle
@@ -463,11 +463,11 @@ func (w WindowsIO) ReadMemoHeader(file *File) error {
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	if file.relatedHandle == nil {
-		return nil, false, newError("dbase-io-readmemo-1", ErrNoFPT)
+		return nil, false, newError("dbase-io-windows-readmemo-1", ErrNoFPT)
 	}
 	handle, ok := file.relatedHandle.(*windows.Handle)
 	if !ok {
-		return nil, false, newError("dbase-io-readmemo-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return nil, false, newError("dbase-io-windows-readmemo-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	// Determine the block number
 	block := binary.LittleEndian.Uint32(address)
@@ -479,7 +479,7 @@ func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	// The position in the file is blocknumber*blocksize
 	_, err := windows.Seek(*handle, position, 0)
 	if err != nil {
-		return nil, false, newError("dbase-io-readmemo-2", err)
+		return nil, false, newError("dbase-io-windows-readmemo-2", err)
 	}
 	// Read the memo block header, instead of reading into a struct using binary.Read we just read the two
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
@@ -487,7 +487,7 @@ func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	hbuf := make([]byte, 8)
 	_, err = windows.Read(*handle, hbuf)
 	if err != nil {
-		return nil, false, newError("dbase-io-readmemo-3", err)
+		return nil, false, newError("dbase-io-windows-readmemo-3", err)
 	}
 	sign := binary.BigEndian.Uint32(hbuf[:4])
 	leng := binary.BigEndian.Uint32(hbuf[4:])
@@ -500,15 +500,15 @@ func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	buf := make([]byte, leng)
 	read, err := windows.Read(*handle, buf)
 	if err != nil {
-		return buf, false, newError("dbase-io-readmemo-4", err)
+		return buf, false, newError("dbase-io-windows-readmemo-4", err)
 	}
 	if read != int(leng) {
-		return buf, sign == 1, newError("dbase-io-readmemo-5", ErrIncomplete)
+		return buf, sign == 1, newError("dbase-io-windows-readmemo-5", ErrIncomplete)
 	}
 	if sign == 1 {
 		buf, err = file.config.Converter.Decode(buf)
 		if err != nil {
-			return []byte{}, false, newError("dbase-io-readmemo-6", err)
+			return []byte{}, false, newError("dbase-io-windows-readmemo-6", err)
 		}
 	}
 	return buf, sign == 1, nil
@@ -519,11 +519,11 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()
 	if file.relatedHandle == nil {
-		return nil, newError("dbase-io-writememo-1", ErrNoFPT)
+		return nil, newError("dbase-io-windows-writememo-1", ErrNoFPT)
 	}
 	handle, ok := file.relatedHandle.(*windows.Handle)
 	if !ok {
-		return nil, newError("dbase-io-writememo-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return nil, newError("dbase-io-windows-writememo-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	blocks := 1
 	blockPosition := file.memoHeader.NextFree
@@ -536,7 +536,7 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	// Write the memo header
 	err := file.WriteMemoHeader(blocks)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-2", err)
+		return nil, newError("dbase-io-windows-writememo-2", err)
 	}
 	// Put the block data together
 	data := make([]byte, 8)
@@ -558,12 +558,12 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 		}
 		err = windows.LockFileEx(*handle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
 		if err != nil {
-			return nil, newError("dbase-io-writememo-2", err)
+			return nil, newError("dbase-io-windows-writememo-2", err)
 		}
 		defer func() {
 			ulockErr := windows.UnlockFileEx(*handle, 0, blockPosition, blockPosition+uint32(file.memoHeader.BlockSize), o)
 			if err != nil {
-				err = newError("dbase-io-writememoheader-3", ulockErr)
+				err = newError("dbase-io-windows-writememoheader-3", ulockErr)
 			}
 		}()
 	}
@@ -572,17 +572,17 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	// Seek to new the next free block
 	_, err = windows.Seek(*handle, position, 0)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-4", err)
+		return nil, newError("dbase-io-windows-writememo-4", err)
 	}
 	// Write the memo data
 	_, err = windows.Write(*handle, data)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-5", err)
+		return nil, newError("dbase-io-windows-writememo-5", err)
 	}
 	// Convert the block number to []byte
 	address, err := toBinary(blockPosition)
 	if err != nil {
-		return nil, newError("dbase-io-writememo-6", err)
+		return nil, newError("dbase-io-windows-writememo-6", err)
 	}
 	return address, nil
 }
@@ -591,11 +591,11 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 // Size is the number of blocks the new memo data will take up.
 func (w WindowsIO) WriteMemoHeader(file *File, size int) (err error) {
 	if file.relatedHandle == nil {
-		return newError("dbase-io-writememoheader-1", ErrNoFPT)
+		return newError("dbase-io-windows-writememoheader-1", ErrNoFPT)
 	}
 	handle, ok := file.relatedHandle.(*windows.Handle)
 	if !ok {
-		return newError("dbase-io-writememoheader-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return newError("dbase-io-windows-writememoheader-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	debugf("Writing memo header...")
 	// Lock the block we are writing to
@@ -606,19 +606,19 @@ func (w WindowsIO) WriteMemoHeader(file *File, size int) (err error) {
 	if file.config.WriteLock {
 		err = windows.LockFileEx(*handle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 0, uint32(file.header.FirstRow), o)
 		if err != nil {
-			return newError("dbase-io-writememoheader-2", err)
+			return newError("dbase-io-windows-writememoheader-2", err)
 		}
 		defer func() {
 			ulockErr := windows.UnlockFileEx(*handle, 0, 0, uint32(file.header.FirstRow), o)
 			if err != nil {
-				err = newError("dbase-io-writememoheader-3", ulockErr)
+				err = newError("dbase-io-windows-writememoheader-3", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
 	_, err = windows.Seek(*handle, 0, 0)
 	if err != nil {
-		return newError("dbase-io-writememoheader-4", err)
+		return newError("dbase-io-windows-writememoheader-4", err)
 	}
 	// Calculate the next free block
 	file.memoHeader.NextFree += uint32(size)
@@ -629,12 +629,12 @@ func (w WindowsIO) WriteMemoHeader(file *File, size int) (err error) {
 	debugf("Writing memo header - next free: %d, block size: %d", file.memoHeader.NextFree, file.memoHeader.BlockSize)
 	_, err = windows.Write(*handle, buf)
 	if err != nil {
-		return newError("dbase-io-writememoheader-5", err)
+		return newError("dbase-io-windows-writememoheader-5", err)
 	}
 	// Write null till end of header
 	_, err = windows.Write(*handle, make([]byte, 512-8))
 	if err != nil {
-		return newError("dbase-io-writememoheader-6", err)
+		return newError("dbase-io-windows-writememoheader-6", err)
 	}
 	return nil
 }
@@ -649,24 +649,24 @@ func (w WindowsIO) WriteMemoHeader(file *File, size int) (err error) {
 func (w WindowsIO) ReadRow(file *File, position uint32) ([]byte, error) {
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
-		return nil, newError("dbase-io-readrow-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return nil, newError("dbase-io-windows-readrow-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	if position >= file.header.RowsCount {
-		return nil, newError("dbase-io-readrow-1", ErrEOF)
+		return nil, newError("dbase-io-windows-readrow-1", ErrEOF)
 	}
 	pos := int64(file.header.FirstRow) + (int64(position) * int64(file.header.RowLength))
 	debugf("Reading row: %d at offset: %v", position, pos)
 	buf := make([]byte, file.header.RowLength)
 	_, err := windows.Seek(*handle, pos, 0)
 	if err != nil {
-		return buf, newError("dbase-io-readrow-2", err)
+		return buf, newError("dbase-io-windows-readrow-2", err)
 	}
 	read, err := windows.Read(*handle, buf)
 	if err != nil {
-		return buf, newError("dbase-io-readrow-3", err)
+		return buf, newError("dbase-io-windows-readrow-3", err)
 	}
 	if read != int(file.header.RowLength) {
-		return buf, newError("dbase-io-readrow-4", ErrIncomplete)
+		return buf, newError("dbase-io-windows-readrow-4", ErrIncomplete)
 	}
 	return buf, nil
 }
@@ -678,12 +678,12 @@ func (w WindowsIO) WriteRow(file *File, row *Row) (err error) {
 	defer row.handle.dbaseMutex.Unlock()
 	handle, ok := row.handle.handle.(*windows.Handle)
 	if !ok {
-		return newError("dbase-io-writerow-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", row.handle.handle))
+		return newError("dbase-io-windows-writerow-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", row.handle.handle))
 	}
 	// Convert the row to raw bytes
 	r, err := row.ToBytes()
 	if err != nil {
-		return newError("dbase-io-writerow-1", err)
+		return newError("dbase-io-windows-writerow-1", err)
 	}
 	// Update the header
 	position := int64(row.handle.header.FirstRow) + (int64(row.Position) * int64(row.handle.header.RowLength))
@@ -693,7 +693,7 @@ func (w WindowsIO) WriteRow(file *File, row *Row) (err error) {
 	}
 	err = row.handle.WriteHeader()
 	if err != nil {
-		return newError("dbase-io-writerow-2", err)
+		return newError("dbase-io-windows-writerow-2", err)
 	}
 	// Lock the block we are writing to
 	if row.handle.config.WriteLock {
@@ -703,12 +703,12 @@ func (w WindowsIO) WriteRow(file *File, row *Row) (err error) {
 		}
 		err = windows.LockFileEx(*handle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, uint32(position), uint32(position+int64(row.handle.header.RowLength)), o)
 		if err != nil {
-			return newError("dbase-io-writerow-3", err)
+			return newError("dbase-io-windows-writerow-3", err)
 		}
 		defer func() {
 			ulockErr := windows.UnlockFileEx(*handle, 0, uint32(position), uint32(position+int64(row.handle.header.RowLength)), o)
 			if err != nil {
-				err = newError("dbase-io-writerow-4", ulockErr)
+				err = newError("dbase-io-windows-writerow-4", ulockErr)
 			}
 		}()
 	}
@@ -716,12 +716,12 @@ func (w WindowsIO) WriteRow(file *File, row *Row) (err error) {
 	// Seek to the correct position
 	_, err = windows.Seek(*handle, position, 0)
 	if err != nil {
-		return newError("dbase-io-writerow-5", err)
+		return newError("dbase-io-windows-writerow-5", err)
 	}
 	// Write the row
 	_, err = windows.Write(*handle, r)
 	if err != nil {
-		return newError("dbase-io-writerow-6", err)
+		return newError("dbase-io-windows-writerow-6", err)
 	}
 	return nil
 }
@@ -735,17 +735,17 @@ func (w WindowsIO) WriteRow(file *File, row *Row) (err error) {
 // Search searches for a row with the given value in the given field
 func (w WindowsIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, error) {
 	if field.column.DataType == 'M' {
-		return nil, newError("dbase-io-search-1", fmt.Errorf("searching memo fields is not supported"))
+		return nil, newError("dbase-io-windows-search-1", fmt.Errorf("searching memo fields is not supported"))
 	}
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
-		return nil, newError("dbase-io-search-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return nil, newError("dbase-io-windows-search-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	debugf("Searching for value: %v in field: %s", field.GetValue(), field.column.Name())
 	// convert the value to bytes
 	val, err := file.GetRepresentation(field, !exactMatch)
 	if err != nil {
-		return nil, newError("dbase-io-search-3", err)
+		return nil, newError("dbase-io-windows-search-3", err)
 	}
 	// Search for the value
 	rows := make([]*Row, 0)
@@ -795,7 +795,7 @@ func (w WindowsIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, er
 func (w WindowsIO) GoTo(file *File, row uint32) error {
 	if row > file.header.RowsCount {
 		file.table.rowPointer = file.header.RowsCount
-		return newError("dbase-io-goto-1", fmt.Errorf("%w, go to %v > %v", ErrEOF, row, file.header.RowsCount))
+		return newError("dbase-io-windows-goto-1", fmt.Errorf("%w, go to %v > %v", ErrEOF, row, file.header.RowsCount))
 	}
 	debugf("Going to row: %d", row)
 	file.table.rowPointer = row
@@ -816,23 +816,23 @@ func (w WindowsIO) Skip(file *File, offset int64) {
 
 func (w WindowsIO) Deleted(file *File) (bool, error) {
 	if file.table.rowPointer >= file.header.RowsCount {
-		return false, newError("dbase-io-deleted-1", ErrEOF)
+		return false, newError("dbase-io-windows-deleted-1", ErrEOF)
 	}
 	handle, ok := file.handle.(*windows.Handle)
 	if !ok {
-		return false, newError("dbase-io-deleted-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+		return false, newError("dbase-io-windows-deleted-2", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	_, err := windows.Seek(*handle, int64(file.header.FirstRow)+(int64(file.table.rowPointer)*int64(file.header.RowLength)), 0)
 	if err != nil {
-		return false, newError("dbase-io-deleted-3", err)
+		return false, newError("dbase-io-windows-deleted-3", err)
 	}
 	buf := make([]byte, 1)
 	read, err := windows.Read(*handle, buf)
 	if err != nil {
-		return false, newError("dbase-io-deleted-4", err)
+		return false, newError("dbase-io-windows-deleted-4", err)
 	}
 	if read != 1 {
-		return false, newError("dbase-io-deleted-5", ErrIncomplete)
+		return false, newError("dbase-io-windows-deleted-5", ErrIncomplete)
 	}
 	return Marker(buf[0]) == Deleted, nil
 }
@@ -842,7 +842,7 @@ func _findFile(name string) (string, error) {
 	// Read all files in the directory
 	files, err := os.ReadDir(filepath.Dir(name))
 	if err != nil {
-		return "", newError("dbase-io-findfile-1", err)
+		return "", newError("dbase-io-windows-findfile-1", err)
 	}
 	for _, file := range files {
 		if strings.EqualFold(file.Name(), filepath.Base(name)) {
