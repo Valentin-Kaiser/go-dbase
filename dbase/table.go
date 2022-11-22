@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -26,6 +27,7 @@ type Config struct {
 	WriteLock         bool              // Whether or not the write operations should lock the record
 	ValidateCodePage  bool              // Whether or not the code page mark should be validated.
 	InterpretCodePage bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.
+	CustomIO          io.ReadWriteSeeker
 }
 
 // Containing DBF header information like dBase FileType, last change and rows count.
@@ -104,7 +106,7 @@ type Modification struct {
  */
 
 // Open a database and all related tables
-func OpenDatabase(config *Config) (*Database, error) {
+func OpenDatabase(config *Config, io IO) (*Database, error) {
 	if config == nil {
 		return nil, newError("dbase-io-opendatabase-1", fmt.Errorf("missing config"))
 	}
@@ -115,7 +117,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 		return nil, newError("dbase-io-opendatabase-3", fmt.Errorf("invalid file name: %v", config.Filename))
 	}
 	debugf("Opening database: %v", config.Filename)
-	databaseTable, err := OpenTable(config)
+	databaseTable, err := OpenTable(config, io)
 	if err != nil {
 		return nil, newError("dbase-io-opendatabase-4", fmt.Errorf("opening database table failed with error: %w", err))
 	}
@@ -157,7 +159,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 			InterpretCodePage: config.InterpretCodePage,
 		}
 		// Load the table
-		table, err := OpenTable(tableConfig)
+		table, err := OpenTable(tableConfig, io)
 		if err != nil {
 			return nil, newError("dbase-io-opendatabase-9", fmt.Errorf("opening table failed with error: %w", err))
 		}
@@ -179,7 +181,7 @@ func (db *Database) Close() error {
 }
 
 // Create a new DBF file
-func New(version FileVersion, config *Config, columns []*Column, memoBlockSize uint16) (*File, error) {
+func New(version FileVersion, config *Config, io IO, columns []*Column, memoBlockSize uint16) (*File, error) {
 	if len(columns) == 0 {
 		return nil, errors.New("no columns defined")
 	}
@@ -188,6 +190,7 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 	}
 	file := &File{
 		config: config,
+		io:     io,
 		header: &Header{
 			FileType:  byte(version),
 			Year:      uint8(time.Now().Year() - 2000),
@@ -258,23 +261,23 @@ func New(version FileVersion, config *Config, columns []*Column, memoBlockSize u
 		debugf("Initializing null flag column - length: %v", length)
 	}
 	// Create the files
-	file, err := create(file)
+	err := file.Create()
 	if err != nil {
 		return nil, err
 	}
 	// Write the headers
-	err = file.writeHeader()
+	err = file.WriteHeader()
 	if err != nil {
 		return nil, err
 	}
 	// Write the columns
-	err = file.writeColumns()
+	err = file.WriteColumns()
 	if err != nil {
 		return nil, err
 	}
 	// Write the memo header
 	if file.memoHeader != nil {
-		err = file.writeMemoHeader(0)
+		err = file.WriteMemoHeader(0)
 		if err != nil {
 			return nil, err
 		}
@@ -588,7 +591,7 @@ func (file *File) Next() (*Row, error) {
 
 // Returns the requested row at file.rowPointer.
 func (file *File) Row() (*Row, error) {
-	data, err := file.readRow(file.table.rowPointer)
+	data, err := file.ReadRow(file.table.rowPointer)
 	if err != nil {
 		return nil, newError("dbase-table-row-1", err)
 	}
@@ -633,7 +636,7 @@ func (file *File) NewFieldByName(name string, value interface{}) (*Field, error)
 
 // Writes the row to the file at the row pointer position
 func (row *Row) Write() error {
-	return row.writeRow()
+	return row.handle.WriteRow(row)
 }
 
 // Increment increases set the value of the auto increment Column to the Next value
@@ -647,7 +650,7 @@ func (row *Row) Increment() error {
 			debugf("Incrementing autoincrement field %s to %v (Step: %v)", field.column.Name(), field.value, field.column.Step)
 		}
 	}
-	err := row.handle.writeColumns()
+	err := row.handle.WriteColumns()
 	if err != nil {
 		return newError("dbase-table-row-increment-1", err)
 	}
@@ -758,7 +761,7 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 	offset := uint16(1)
 	for i := 0; i < int(file.ColumnsCount()); i++ {
 		column := file.table.columns[i]
-		val, err := file.interpret(data[offset:offset+uint16(column.Length)], file.table.columns[i])
+		val, err := file.Interpret(data[offset:offset+uint16(column.Length)], file.table.columns[i])
 		if err != nil {
 			return rec, newError("dbase-table-bytestorow-3", err)
 		}
@@ -786,7 +789,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 	varPos := 0
 	nullFlag := make([]byte, 1)
 	for _, field := range row.fields {
-		val, err := row.handle.getRepresentation(field, false)
+		val, err := row.handle.GetRepresentation(field, false)
 		if err != nil {
 			return nil, newError("dbase-table-rowtobytes-1", err)
 		}
