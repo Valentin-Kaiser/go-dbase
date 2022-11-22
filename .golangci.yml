@@ -42,6 +42,8 @@ linters:
     - gofmt
     - goimports
     - makezero
+    - wrapcheck
+    - interfacebloat
 
     # disabled because of generics
     - rowserrcheck
