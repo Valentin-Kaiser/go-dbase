@@ -51,6 +51,7 @@ func main() {
 			Converter:  dbase.NewDefaultConverter(charmap.Windows1250),
 			TrimSpaces: true,
 		},
+		nil,
 		[]*dbase.Column{
 			idCol,
 			nameCol,
