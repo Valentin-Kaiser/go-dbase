@@ -1,4 +1,4 @@
-all: clean read_table write_table open_table_custom create_table search_table database_export database_schema  database_documentation
+all: clean read_table write_table create_table open_table_custom  search_table database_export database_schema  database_documentation
 read_table:
 	cd read && go run ./read.go
 write_table:

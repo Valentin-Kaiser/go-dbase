@@ -449,16 +449,16 @@ func (u UnixIO) ReadNullFlag(file *File, rowPosition uint64, column *Column) (bo
 // readMemoHeader reads the memo header from the given file handle.
 func (u UnixIO) ReadMemoHeader(file *File) error {
 	debugf("Reading memo header...")
-	handle, ok := file.relatedHandle.(*os.File)
+	relatedHandle, ok := file.relatedHandle.(*os.File)
 	if !ok {
 		return newError("dbase-io-unix-readmemoheader-1", fmt.Errorf("handle is of wrong type %T expected *os.File", file.relatedHandle))
 	}
 	h := &MemoHeader{}
-	if _, err := handle.Seek(0, 0); err != nil {
+	if _, err := relatedHandle.Seek(0, 0); err != nil {
 		return newError("dbase-io-unix-readmemoheader-2", err)
 	}
-	b := make([]byte, 1024)
-	n, err := handle.Read(b)
+	b := make([]byte, 8)
+	n, err := relatedHandle.Read(b)
 	if err != nil {
 		return newError("dbase-io-unix-readmemoheader-3", err)
 	}
@@ -467,7 +467,7 @@ func (u UnixIO) ReadMemoHeader(file *File) error {
 		return newError("dbase-io-unix-readmemoheader-4", err)
 	}
 	debugf("Memo header: %+v", h)
-	file.relatedHandle = handle
+	file.relatedHandle = relatedHandle
 	file.memoHeader = h
 	return nil
 }
@@ -478,16 +478,16 @@ func (u UnixIO) ReadMemo(file *File, blockdata []byte) ([]byte, bool, error) {
 	if file.relatedHandle == nil {
 		return nil, false, newError("dbase-io-unix-readmemo-1", ErrNoFPT)
 	}
-	handle, ok := file.relatedHandle.(*os.File)
+	relatedHandle, ok := file.relatedHandle.(*os.File)
 	if !ok {
-		return nil, false, newError("dbase-io-unix-readmemo-2", fmt.Errorf("handle is of wrong type %T expected *os.File", file.handle))
+		return nil, false, newError("dbase-io-unix-readmemo-2", fmt.Errorf("handle is of wrong type %T expected *os.File", file.relatedHandle))
 	}
 	// Determine the block number
 	block := binary.LittleEndian.Uint32(blockdata)
 	// The position in the file is blocknumber*blocksize
 	position := int64(file.memoHeader.BlockSize) * int64(block)
 	debugf("Reading memo block %d at position %d", block, position)
-	_, err := handle.Seek(position, 0)
+	_, err := relatedHandle.Seek(position, 0)
 	if err != nil {
 		return nil, false, newError("dbase-io-unix-readmemo-2", err)
 	}
@@ -495,7 +495,7 @@ func (u UnixIO) ReadMemo(file *File, blockdata []byte) ([]byte, bool, error) {
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
 	// as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
-	_, err = handle.Read(hbuf)
+	_, err = relatedHandle.Read(hbuf)
 	if err != nil {
 		return nil, false, newError("dbase-io-unix-readmemo-3", err)
 	}
@@ -508,7 +508,7 @@ func (u UnixIO) ReadMemo(file *File, blockdata []byte) ([]byte, bool, error) {
 	}
 	// Now read the actual data
 	buf := make([]byte, leng)
-	read, err := handle.Read(buf)
+	read, err := relatedHandle.Read(buf)
 	if err != nil {
 		return buf, false, newError("dbase-io-unix-readmemo-4", err)
 	}
@@ -531,9 +531,9 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 	if file.relatedHandle == nil {
 		return nil, newError("dbase-io-unix-writememo-1", ErrNoFPT)
 	}
-	handle, ok := file.relatedHandle.(*os.File)
+	relatedHandle, ok := file.relatedHandle.(*os.File)
 	if !ok {
-		return nil, newError("dbase-io-unix-writememo-2", fmt.Errorf("handle is of wrong type %T expected *os.File", file.handle))
+		return nil, newError("dbase-io-unix-writememo-2", fmt.Errorf("handle is of wrong type %T expected *os.File", file.relatedHandle))
 	}
 	// Get the block position
 	blockPosition := file.memoHeader.NextFree
@@ -567,7 +567,7 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 	}
 	if file.config.WriteLock {
 		for {
-			err = unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
+			err = unix.FcntlFlock(relatedHandle.Fd(), unix.F_SETLK, flock)
 			if err == nil {
 				break
 			}
@@ -578,7 +578,7 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 		}
 		defer func() {
 			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
+			ulockErr := unix.FcntlFlock(relatedHandle.Fd(), unix.F_SETLK, flock)
 			if ulockErr != nil {
 				err = newError("dbase-io-unix-writememo-4", ulockErr)
 			}
@@ -587,12 +587,12 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 	position := int64(blockPosition) * int64(file.memoHeader.BlockSize)
 	debugf("Writing memo block %d at position %d", blockPosition, position)
 	// Seek to new the next free block
-	_, err = handle.Seek(position, 0)
+	_, err = relatedHandle.Seek(position, 0)
 	if err != nil {
 		return nil, newError("dbase-io-unix-writememo-5", err)
 	}
 	// Write the memo data
-	_, err = handle.Write(data)
+	_, err = relatedHandle.Write(data)
 	if err != nil {
 		return nil, newError("dbase-io-unix-writememo-6", err)
 	}
@@ -610,9 +610,9 @@ func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
 	if file.relatedHandle == nil {
 		return newError("dbase-io-unix-writememoheader-1", ErrNoFPT)
 	}
-	handle, ok := file.relatedHandle.(*os.File)
+	relatedHandle, ok := file.relatedHandle.(*os.File)
 	if !ok {
-		return newError("dbase-io-unix-writememoheader-2", fmt.Errorf("handle is of wrong type %T expected *os.File", file.handle))
+		return newError("dbase-io-unix-writememoheader-2", fmt.Errorf("handle is of wrong type %T expected *os.File", file.relatedHandle))
 	}
 	debugf("Writing memo header...")
 	// Lock the block we are writing to
@@ -624,7 +624,7 @@ func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
 			Whence: 0,
 		}
 		for {
-			err = unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
+			err = unix.FcntlFlock(relatedHandle.Fd(), unix.F_SETLK, flock)
 			if err == nil {
 				break
 			}
@@ -637,14 +637,14 @@ func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
 		}
 		defer func() {
 			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
+			ulockErr := unix.FcntlFlock(relatedHandle.Fd(), unix.F_SETLK, flock)
 			if ulockErr != nil {
 				err = newError("dbase-io-unix-writememoheader-3", ulockErr)
 			}
 		}()
 	}
 	// Seek to the beginning of the file
-	_, err = handle.Seek(0, 0)
+	_, err = relatedHandle.Seek(0, 0)
 	if err != nil {
 		return newError("dbase-io-unix-writememoheader-4", err)
 	}
@@ -655,12 +655,12 @@ func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
 	binary.BigEndian.PutUint32(buf[:4], file.memoHeader.NextFree)
 	binary.BigEndian.PutUint16(buf[6:8], file.memoHeader.BlockSize)
 	debugf("Writing memo header - next free: %d, block size: %d", file.memoHeader.NextFree, file.memoHeader.BlockSize)
-	_, err = handle.Write(buf)
+	_, err = relatedHandle.Write(buf)
 	if err != nil {
 		return newError("dbase-io-unix-writememoheader-5", err)
 	}
 	// Write null till end of header
-	_, err = handle.Write(make([]byte, 512-8))
+	_, err = relatedHandle.Write(make([]byte, 512-8))
 	if err != nil {
 		return newError("dbase-io-unix-writememoheader-6", err)
 	}

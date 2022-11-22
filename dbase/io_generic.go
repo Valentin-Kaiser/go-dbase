@@ -87,13 +87,13 @@ func (g GenericIO) Close(file *File) error {
 		}
 	}
 	if file.relatedHandle != nil {
-		handle, ok := file.relatedHandle.(io.Closer)
+		relatedHandle, ok := file.relatedHandle.(io.Closer)
 		if !ok {
 			return newError("dbase-io-generic-close-3", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 		}
 
 		debugf("Closing related file: %s", file.config.Filename)
-		err := handle.Close()
+		err := relatedHandle.Close()
 		if err != nil {
 			return newError("dbase-io-generic-close-4", fmt.Errorf("closing FPT failed with error: %w", err))
 		}
@@ -111,7 +111,6 @@ func (g GenericIO) ReadHeader(file *File) error {
 	if !ok {
 		return newError("dbase-io-generic-generic-readheader-1", fmt.Errorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle))
 	}
-
 	_, err := handle.Seek(0, 0)
 	if err != nil {
 		return newError("dbase-io-generic-generic-readheader-2", err)
@@ -264,23 +263,22 @@ func (g GenericIO) WriteColumns(file *File) error {
 
 func (g GenericIO) ReadMemoHeader(file *File) error {
 	debugf("Reading memo header...")
-	handle, ok := file.relatedHandle.(io.ReadWriteSeeker)
+	relatedHandle, ok := file.relatedHandle.(io.ReadWriteSeeker)
 	if !ok {
 		return newError("dbase-io-generic-readmemoheader-1", fmt.Errorf("invalid handle"))
 	}
-
 	h := &MemoHeader{}
-	if _, err := handle.Seek(0, 0); err != nil {
-		return newError("dbase-io-generic-read-memo-header-1", err)
-	}
-	b := make([]byte, 1024)
-	n, err := handle.Read(b)
-	if err != nil {
+	if _, err := relatedHandle.Seek(0, 0); err != nil {
 		return newError("dbase-io-generic-read-memo-header-2", err)
+	}
+	b := make([]byte, 8)
+	n, err := relatedHandle.Read(b)
+	if err != nil {
+		return newError("dbase-io-generic-read-memo-header-3", err)
 	}
 	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
 	if err != nil {
-		return newError("dbase-io-generic-read-memo-header-3", err)
+		return newError("dbase-io-generic-read-memo-header-4", err)
 	}
 	debugf("Memo header: %+v", h)
 	file.memoHeader = h
@@ -291,14 +289,14 @@ func (g GenericIO) WriteMemoHeader(file *File, size int) error {
 	if file.relatedHandle == nil {
 		return newError("dbase-io-generic-writememoheader-1", ErrNoFPT)
 	}
-	handle, ok := file.relatedHandle.(io.ReadWriteSeeker)
+	relatedHandle, ok := file.relatedHandle.(io.ReadWriteSeeker)
 	if !ok {
 		return newError("dbase-io-generic-writememoheader-2", fmt.Errorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle))
 	}
 
 	debugf("Writing memo header...")
 	// Seek to the beginning of the file
-	_, err := handle.Seek(0, 0)
+	_, err := relatedHandle.Seek(0, 0)
 	if err != nil {
 		return newError("dbase-io-generic-writememoheader-3", err)
 	}
@@ -309,12 +307,12 @@ func (g GenericIO) WriteMemoHeader(file *File, size int) error {
 	binary.BigEndian.PutUint32(buf[:4], file.memoHeader.NextFree)
 	binary.BigEndian.PutUint16(buf[6:8], file.memoHeader.BlockSize)
 	debugf("Writing memo header - next free: %d, block size: %d", file.memoHeader.NextFree, file.memoHeader.BlockSize)
-	_, err = handle.Write(buf)
+	_, err = relatedHandle.Write(buf)
 	if err != nil {
 		return newError("dbase-io-generic-writememoheader-5", err)
 	}
 	// Write null till end of header
-	_, err = handle.Write(make([]byte, 512-8))
+	_, err = relatedHandle.Write(make([]byte, 512-8))
 	if err != nil {
 		return newError("dbase-io-generic-writememoheader-6", err)
 	}
@@ -322,9 +320,9 @@ func (g GenericIO) WriteMemoHeader(file *File, size int) error {
 }
 
 func (g GenericIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
-	handle, ok := file.relatedHandle.(io.ReadWriteSeeker)
+	relatedHandle, ok := file.relatedHandle.(io.ReadWriteSeeker)
 	if !ok {
-		return nil, false, newError("dbase-io-generic-readmemo-1", fmt.Errorf("invalid handle"))
+		return nil, false, newError("dbase-io-generic-readmemo-1", fmt.Errorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle))
 	}
 
 	// Determine the block number
@@ -335,7 +333,7 @@ func (g GenericIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	position := int64(file.memoHeader.BlockSize) * int64(block)
 	debugf("Reading memo block %d at position %d", block, position)
 	// The position in the file is blocknumber*blocksize
-	_, err := handle.Seek(position, 0)
+	_, err := relatedHandle.Seek(position, 0)
 	if err != nil {
 		return nil, false, newError("dbase-io-generic-readmemo-2", err)
 	}
@@ -343,7 +341,7 @@ func (g GenericIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
 	// as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
-	_, err = handle.Read(hbuf)
+	_, err = relatedHandle.Read(hbuf)
 	if err != nil {
 		return nil, false, newError("dbase-io-generic-readmemo-3", err)
 	}
@@ -356,7 +354,7 @@ func (g GenericIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	}
 	// Now read the actual data
 	buf := make([]byte, leng)
-	read, err := handle.Read(buf)
+	read, err := relatedHandle.Read(buf)
 	if err != nil {
 		return buf, false, newError("dbase-io-generic-readmemo-4", err)
 	}
@@ -378,7 +376,7 @@ func (g GenericIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	if file.relatedHandle == nil {
 		return nil, newError("dbase-io-generic-writememo-1", ErrNoFPT)
 	}
-	handle, ok := file.relatedHandle.(io.ReadWriteSeeker)
+	relatedHandle, ok := file.relatedHandle.(io.ReadWriteSeeker)
 	if !ok {
 		return nil, newError("dbase-io-generic-writememo-2", fmt.Errorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle))
 	}
@@ -408,12 +406,12 @@ func (g GenericIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	position := int64(blockPosition) * int64(file.memoHeader.BlockSize)
 	debugf("Writing memo block %d at position %d", blockPosition, position)
 	// Seek to new the next free block
-	_, err = handle.Seek(position, 0)
+	_, err = relatedHandle.Seek(position, 0)
 	if err != nil {
 		return nil, newError("dbase-io-generic-writememo-4", err)
 	}
 	// Write the memo data
-	_, err = handle.Write(data)
+	_, err = relatedHandle.Write(data)
 	if err != nil {
 		return nil, newError("dbase-io-generic-writememo-5", err)
 	}
