@@ -32,7 +32,7 @@ import (
 //
 // This package contains the functions to convert a dbase database entry as byte array into a row struct
 // with the columns converted into the corresponding data types.
-func (file *File) interpret(raw []byte, column *Column) (interface{}, error) {
+func (file *File) Interpret(raw []byte, column *Column) (interface{}, error) {
 	// Not all column types have been implemented because we don't use them in our DBFs
 	// Extend this function if needed
 	if len(raw) != int(column.Length) {
@@ -94,7 +94,7 @@ func (file *File) interpret(raw []byte, column *Column) (interface{}, error) {
 
 // Converts column data to the byte representation
 // For M values the data has to be written to the memo file
-func (file *File) getRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
+func (file *File) GetRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
 	// if value is nil, return empty byte array
 	if field.GetValue() == nil {
 		return make([]byte, field.column.Length), nil
@@ -155,7 +155,7 @@ func (file *File) getRepresentation(field *Field, skipSpacing bool) ([]byte, err
 // Returns the value from the memo file as string or []byte
 func (file *File) parseMemo(raw []byte, column *Column) (interface{}, error) {
 	// M values contain the address in the FPT file from where to read data
-	memo, isText, err := file.readMemo(raw)
+	memo, isText, err := file.ReadMemo(raw)
 	if err != nil {
 		return nil, newError("dbase-interpreter-parsememo-1", fmt.Errorf("parsing memo failed at column field: %v failed with error: %w", column.Name(), err))
 	}
@@ -183,7 +183,7 @@ func (file *File) getMemoRepresentation(field *Field) ([]byte, error) {
 		return nil, newError("dbase-interpreter-getmemorepresentation-1", fmt.Errorf("invalid type for memo field: %T", field.value))
 	}
 	// Write the memo to the memo file
-	address, err := file.writeMemo(memo, txt, len(memo))
+	address, err := file.WriteMemo(memo, txt, len(memo))
 	if err != nil {
 		return nil, newError("dbase-interpreter-getmrepresentation-2", fmt.Errorf("writing to memo file at column field: %v failed with error: %w", field.Name(), err))
 	}
@@ -481,7 +481,7 @@ func (file *File) getNumericRepresentation(field *Field, skipSpacing bool) ([]by
 }
 
 func (file *File) parseVarchar(raw []byte, column *Column) (interface{}, error) {
-	varlen, null, err := file.readNullFlag(uint64(file.table.rowPointer), column)
+	varlen, null, err := file.ReadNullFlag(uint64(file.table.rowPointer), column)
 	if err != nil {
 		return nil, newError("dbase-interpreter-parsevarchar-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
 	}
@@ -508,7 +508,7 @@ func (file *File) getVarcharRepresentation(field *Field) ([]byte, error) {
 }
 
 func (file *File) parseVarbinary(raw []byte, column *Column) (interface{}, error) {
-	varlen, null, err := file.readNullFlag(uint64(file.table.rowPointer), column)
+	varlen, null, err := file.ReadNullFlag(uint64(file.table.rowPointer), column)
 	if err != nil {
 		return nil, newError("dbase-interpreter-parsevarbinary-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
 	}

@@ -42,7 +42,7 @@ func main() {
 	table, err := dbase.OpenTable(&dbase.Config{
 		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
-	})
+	}, nil)
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}
@@ -63,13 +63,10 @@ func main() {
 
 	// Loop through all rows using rowPointer in DBF struct.
 	for !table.EOF() {
-		row, err := table.Row()
+		row, err := table.Next()
 		if err != nil {
 			panic(dbase.GetErrorTrace(err))
 		}
-
-		// Increment the row pointer.
-		table.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {

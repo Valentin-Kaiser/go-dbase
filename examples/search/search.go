@@ -20,7 +20,7 @@ func main() {
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
 		Filename: "../test_data/table/TEST.DBF",
-	})
+	}, nil)
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}

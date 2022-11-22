@@ -51,6 +51,7 @@ func main() {
 			Converter:  dbase.NewDefaultConverter(charmap.Windows1250),
 			TrimSpaces: true,
 		},
+		nil,
 		[]*dbase.Column{
 			idCol,
 			nameCol,
@@ -107,13 +108,10 @@ func main() {
 
 	// Read all records
 	for !file.EOF() {
-		row, err := file.Row()
+		row, err := file.Next()
 		if err != nil {
 			panic(dbase.GetErrorTrace(err))
 		}
-
-		// Increment the row pointer.
-		file.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {

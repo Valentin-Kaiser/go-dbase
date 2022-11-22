@@ -42,7 +42,7 @@ func main() {
 		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 		WriteLock:  true,
-	})
+	}, nil)
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}
@@ -123,13 +123,10 @@ func main() {
 
 	// Print all rows.
 	for !table.EOF() {
-		row, err := table.Row()
+		row, err := table.Next()
 		if err != nil {
 			panic(dbase.GetErrorTrace(err))
 		}
-
-		// Increment the row pointer.
-		table.Skip(1)
 
 		// Skip deleted rows.
 		if row.Deleted {
