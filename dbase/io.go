@@ -9,9 +9,9 @@ import (
 // Each file type is basically a Table or a Memo file.
 type File struct {
 	config         *Config     // The config used when working with the DBF file.
-	handle         interface{} // DBase file windows handle pointer.
-	relatedHandle  interface{} // Memo file windows handle pointer.
-	io             IO          // IO struct containing the file handles.
+	handle         interface{} // DBase file handle.
+	relatedHandle  interface{} // Memo file handle.
+	io             IO          // The IO interface used to work with the DBF file.
 	header         *Header     // DBase file header containing relevant information.
 	memoHeader     *MemoHeader // Memo file header containing relevant information.
 	dbaseMutex     *sync.Mutex // Mutex locks for concurrent writing access to the DBF file.
