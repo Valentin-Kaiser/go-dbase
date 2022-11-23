@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -52,11 +50,6 @@ type MemoHeader struct {
 	BlockSize uint16  // Block size (bytes per block)
 }
 
-type Database struct {
-	file   *File
-	tables map[string]*File
-}
-
 // Table is a struct containing the table columns, modifications and the row pointer
 type Table struct {
 	columns    []*Column       // Columns defined in this table
@@ -99,89 +92,8 @@ type Modification struct {
 	ExternalKey string                                 // External key to use for the column
 }
 
-/**
- *  ###############################################################
- *  #                   Create new DBF file
- *  ###############################################################
- */
-
-// Open a database and all related tables
-func OpenDatabase(config *Config) (*Database, error) {
-	if config == nil {
-		return nil, newError("dbase-io-opendatabase-1", fmt.Errorf("missing config"))
-	}
-	if len(strings.TrimSpace(config.Filename)) == 0 {
-		return nil, newError("dbase-io-opendatabase-2", fmt.Errorf("missing filename"))
-	}
-	if strings.ToUpper(filepath.Ext(config.Filename)) != string(DBC) {
-		return nil, newError("dbase-io-opendatabase-3", fmt.Errorf("invalid file name: %v", config.Filename))
-	}
-	debugf("Opening database: %v", config.Filename)
-	databaseTable, err := OpenTable(config, nil)
-	if err != nil {
-		return nil, newError("dbase-io-opendatabase-4", fmt.Errorf("opening database table failed with error: %w", err))
-	}
-	// Search by all records where object type is table
-	typeField, err := databaseTable.NewFieldByName("OBJECTTYPE", "Table")
-	if err != nil {
-		return nil, newError("dbase-io-opendatabase-5", fmt.Errorf("creating type field failed with error: %w", err))
-	}
-	rows, err := databaseTable.Search(typeField, true)
-	if err != nil {
-		return nil, newError("dbase-io-opendatabase-6", fmt.Errorf("searching for type field failed with error: %w", err))
-	}
-	// Try to load the table files
-	tables := make(map[string]*File, 0)
-	for _, row := range rows {
-		objectName, err := row.ValueByName("OBJECTNAME")
-		if err != nil {
-			return nil, newError("dbase-io-opendatabase-7", fmt.Errorf("getting table name failed with error: %w", err))
-		}
-		tableName, ok := objectName.(string)
-		if !ok {
-			return nil, newError("dbase-io-opendatabase-8", fmt.Errorf("table name is not a string"))
-		}
-		tableName = strings.Trim(tableName, " ")
-		if tableName == "" {
-			continue
-		}
-		debugf("Found table: %v in database", tableName)
-		// Replace underscores with spaces
-		tablePath := path.Join(filepath.Dir(config.Filename), strings.ReplaceAll(tableName, "_", " ")+string(DBF))
-		tableConfig := &Config{
-			Filename:          tablePath,
-			Converter:         config.Converter,
-			Exclusive:         config.Exclusive,
-			Untested:          config.Untested,
-			TrimSpaces:        config.TrimSpaces,
-			WriteLock:         config.WriteLock,
-			ValidateCodePage:  config.ValidateCodePage,
-			InterpretCodePage: config.InterpretCodePage,
-		}
-		// Load the table
-		table, err := OpenTable(tableConfig, nil)
-		if err != nil {
-			return nil, newError("dbase-io-opendatabase-9", fmt.Errorf("opening table failed with error: %w", err))
-		}
-		if table != nil {
-			tables[tableName] = table
-		}
-	}
-	return &Database{file: databaseTable, tables: tables}, nil
-}
-
-// Close the database file and all related tables
-func (db *Database) Close() error {
-	for _, table := range db.tables {
-		if err := table.Close(); err != nil {
-			return newError("dbase-io-close-1", err)
-		}
-	}
-	return db.file.Close()
-}
-
-// Create a new DBF file
-func New(version FileVersion, config *Config, io IO, columns []*Column, memoBlockSize uint16) (*File, error) {
+// Create a new DBF file with the specified version, configuration and columns
+func New(version FileVersion, config *Config, columns []*Column, memoBlockSize uint16, io IO) (*File, error) {
 	if len(columns) == 0 {
 		return nil, errors.New("no columns defined")
 	}
@@ -322,10 +234,10 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 		column.Length = length
 	case Varbinary:
 		if length > 254 {
-			return nil, newError("dbase-table-newcolumn-5", errors.New("varbinary length can only be 254 bytes long"))
+			return nil, newError("dbase-table-newcolumn-4", errors.New("varbinary length can only be 254 bytes long"))
 		}
 		if length == 0 {
-			return nil, newError("dbase-table-newcolumn-6", errors.New("varbinary length can not be 0"))
+			return nil, newError("dbase-table-newcolumn-5", errors.New("varbinary length can not be 0"))
 		}
 		column.Length = length
 		column.Flag |= byte(BinaryFlag)
@@ -339,18 +251,18 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 		column.Length = length
 	case Numeric:
 		if length > 20 {
-			return nil, newError("dbase-table-newcolumn-3", errors.New("numeric length can only be 20 bytes long"))
+			return nil, newError("dbase-table-newcolumn-8", errors.New("numeric length can only be 20 bytes long"))
 		}
 		if length == 0 {
-			return nil, newError("dbase-table-newcolumn-4", errors.New("numeric length can not be 0"))
+			return nil, newError("dbase-table-newcolumn-9", errors.New("numeric length can not be 0"))
 		}
 		column.Length = length
 	case Float:
 		if length > 20 {
-			return nil, newError("dbase-table-newcolumn-4", errors.New("float length can only be 20 bytes long"))
+			return nil, newError("dbase-table-newcolumn-10", errors.New("float length can only be 20 bytes long"))
 		}
 		if length == 0 {
-			return nil, newError("dbase-table-newcolumn-5", errors.New("float length can not be 0"))
+			return nil, newError("dbase-table-newcolumn-11", errors.New("float length can not be 0"))
 		}
 		column.Length = length
 	case Logical:
@@ -360,26 +272,23 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 	case Currency, Date, DateTime, Double:
 		column.Length = 8
 	default:
-		return nil, newError("dbase-table-newcolumn-2", errors.New("invalid data type"))
+		return nil, newError("dbase-table-newcolumn-12", fmt.Errorf("invalid data type %v specified", dataType))
 	}
 	return column, nil
 }
 
-/**
- *	################################################################
- *	#					dBase header helpers
- *	################################################################
- */
-
 // Parses the year, month and day to time.Time.
-// Note: the year is stored in 2 digits, so we assume the year is between 2000 and 2099.
-func (h *Header) Modified() time.Time {
-	return time.Date(2000+int(h.Year), time.Month(h.Month), int(h.Day), 0, 0, 0, 0, time.Local)
+// The year is stored in decades (2 digits) and added to the base century (2000).
+// Note: we assume the year is between 2000 and 2099 as default.
+func (h *Header) Modified(base int) time.Time {
+	if base == 0 {
+		base = 2000
+	}
+	return time.Date(base+int(h.Year), time.Month(h.Month), int(h.Day), 0, 0, 0, 0, time.Local)
 }
 
 // Returns the calculated number of columns from the header info alone (without the need to read the columninfo from the header).
 // This is the fastest way to determine the number of rows in the file.
-// Note: when Open is used the columns have already been parsed so it is better to call DBF.ColumnsCount() in that case.
 func (h *Header) ColumnsCount() uint16 {
 	return (h.FirstRow - 296) / 32
 }
@@ -393,12 +302,6 @@ func (h *Header) RecordsCount() uint32 {
 func (h *Header) FileSize() int64 {
 	return 296 + int64(h.ColumnsCount()*32) + int64(h.RowsCount*uint32(h.RowLength))
 }
-
-/**
- *	################################################################
- *	#						DBF helper
- *	################################################################
- */
 
 // Returns if the internal row pointer is at end of file
 func (file *File) EOF() bool {
@@ -415,7 +318,7 @@ func (file *File) Pointer() uint32 {
 	return file.table.rowPointer
 }
 
-// Returns the dBase database file header struct for inspecting
+// Returns the dBase table file header struct for inspecting
 func (file *File) Header() *Header {
 	return file.header
 }
@@ -473,41 +376,6 @@ func (file *File) ColumnPos(column *Column) int {
 	return -1
 }
 
-/**
- *	################################################################
- *	#						Database helper
- *	################################################################
- */
-
-// Returns all table of the database
-func (db *Database) Tables() map[string]*File {
-	return db.tables
-}
-
-// Returns the names of every table in the database
-func (db *Database) Names() []string {
-	names := make([]string, 0)
-	for name := range db.tables {
-		names = append(names, name)
-	}
-	return names
-}
-
-// Returns the complete database schema
-func (db *Database) Schema() map[string][]*Column {
-	schema := make(map[string][]*Column)
-	for name, table := range db.tables {
-		schema[name] = table.Columns()
-	}
-	return schema
-}
-
-/**
- *	################################################################
- *	#						Modifications
- *	################################################################
- */
-
 // SetColumnModification sets a modification for a column
 func (file *File) SetColumnModification(position int, mod *Modification) {
 	// Skip if position is out of range
@@ -532,12 +400,6 @@ func (file *File) GetColumnModification(position int) *Modification {
 	return file.table.mods[position]
 }
 
-/**
- *	################################################################
- *	#						ColumnHeader helper
- *	################################################################
- */
-
 // Returns the name of the column as a trimmed string (max length 10)
 func (c *Column) Name() string {
 	return string(bytes.TrimRight(c.FieldName[:], "\x00"))
@@ -551,12 +413,6 @@ func (c *Column) Type() string {
 func (c *Column) Reflect() reflect.Type {
 	return DataType(c.DataType).Reflect()
 }
-
-/**
- *	################################################################
- *	#						Rows
- *	################################################################
- */
 
 // Returns all rows as a slice
 func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
@@ -735,12 +591,6 @@ func (field Field) Column() *Column {
 	return field.column
 }
 
-/**
- *	################################################################
- *	#						Conversions
- *	################################################################
- */
-
 // Converts raw row data to a Row struct
 // If the data points to a memo (FPT) file this file is also read
 func (file *File) BytesToRow(data []byte) (*Row, error) {
@@ -906,12 +756,6 @@ func (row *Row) ToStruct(v interface{}) error {
 	}
 	return nil
 }
-
-/**
- *	################################################################
- *	#					Row conversions
- *	################################################################
- */
 
 // Converts a map of interfaces into the row representation
 func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {

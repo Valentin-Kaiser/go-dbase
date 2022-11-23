@@ -83,7 +83,7 @@ func main() {
 			Columns:  tables[tablename].Header().ColumnsCount(),
 			Records:  tables[tablename].Header().RecordsCount(),
 			FileSize: tables[tablename].Header().FileSize(),
-			Modified: tables[tablename].Header().Modified(),
+			Modified: tables[tablename].Header().Modified(0),
 			Fields:   make(map[string]Field),
 			Data:     make([]map[string]interface{}, 0),
 		}

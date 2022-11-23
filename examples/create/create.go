@@ -51,7 +51,6 @@ func main() {
 			Converter:  dbase.NewDefaultConverter(charmap.Windows1250),
 			TrimSpaces: true,
 		},
-		nil,
 		[]*dbase.Column{
 			idCol,
 			nameCol,
@@ -59,6 +58,7 @@ func main() {
 			varCol,
 		},
 		64,
+		nil,
 	)
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
@@ -67,7 +67,7 @@ func main() {
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		file.Header().Modified(),
+		file.Header().Modified(0),
 		file.Header().ColumnsCount(),
 		file.Header().RecordsCount(),
 		file.Header().FileSize(),

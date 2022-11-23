@@ -5,9 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
@@ -107,24 +104,9 @@ func (g GenericIO) Close(file *File) error {
 }
 
 func (g GenericIO) Create(file *File) error {
-	file.config.Filename = strings.ToUpper(strings.TrimSpace(file.config.Filename))
-	// Check for valid file name
-	if len(file.config.Filename) == 0 {
-		return newError("dbase-io-generic-create-1", fmt.Errorf("missing filename"))
-	}
-	dbfFile, err := os.Create(file.config.Filename)
-	if err != nil {
-		return newError("dbase-io-generic-create-2", fmt.Errorf("creating file failed with error: %w", err))
-	}
-	file.handle = dbfFile
+	file.handle = g.Handle
 	if file.memoHeader != nil {
-		debugf("Creating related file: %s", file.config.Filename)
-		// Create the memo file
-		memoFile, err := os.Create(strings.TrimSuffix(file.config.Filename, filepath.Ext(file.config.Filename)) + ".FPT")
-		if err != nil {
-			return newError("dbase-io-windows-create-6", fmt.Errorf("creating FPT file failed with error: %w", err))
-		}
-		file.relatedHandle = memoFile
+		file.relatedHandle = g.RelatedHandle
 	}
 	return nil
 }

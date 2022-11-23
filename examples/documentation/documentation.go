@@ -73,7 +73,7 @@ func main() {
 			int(tables[name].Header().FirstRow),
 			ToByteString(int(tables[name].Header().RowLength)),
 			ToByteString(int(tables[name].Header().FileSize())),
-			tables[name].Header().Modified(),
+			tables[name].Header().Modified(0),
 		))
 		if err != nil {
 			panic(err)

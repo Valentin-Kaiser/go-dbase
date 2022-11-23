@@ -164,12 +164,6 @@ func setNthBit(b byte, n int) byte {
 	return b
 }
 
-/**
- *	################################################################
- *	#					Row conversion helper
- *	################################################################
- */
-
 // setStructField sets the field with the key or dbase tag of name of the struct obj to the given value
 func setStructField(tags map[string]string, obj interface{}, name string, value interface{}) error {
 	if fieldName, ok := tags[name]; ok {
