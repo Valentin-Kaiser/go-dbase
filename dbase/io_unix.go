@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var defaultIO UnixIO
+var DefaultIO UnixIO
 
 // UnixIO implements the IO interface for unix systems.
 type UnixIO struct{}

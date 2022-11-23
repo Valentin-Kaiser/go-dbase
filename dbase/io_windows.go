@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-var defaultIO WindowsIO
+var DefaultIO WindowsIO
 
 // WindowsIO implements the IO interface for Windows systems.
 type WindowsIO struct{}
