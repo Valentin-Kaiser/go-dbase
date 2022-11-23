@@ -23,7 +23,7 @@ func main() {
 	start := time.Now()
 	db, err := dbase.OpenDatabase(&dbase.Config{
 		Filename: "../test_data/database/EXPENSES.DBC",
-	}, nil)
+	})
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}

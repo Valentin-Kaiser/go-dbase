@@ -55,7 +55,7 @@ func main() {
 	db, err := dbase.OpenDatabase(&dbase.Config{
 		Filename:   path,
 		TrimSpaces: true,
-	}, nil)
+	})
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}

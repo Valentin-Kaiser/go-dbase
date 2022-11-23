@@ -106,7 +106,7 @@ type Modification struct {
  */
 
 // Open a database and all related tables
-func OpenDatabase(config *Config, io IO) (*Database, error) {
+func OpenDatabase(config *Config) (*Database, error) {
 	if config == nil {
 		return nil, newError("dbase-io-opendatabase-1", fmt.Errorf("missing config"))
 	}
@@ -117,7 +117,7 @@ func OpenDatabase(config *Config, io IO) (*Database, error) {
 		return nil, newError("dbase-io-opendatabase-3", fmt.Errorf("invalid file name: %v", config.Filename))
 	}
 	debugf("Opening database: %v", config.Filename)
-	databaseTable, err := OpenTable(config, io)
+	databaseTable, err := OpenTable(config, nil)
 	if err != nil {
 		return nil, newError("dbase-io-opendatabase-4", fmt.Errorf("opening database table failed with error: %w", err))
 	}
@@ -159,7 +159,7 @@ func OpenDatabase(config *Config, io IO) (*Database, error) {
 			InterpretCodePage: config.InterpretCodePage,
 		}
 		// Load the table
-		table, err := OpenTable(tableConfig, io)
+		table, err := OpenTable(tableConfig, nil)
 		if err != nil {
 			return nil, newError("dbase-io-opendatabase-9", fmt.Errorf("opening table failed with error: %w", err))
 		}
