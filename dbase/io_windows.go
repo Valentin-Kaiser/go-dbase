@@ -797,7 +797,7 @@ func (w WindowsIO) getHandle(file *File) (*windows.Handle, error) {
 		return nil, newError("dbase-io-windows-gethandle-1", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
 	}
 	if handle == nil || reflect.ValueOf(handle).IsNil() {
-		return nil, newError("dbase-io-windows-gethandle-2", fmt.Errorf("handle is nil"))
+		return nil, newError("dbase-io-windows-gethandle-2", ErrNoDBF)
 	}
 	return handle, nil
 }
@@ -808,7 +808,7 @@ func (w WindowsIO) getRelatedHandle(file *File) (*windows.Handle, error) {
 		return nil, newError("dbase-io-windows-getrelatedhandle-1", fmt.Errorf("memo handle is of wrong type %T expected *windows.Handle", file.relatedHandle))
 	}
 	if handle == nil || reflect.ValueOf(handle).IsNil() {
-		return nil, newError("dbase-io-windows-getrelatedhandle-2", fmt.Errorf("memo handle is nil"))
+		return nil, newError("dbase-io-windows-getrelatedhandle-2", ErrNoFPT)
 	}
 	return handle, nil
 }

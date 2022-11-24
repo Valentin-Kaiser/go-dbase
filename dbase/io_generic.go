@@ -632,7 +632,7 @@ func (g GenericIO) getHandle(file *File) (io.ReadWriteSeeker, error) {
 		return nil, newError("dbase-io-generic-gethandle-1", fmt.Errorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle))
 	}
 	if handle == nil || reflect.ValueOf(handle).IsNil() {
-		return nil, newError("dbase-io-generic-gethandle-2", fmt.Errorf("handle is nil"))
+		return nil, newError("dbase-io-generic-gethandle-2", ErrNoDBF)
 	}
 	return handle, nil
 }
@@ -643,7 +643,7 @@ func (g GenericIO) getRelatedHandle(file *File) (io.ReadWriteSeeker, error) {
 		return nil, newError("dbase-io-generic-getrelatedhandle-1", fmt.Errorf("memo handle is of wrong type %T expected io.ReadWriteSeeker", file.relatedHandle))
 	}
 	if handle == nil || reflect.ValueOf(handle).IsNil() {
-		return nil, newError("dbase-io-generic-getrelatedhandle-2", fmt.Errorf("memo handle is nil"))
+		return nil, newError("dbase-io-generic-getrelatedhandle-2", ErrNoFPT)
 	}
 	return handle, nil
 }
