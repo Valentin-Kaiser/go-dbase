@@ -48,7 +48,7 @@ func main() {
 	}
 
 	// Open the example database table.
-	table, err := dbase.OpenTable(&dbase.Config{TrimSpaces: true}, dbase.GenericIO{Handle: dbf, RelatedHandle: memo})
+	table, err := dbase.OpenTable(&dbase.Config{TrimSpaces: true, IO: dbase.GenericIO{Handle: dbf, RelatedHandle: memo}})
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}
@@ -56,7 +56,7 @@ func main() {
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		table.Header().Modified(),
+		table.Header().Modified(0),
 		table.Header().ColumnsCount(),
 		table.Header().RecordsCount(),
 		table.Header().FileSize(),

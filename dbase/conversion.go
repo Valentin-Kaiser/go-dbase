@@ -150,7 +150,7 @@ func sanitizeString(raw []byte) []byte {
 }
 
 // nthBit returns the nth bit of a byte slice
-func nthBit(bytes []byte, n int) bool {
+func getNthBit(bytes []byte, n int) bool {
 	if n > len(bytes)*8 {
 		return false
 	}
@@ -163,12 +163,6 @@ func setNthBit(b byte, n int) byte {
 	b |= 1 << n
 	return b
 }
-
-/**
- *	################################################################
- *	#					Row conversion helper
- *	################################################################
- */
 
 // setStructField sets the field with the key or dbase tag of name of the struct obj to the given value
 func setStructField(tags map[string]string, obj interface{}, name string, value interface{}) error {

@@ -25,6 +25,7 @@ type File struct {
 // - WindowsIO (for direct file access with Windows)
 // - UnixIO (for direct file access with Unix)
 // - GenericIO (for any custom file access implementing io.ReadWriteSeeker)
+// The IO interface can be implemented for any custom file access.
 type IO interface {
 	OpenTable(config *Config) (*File, error)
 	Close(file *File) error
@@ -47,110 +48,75 @@ type IO interface {
 }
 
 // Opens a dBase database file (and the memo file if needed).
-// Uses the specified io implementation. If nil, the default io implementation is used depending on the OS.
-func OpenTable(config *Config, io IO) (*File, error) {
-	if io == nil {
-		io = defaultIO
+// The config parameter is required to specify the file path, encoding, file handles (IO) and others.
+// If IO is nil, the default implementation is used depending on the OS.
+func OpenTable(config *Config) (*File, error) {
+	if config.IO == nil {
+		config.IO = DefaultIO
 	}
-	return io.OpenTable(config)
+	return config.IO.OpenTable(config)
 }
 
 // Closes all file handlers.
 func (file *File) Close() error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.Close(file)
+	return file.defaults().io.Close(file)
 }
 
 // Creates a new dBase database file (and the memo file if needed).
 func (file *File) Create() error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.Create(file)
+	return file.defaults().io.Create(file)
 }
 
 // Reads the DBF header from the file handle.
 func (file *File) ReadHeader() error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.ReadHeader(file)
+	return file.defaults().io.ReadHeader(file)
 }
 
 // WriteHeader writes the header to the dbase file.
 func (file *File) WriteHeader() error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.WriteHeader(file)
+	return file.defaults().io.WriteHeader(file)
 }
 
 // ReadColumns reads from DBF header, starting at pos 32, until it finds the Header row terminator END_OF_COLUMN(0x0D).
 func (file *File) ReadColumns() ([]*Column, *Column, error) {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.ReadColumns(file)
+	return file.defaults().io.ReadColumns(file)
 }
 
 // WriteColumns writes the columns at the end of header in dbase file
 func (file *File) WriteColumns() error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.WriteColumns(file)
+	return file.defaults().io.WriteColumns(file)
 }
 
 // ReadMemoHeader reads the memo header from the given file handle.
 func (file *File) ReadMemoHeader() error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.ReadMemoHeader(file)
+	return file.defaults().io.ReadMemoHeader(file)
 }
 
 // WriteMemoHeader writes the memo header to the memo file.
 // Size is the number of blocks the new memo data will take up.
 func (file *File) WriteMemoHeader(size int) error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.WriteMemoHeader(file, size)
+	return file.defaults().io.WriteMemoHeader(file, size)
 }
 
 // Reads raw row data of one row at rowPosition
 func (file *File) ReadRow(position uint32) ([]byte, error) {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.ReadRow(file, position)
+	return file.defaults().io.ReadRow(file, position)
 }
 
 // WriteRow writes a raw row data to the given row position
 func (file *File) WriteRow(row *Row) error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.WriteRow(file, row)
+	return file.defaults().io.WriteRow(file, row)
 }
 
 // Reads one or more blocks from the FPT file, called for each memo column.
 // the return value is the raw data and true if the data read is text (false is RAW binary data).
 func (file *File) ReadMemo(address []byte) ([]byte, bool, error) {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.ReadMemo(file, address)
+	return file.defaults().io.ReadMemo(file, address)
 }
 
 // WriteMemo writes a memo to the memo file and returns the address of the memo.
 func (file *File) WriteMemo(data []byte, text bool, length int) ([]byte, error) {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.WriteMemo(file, data, text, length)
+	return file.defaults().io.WriteMemo(file, data, text, length)
 }
 
 // Read the nullFlag field at the end of the row
@@ -159,27 +125,18 @@ func (file *File) WriteMemo(data []byte, text bool, length int) ([]byte, error) 
 // If varlength is false, we read the complete field
 // If the field is null, we return true as second return value
 func (file *File) ReadNullFlag(position uint64, column *Column) (bool, bool, error) {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.ReadNullFlag(file, position, column)
+	return file.defaults().io.ReadNullFlag(file, position, column)
 }
 
 // Search searches for a row with the given value in the given field
 func (file *File) Search(field *Field, exactMatch bool) ([]*Row, error) {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.Search(file, field, exactMatch)
+	return file.defaults().io.Search(file, field, exactMatch)
 }
 
 // GoTo sets the internal row pointer to row rowNumber
 // Returns and EOF error if at EOF and positions the pointer at lastRow+1
 func (file *File) GoTo(row uint32) error {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.GoTo(file, row)
+	return file.defaults().io.GoTo(file, row)
 }
 
 // Skip adds offset to the internal row pointer
@@ -187,18 +144,12 @@ func (file *File) GoTo(row uint32) error {
 // If the row pointer would be become negative positions the pointer at 0
 // Does not skip deleted rows
 func (file *File) Skip(offset int64) {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	file.io.Skip(file, offset)
+	file.defaults().io.Skip(file, offset)
 }
 
 // Returns if the row at internal row pointer is deleted
 func (file *File) Deleted() (bool, error) {
-	if file.io == nil {
-		file.io = defaultIO
-	}
-	return file.io.Deleted(file)
+	return file.defaults().io.Deleted(file)
 }
 
 // Returns the used IO implementation
@@ -209,6 +160,14 @@ func (file *File) GetIO() IO {
 // Returns the used file handle (DBF,FPT)
 func (file *File) GetHandle() (interface{}, interface{}) {
 	return file.handle, file.relatedHandle
+}
+
+// Sets the default if no io is set
+func (file *File) defaults() *File {
+	if file.io == nil {
+		file.io = DefaultIO
+	}
+	return file
 }
 
 // Check if the file version is tested

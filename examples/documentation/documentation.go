@@ -23,7 +23,7 @@ func main() {
 	start := time.Now()
 	db, err := dbase.OpenDatabase(&dbase.Config{
 		Filename: "../test_data/database/EXPENSES.DBC",
-	}, nil)
+	})
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}
@@ -73,7 +73,7 @@ func main() {
 			int(tables[name].Header().FirstRow),
 			ToByteString(int(tables[name].Header().RowLength)),
 			ToByteString(int(tables[name].Header().FileSize())),
-			tables[name].Header().Modified(),
+			tables[name].Header().Modified(0),
 		))
 		if err != nil {
 			panic(err)

@@ -42,7 +42,7 @@ func main() {
 		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 		WriteLock:  true,
-	}, nil)
+	})
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}
@@ -50,7 +50,7 @@ func main() {
 
 	fmt.Printf(
 		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		table.Header().Modified(),
+		table.Header().Modified(0),
 		table.Header().ColumnsCount(),
 		table.Header().RecordsCount(),
 		table.Header().FileSize(),
