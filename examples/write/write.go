@@ -42,7 +42,7 @@ func main() {
 		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 		WriteLock:  true,
-	}, nil)
+	})
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}

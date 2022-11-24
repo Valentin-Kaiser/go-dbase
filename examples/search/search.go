@@ -17,20 +17,10 @@ func main() {
 	}
 	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
 
-	dbf, err := os.OpenFile("../test_data/table/TEST.DBF", os.O_RDWR, 0600)
-	if err != nil {
-		panic(err)
-	}
-
-	memo, err := os.OpenFile("../test_data/table/TEST.FPT", os.O_RDWR, 0600)
-	if err != nil {
-		panic(err)
-	}
-
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
 		Filename: "../test_data/table/TEST.DBF",
-	}, dbase.GenericIO{Handle: dbf, RelatedHandle: memo})
+	})
 	if err != nil {
 		panic(dbase.GetErrorTrace(err))
 	}
