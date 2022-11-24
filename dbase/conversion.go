@@ -150,7 +150,7 @@ func sanitizeString(raw []byte) []byte {
 }
 
 // nthBit returns the nth bit of a byte slice
-func nthBit(bytes []byte, n int) bool {
+func getNthBit(bytes []byte, n int) bool {
 	if n > len(bytes)*8 {
 		return false
 	}

@@ -25,6 +25,7 @@ type File struct {
 // - WindowsIO (for direct file access with Windows)
 // - UnixIO (for direct file access with Unix)
 // - GenericIO (for any custom file access implementing io.ReadWriteSeeker)
+// The IO interface can be implemented for any custom file access.
 type IO interface {
 	OpenTable(config *Config) (*File, error)
 	Close(file *File) error
@@ -47,12 +48,13 @@ type IO interface {
 }
 
 // Opens a dBase database file (and the memo file if needed).
-// Uses the specified io implementation. If nil, the default io implementation is used depending on the OS.
-func OpenTable(config *Config, io IO) (*File, error) {
-	if io == nil {
-		io = DefaultIO
+// The config parameter is required to specify the file path, encoding, file handles (IO) and others.
+// If IO is nil, the default implementation is used depending on the OS.
+func OpenTable(config *Config) (*File, error) {
+	if config.IO == nil {
+		config.IO = DefaultIO
 	}
-	return io.OpenTable(config)
+	return config.IO.OpenTable(config)
 }
 
 // Closes all file handlers.
@@ -160,6 +162,7 @@ func (file *File) GetHandle() (interface{}, interface{}) {
 	return file.handle, file.relatedHandle
 }
 
+// Sets the default if no io is set
 func (file *File) defaults() *File {
 	if file.io == nil {
 		file.io = DefaultIO

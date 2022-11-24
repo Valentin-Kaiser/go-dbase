@@ -13,6 +13,7 @@ type Database struct {
 }
 
 // Open a database and all related tables
+// Only works with default IO implementation
 func OpenDatabase(config *Config) (*Database, error) {
 	if config == nil {
 		return nil, newError("dbase-io-opendatabase-1", fmt.Errorf("missing config"))
@@ -24,7 +25,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 		return nil, newError("dbase-io-opendatabase-3", fmt.Errorf("invalid file name: %v", config.Filename))
 	}
 	debugf("Opening database: %v", config.Filename)
-	databaseTable, err := OpenTable(config, nil)
+	databaseTable, err := OpenTable(config)
 	if err != nil {
 		return nil, newError("dbase-io-opendatabase-4", fmt.Errorf("opening database table failed with error: %w", err))
 	}
@@ -66,7 +67,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 			InterpretCodePage: config.InterpretCodePage,
 		}
 		// Load the table
-		table, err := OpenTable(tableConfig, nil)
+		table, err := OpenTable(tableConfig)
 		if err != nil {
 			return nil, newError("dbase-io-opendatabase-9", fmt.Errorf("opening table failed with error: %w", err))
 		}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -25,7 +24,7 @@ type Config struct {
 	WriteLock         bool              // Whether or not the write operations should lock the record
 	ValidateCodePage  bool              // Whether or not the code page mark should be validated.
 	InterpretCodePage bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.
-	CustomIO          io.ReadWriteSeeker
+	IO                IO                // The IO interface to use.
 }
 
 // Containing DBF header information like dBase FileType, last change and rows count.

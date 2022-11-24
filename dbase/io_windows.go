@@ -398,11 +398,11 @@ func (w WindowsIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 		return false, false, newError("dbase-io-windows-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, file.nullFlagColumn.Length))
 	}
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
-		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), nthBit(buf, bitCount), nthBit(buf, bitCount+1))
-		return nthBit(buf, bitCount), nthBit(buf, bitCount+1), nil
+		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, bitCount), getNthBit(buf, bitCount+1))
+		return getNthBit(buf, bitCount), getNthBit(buf, bitCount+1), nil
 	}
-	debugf("Read _NullFlag for column %s => varlength: %v ", column.Name(), nthBit(buf, bitCount))
-	return nthBit(buf, bitCount), false, nil
+	debugf("Read _NullFlag for column %s => varlength: %v ", column.Name(), getNthBit(buf, bitCount))
+	return getNthBit(buf, bitCount), false, nil
 }
 
 func (w WindowsIO) ReadMemoHeader(file *File) error {

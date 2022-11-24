@@ -411,12 +411,12 @@ func (u UnixIO) ReadNullFlag(file *File, rowPosition uint64, column *Column) (bo
 	}
 
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
-		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), nthBit(buf, bitCount), nthBit(buf, bitCount+1))
-		return nthBit(buf, bitCount), nthBit(buf, bitCount+1), nil
+		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, bitCount), getNthBit(buf, bitCount+1))
+		return getNthBit(buf, bitCount), getNthBit(buf, bitCount+1), nil
 	}
 
-	debugf("Read _NullFlag for column %s => varlength: %v", column.Name(), nthBit(buf, bitCount))
-	return nthBit(buf, bitCount), false, nil
+	debugf("Read _NullFlag for column %s => varlength: %v", column.Name(), getNthBit(buf, bitCount))
+	return getNthBit(buf, bitCount), false, nil
 }
 
 func (u UnixIO) ReadMemoHeader(file *File) error {
