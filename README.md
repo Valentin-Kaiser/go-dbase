@@ -91,7 +91,7 @@ The following encodings are supported by this package:
 
 ## Installation
 ``` 
-go get github.com/Valentin-Kaiser/go-dbase/dbase
+go get github.com/Valentin-Kaiser/go-dbase@latest
 ```
 
 ## Projects
