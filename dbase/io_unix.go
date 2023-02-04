@@ -6,7 +6,6 @@ package dbase
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -15,8 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 var DefaultIO UnixIO
@@ -274,7 +271,6 @@ func (u UnixIO) WriteColumns(file *File) (err error) {
 	if err != nil {
 		return newError("dbase-io-unix-writecolumns-1", err)
 	}
-	position := uint32(32)
 	// Seek to the beginning of the file
 	_, err = handle.Seek(32, 0)
 	if err != nil {
