@@ -197,32 +197,6 @@ func (u UnixIO) WriteHeader(file *File) (err error) {
 	if err != nil {
 		return newError("dbase-io-unix-writeheader-1", err)
 	}
-	// Lock the block we are writing to
-	if file.config.WriteLock {
-		flock := &unix.Flock_t{
-			Type:   unix.F_WRLCK,
-			Start:  0,
-			Len:    int64(file.header.FirstRow),
-			Whence: 0,
-		}
-		for {
-			err = unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
-			if err == nil {
-				break
-			}
-			if !errors.Is(err, unix.EAGAIN) {
-				return newError("dbase-io-unix-writeheader-2", err)
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-		defer func() {
-			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
-			if ulockErr != nil {
-				err = newError("dbase-io-unix-writeheader-3", ulockErr)
-			}
-		}()
-	}
 	// Seek to the beginning of the file
 	_, err = handle.Seek(0, 0)
 	if err != nil {
@@ -300,34 +274,7 @@ func (u UnixIO) WriteColumns(file *File) (err error) {
 	if err != nil {
 		return newError("dbase-io-unix-writecolumns-1", err)
 	}
-	// Lock the block we are writing to
 	position := uint32(32)
-	// Lock the block we are writing to
-	if file.config.WriteLock {
-		flock := &unix.Flock_t{
-			Type:   unix.F_WRLCK,
-			Start:  int64(position),
-			Len:    int64(file.header.FirstRow),
-			Whence: 0,
-		}
-		for {
-			err = unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
-			if err == nil {
-				break
-			}
-			if !errors.Is(err, unix.EAGAIN) {
-				return newError("dbase-io-unix-writecolumns-1", err)
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-		defer func() {
-			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
-			if ulockErr != nil {
-				err = newError("dbase-io-unix-writecolumns-2", ulockErr)
-			}
-		}()
-	}
 	// Seek to the beginning of the file
 	_, err = handle.Seek(32, 0)
 	if err != nil {
@@ -521,32 +468,6 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 	binary.BigEndian.PutUint32(data[4:8], uint32(length))
 	// The rest is the data
 	data = append(data, raw...)
-	// Lock the block we are writing to
-	flock := &unix.Flock_t{
-		Type:   unix.F_WRLCK,
-		Start:  int64(blockPosition),
-		Len:    int64(file.memoHeader.BlockSize),
-		Whence: 0,
-	}
-	if file.config.WriteLock {
-		for {
-			err = unix.FcntlFlock(relatedHandle.Fd(), unix.F_SETLK, flock)
-			if err == nil {
-				break
-			}
-			if !errors.Is(err, unix.EAGAIN) {
-				return nil, newError("dbase-io-unix-writememo-3", err)
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-		defer func() {
-			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(relatedHandle.Fd(), unix.F_SETLK, flock)
-			if ulockErr != nil {
-				err = newError("dbase-io-unix-writememo-4", ulockErr)
-			}
-		}()
-	}
 	position := int64(blockPosition) * int64(file.memoHeader.BlockSize)
 	debugf("Writing memo block %d at position %d", blockPosition, position)
 	// Seek to new the next free block
@@ -573,34 +494,6 @@ func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
 		return newError("dbase-io-unix-writememoheader-1", err)
 	}
 	debugf("Writing memo header...")
-	// Lock the block we are writing to
-	if file.config.WriteLock {
-		flock := &unix.Flock_t{
-			Type:   unix.F_WRLCK,
-			Start:  0,
-			Len:    int64(file.header.FirstRow),
-			Whence: 0,
-		}
-		for {
-			err = unix.FcntlFlock(relatedHandle.Fd(), unix.F_SETLK, flock)
-			if err == nil {
-				break
-			}
-
-			if !errors.Is(err, unix.EAGAIN) {
-				return newError("dbase-io-unix-writememoheader-2", err)
-			}
-
-			time.Sleep(10 * time.Millisecond)
-		}
-		defer func() {
-			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(relatedHandle.Fd(), unix.F_SETLK, flock)
-			if ulockErr != nil {
-				err = newError("dbase-io-unix-writememoheader-3", ulockErr)
-			}
-		}()
-	}
 	// Seek to the beginning of the file
 	_, err = relatedHandle.Seek(0, 0)
 	if err != nil {
@@ -672,34 +565,6 @@ func (u UnixIO) WriteRow(file *File, row *Row) (err error) {
 	err = row.handle.WriteHeader()
 	if err != nil {
 		return newError("dbase-io-unix-writerow-3", err)
-	}
-	// Lock the block we are writing to
-	if row.handle.config.WriteLock {
-		flock := &unix.Flock_t{
-			Type:   unix.F_WRLCK,
-			Start:  position,
-			Len:    int64(row.handle.header.RowLength),
-			Whence: 0,
-		}
-		for {
-			err = unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
-			if err == nil {
-				break
-			}
-
-			if !errors.Is(err, unix.EAGAIN) {
-				return newError("dbase-io-unix-writerow-4", err)
-			}
-
-			time.Sleep(10 * time.Millisecond)
-		}
-		defer func() {
-			flock.Type = unix.F_ULOCK
-			ulockErr := unix.FcntlFlock(handle.Fd(), unix.F_SETLK, flock)
-			if ulockErr != nil {
-				err = newError("dbase-io-unix-writerow-5", ulockErr)
-			}
-		}()
 	}
 	debugf("Writing row: %d at offset: %v", row.Position, position)
 	// Seek to the correct position
