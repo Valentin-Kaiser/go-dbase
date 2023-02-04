@@ -13,7 +13,6 @@ on:
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest, windows-latest, macos-latest
     permissions:
       actions: read
       contents: read
@@ -22,6 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         language: [ 'go' ] 
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
