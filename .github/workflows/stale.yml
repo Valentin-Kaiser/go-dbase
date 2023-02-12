@@ -15,14 +15,14 @@ jobs:
       pull-requests: write
 
     steps:
-    - uses: actions/stale@v5
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        stale-issue-message: 'No activity on this issue for some time. Will be marked as stale.'
-        close-issue-message: 'This issue has been automatically closed due to inactivity. If you feel this is in error, please re-open the issue.'
-        stale-pr-message: 'No activity on this pull request for some time. Will be marked as stale. If you feel this is in error, please re-open the pull request.'
-        close-pr-message: 'This pull request has been automatically closed due to inactivity. If you feel this is in error, please re-open the pull request.'
-        stale-issue-label: 'stale'
-        stale-pr-label: 'stale'
-        days-before-stale: 30
-        days-before-close: 7
+      - uses: actions/stale@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: 'No activity on this issue for some time. Will be marked as stale.'
+          close-issue-message: 'This issue has been automatically closed due to inactivity. If you feel this is in error, please re-open the issue.'
+          stale-pr-message: 'No activity on this pull request for some time. Will be marked as stale. If you feel this is in error, please re-open the pull request.'
+          close-pr-message: 'This pull request has been automatically closed due to inactivity. If you feel this is in error, please re-open the pull request.'
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          days-before-stale: 30
+          days-before-close: 7
