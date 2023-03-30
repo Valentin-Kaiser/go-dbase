@@ -59,6 +59,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 		tableConfig := &Config{
 			Filename:          tablePath,
 			Converter:         config.Converter,
+			ReadOnly:          config.ReadOnly,
 			Exclusive:         config.Exclusive,
 			Untested:          config.Untested,
 			TrimSpaces:        config.TrimSpaces,

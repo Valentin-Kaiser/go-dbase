@@ -18,6 +18,7 @@ import (
 type Config struct {
 	Filename          string            // The filename of the DBF file.
 	Converter         EncodingConverter // The encoding converter to use.
+	ReadOnly          bool              // If true the file is opened in read-only mode.
 	Exclusive         bool              // If true the file is opened in exclusive mode.
 	Untested          bool              // If true the file version is not checked.
 	TrimSpaces        bool              // Trimspaces default value
