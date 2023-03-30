@@ -16,16 +16,17 @@ import (
 // If Converter and InterpretCodePage are both not set the package will try to interpret the code page mark.
 // To open untested files set Untested to true. Tested files are defined in the constants.go file.
 type Config struct {
-	Filename          string            // The filename of the DBF file.
-	Converter         EncodingConverter // The encoding converter to use.
-	ReadOnly          bool              // If true the file is opened in read-only mode.
-	Exclusive         bool              // If true the file is opened in exclusive mode.
-	Untested          bool              // If true the file version is not checked.
-	TrimSpaces        bool              // Trimspaces default value
-	WriteLock         bool              // Whether or not the write operations should lock the record
-	ValidateCodePage  bool              // Whether or not the code page mark should be validated.
-	InterpretCodePage bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.
-	IO                IO                // The IO interface to use.
+	Filename                          string            // The filename of the DBF file.
+	Converter                         EncodingConverter // The encoding converter to use.
+	Exclusive                         bool              // If true the file is opened in exclusive mode.
+	Untested                          bool              // If true the file version is not checked.
+	TrimSpaces                        bool              // Trimspaces default value
+	DisableConvertFilenameUnderscores bool              // If false underscores in the table filename are converted to spaces.
+  ReadOnly                          bool              // If true the file is opened in read-only mode.
+	WriteLock                         bool              // Whether or not the write operations should lock the record
+	ValidateCodePage                  bool              // Whether or not the code page mark should be validated.
+	InterpretCodePage                 bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.
+	IO                                IO                // The IO interface to use.
 }
 
 // Containing DBF header information like dBase FileType, last change and rows count.

@@ -54,18 +54,22 @@ func OpenDatabase(config *Config) (*Database, error) {
 			continue
 		}
 		debugf("Found table: %v in database", tableName)
+		tablePath := path.Join(filepath.Dir(config.Filename), tableName+string(DBF))
 		// Replace underscores with spaces
-		tablePath := path.Join(filepath.Dir(config.Filename), strings.ReplaceAll(tableName, "_", " ")+string(DBF))
+		if !config.DisableConvertFilenameUnderscores {
+			tablePath = path.Join(filepath.Dir(config.Filename), strings.ReplaceAll(tableName, "_", " ")+string(DBF))
+		}
 		tableConfig := &Config{
-			Filename:          tablePath,
-			Converter:         config.Converter,
-			ReadOnly:          config.ReadOnly,
-			Exclusive:         config.Exclusive,
-			Untested:          config.Untested,
-			TrimSpaces:        config.TrimSpaces,
-			WriteLock:         config.WriteLock,
-			ValidateCodePage:  config.ValidateCodePage,
-			InterpretCodePage: config.InterpretCodePage,
+			Filename:                          tablePath,
+			Converter:                         config.Converter,
+			Exclusive:                         config.Exclusive,
+			Untested:                          config.Untested,
+			TrimSpaces:                        config.TrimSpaces,
+			DisableConvertFilenameUnderscores: config.DisableConvertFilenameUnderscores,
+      ReadOnly:                          config.ReadOnly,
+			WriteLock:                         config.WriteLock,
+			ValidateCodePage:                  config.ValidateCodePage,
+			InterpretCodePage:                 config.InterpretCodePage,
 		}
 		// Load the table
 		table, err := OpenTable(tableConfig)
