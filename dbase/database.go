@@ -66,6 +66,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 			Untested:                          config.Untested,
 			TrimSpaces:                        config.TrimSpaces,
 			DisableConvertFilenameUnderscores: config.DisableConvertFilenameUnderscores,
+			ReadOnly:                          config.ReadOnly,
 			WriteLock:                         config.WriteLock,
 			ValidateCodePage:                  config.ValidateCodePage,
 			InterpretCodePage:                 config.InterpretCodePage,

@@ -22,6 +22,7 @@ type Config struct {
 	Untested                          bool              // If true the file version is not checked.
 	TrimSpaces                        bool              // Trimspaces default value
 	DisableConvertFilenameUnderscores bool              // If false underscores in the table filename are converted to spaces.
+	ReadOnly                          bool              // If true the file is opened in read-only mode.
 	WriteLock                         bool              // Whether or not the write operations should lock the record
 	ValidateCodePage                  bool              // Whether or not the code page mark should be validated.
 	InterpretCodePage                 bool              // Whether or not the code page mark should be interpreted. Ignores the defined converter.

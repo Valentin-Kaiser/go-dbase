@@ -27,7 +27,7 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	if config == nil {
 		return nil, newError("dbase-io-windows-opentable-1", fmt.Errorf("missing configuration"))
 	}
-	debugf("Opening table: %s - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
+	debugf("Opening table: %s - Read-only: %v - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.ReadOnly, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
 	if len(strings.TrimSpace(config.Filename)) == 0 {
 		return nil, newError("dbase-io-windows-opentable-2", fmt.Errorf("missing filename"))
 	}
@@ -38,6 +38,9 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 		return nil, newError("dbase-io-windows-opentable-3", err)
 	}
 	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
+	if config.ReadOnly {
+		mode = os.O_RDONLY | windows.O_CLOEXEC | windows.O_NONBLOCK
+	}
 	if config.Exclusive {
 		mode = windows.O_RDWR | windows.O_CLOEXEC | windows.O_EXCL
 	}
