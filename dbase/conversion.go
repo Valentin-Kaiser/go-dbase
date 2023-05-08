@@ -47,7 +47,6 @@ func parseDate(raw []byte) (time.Time, error) {
 
 // parseDateTIme parses a date and time string from a byte slice and returns a time.Time
 func parseDateTime(raw []byte) time.Time {
-	raw = sanitizeString(raw)
 	if len(raw) != 8 {
 		return time.Time{}
 	}
