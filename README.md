@@ -109,6 +109,6 @@ These examples can be found in the [examples](./examples/) directory:
 - [Write](./examples/write/write.go)
 - [Search](./examples/search/search.go)
 - [Create](./examples/create/create.go)
-- [Database export](./examples/database/database.go)
+- [Database export](./examples/database/export.go)
 - [Database documentation](./examples/documentation/documentation.go)
 - [Database schema](./examples/schema/schema.go)
