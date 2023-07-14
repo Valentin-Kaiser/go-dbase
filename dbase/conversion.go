@@ -179,6 +179,14 @@ func setStructField(tags map[string]string, obj interface{}, name string, value 
 	structFieldType := structFieldValue.Type()
 	value = dynamicCast(value, structFieldType)
 	val := reflect.ValueOf(value)
+
+	if structFieldType.Kind() == reflect.Ptr {
+		// Convert the value to a pointer to match the field type
+		ptr := reflect.New(structFieldType.Elem())
+		ptr.Elem().Set(val)
+		val = ptr
+	}
+
 	if structFieldType != val.Type() {
 		return newError("dbase-conversion-setstructfield-2", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
 	}
