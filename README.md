@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="go-dbase.png" width="200">
+  <img src="go-dbase.png" width="365">
 </p>
 
 # Microsoft Visual FoxPro / dbase library for Go
