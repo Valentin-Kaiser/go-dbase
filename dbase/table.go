@@ -154,25 +154,24 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 	var err error
 	for i, field := range row.fields {
 		val := field.GetValue()
-		if i >= 0 && i < len(row.handle.table.mods) {
-			if mod := row.handle.table.mods[i]; mod != nil {
-				if mod.TrimSpaces {
-					if str, ok := val.(string); ok {
-						val = strings.TrimSpace(str)
-					}
+		if i >= 0 && i < len(row.handle.table.mods) && row.handle.table.mods[i] != nil {
+			mod := row.handle.table.mods[i]
+			if mod.TrimSpaces {
+				if str, ok := val.(string); ok {
+					val = strings.TrimSpace(str)
 				}
-				if mod.Convert != nil {
-					debugf("Converting field %v due to modification", field.Name())
-					val, err = mod.Convert(val)
-					if err != nil {
-						return nil, newError("dbase-table-tomap-1", err)
-					}
+			}
+			if mod.Convert != nil {
+				debugf("Converting field %v due to modification", field.Name())
+				val, err = mod.Convert(val)
+				if err != nil {
+					return nil, newError("dbase-table-tomap-1", err)
 				}
-				if len(mod.ExternalKey) != 0 {
-					debugf("Resolving external key %v for field %v due to modification", mod.ExternalKey, field.Name())
-					out[mod.ExternalKey] = val
-					continue
-				}
+			}
+			if len(mod.ExternalKey) != 0 {
+				debugf("Resolving external key %v for field %v due to modification", mod.ExternalKey, field.Name())
+				out[mod.ExternalKey] = val
+				continue
 			}
 		}
 		out[field.Name()] = val
