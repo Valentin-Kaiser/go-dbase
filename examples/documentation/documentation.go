@@ -97,7 +97,12 @@ func main() {
 		}
 
 		for _, column := range schema[name] {
-			_, err = schemaFile.WriteString(fmt.Sprintf("| *%v* | %v | %v | %v |  | \n", column.Name(), column.Type(), column.Reflect(), column.Length))
+			typ, err := column.Reflect()
+			if err != nil {
+				panic(err)
+			}
+
+			_, err = schemaFile.WriteString(fmt.Sprintf("| *%v* | %v | %v | %v |  | \n", column.Name(), column.Type(), typ, column.Length))
 			if err != nil {
 				panic(err)
 			}

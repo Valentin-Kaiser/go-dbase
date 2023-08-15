@@ -44,7 +44,7 @@ func main() {
 
 	// When creating a new table you need to define table type
 	// For more information about table types see the constants.go file
-	file, err := dbase.New(
+	file, err := dbase.NewTable(
 		dbase.FoxProVar,
 		&dbase.Config{
 			Filename:   "test.dbf",

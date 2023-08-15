@@ -89,10 +89,15 @@ func main() {
 		}
 
 		for _, field := range schema[tablename] {
+			typ, err := field.Reflect()
+			if err != nil {
+				panic(err)
+			}
+
 			t.Fields[field.Name()] = Field{
 				Name:   field.Name(),
 				Type:   field.Type(),
-				GoType: field.Reflect().String(),
+				GoType: typ.String(),
 				Length: int(field.Length),
 			}
 		}

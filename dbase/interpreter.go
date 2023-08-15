@@ -15,26 +15,23 @@ import (
 //
 // The supported column types with their return Go types are:
 //
-//	Column Type >> Column Type Name >> Golang type
+// | Column Type | Column Type Name | Golang type |
+// | ----------- | ---------------- | ----------- |
+// | B | Double | float64 |
+// | C | Character | string |
+// | D | Date | time.Time |
+// | F | Float | float64 |
+// | I | Integer | int32 |
+// | L | Logical | bool |
+// | M | Memo | string |
+// | M | Memo (Binary) | []byte |
+// | N | Numeric (0 decimals) | int64 |
+// | N | Numeric (with decimals) | float64 |
+// | T | DateTime | time.Time |
+// | Y | Currency | float64 |
 //
-//	B  >>  Double  >>  float64
-//	C  >>  Character  >>  string
-//	D  >>  Date  >>  time.Time
-//	F  >>  Float  >>  float64
-//	I  >>  Integer  >>  int32
-//	L  >>  Logical  >>  bool
-//	M  >>  Memo   >>  string
-//	M  >>  Memo (Binary)  >>  []byte
-//	N  >>  Numeric (0 decimals)  >>  int64
-//	N  >>  Numeric (with decimals)  >>  float64
-//	T  >>  DateTime  >>  time.Time
-//	Y  >>  Currency  >>  float64
-//
-// This package contains the functions to convert a dbase database entry as byte array into a row struct
-// with the columns converted into the corresponding data types.
+// Not all available column types have been implemented because we don't use them in our DBFs
 func (file *File) Interpret(raw []byte, column *Column) (interface{}, error) {
-	// Not all column types have been implemented because we don't use them in our DBFs
-	// Extend this function if needed
 	if len(raw) != int(column.Length) {
 		return nil, newError("dbase-interpreter-datatovalue-1", fmt.Errorf("invalid length %v Bytes != %v Bytes at column field: %v", len(raw), column.Length, column.Name()))
 	}
@@ -92,9 +89,9 @@ func (file *File) Interpret(raw []byte, column *Column) (interface{}, error) {
 	}
 }
 
-// Converts column data to the byte representation
-// For M values the data has to be written to the memo file
-func (file *File) GetRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
+// Represent converts column data to the byte representation of the columns data type
+// For M values the data is written to the memo file and the address is returned
+func (file *File) Represent(field *Field, skipSpacing bool) ([]byte, error) {
 	// if value is nil, return empty byte array
 	if field.GetValue() == nil {
 		return make([]byte, field.column.Length), nil
@@ -385,7 +382,7 @@ func (file *File) getDateTimeRepresentation(field *Field) ([]byte, error) {
 		t = parsedTime
 	}
 	raw := make([]byte, 8)
-	i := ymd2jd(t.Year(), int(t.Month()), t.Day())
+	i := julianDate(t.Year(), int(t.Month()), t.Day())
 	date, err := toBinary(uint64(i))
 	if err != nil {
 		return nil, newError("dbase-interpreter-getdatetimerepresentation-3", fmt.Errorf("time conversion at column field: %v failed with error: %w", field.Name(), err))

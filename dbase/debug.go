@@ -6,9 +6,11 @@ import (
 	"os"
 )
 
-var debug = false
-var debugLogger = log.New(os.Stdout, "[dbase] [DEBUG] ", log.LstdFlags)
-var errorLogger = log.New(os.Stdout, "[dbase] [ERROR] ", log.LstdFlags)
+var (
+	debug       = false
+	debugLogger = log.New(os.Stdout, "[dbase] [DEBUG] ", log.LstdFlags)
+	errorLogger = log.New(os.Stdout, "[dbase] [ERROR] ", log.LstdFlags)
+)
 
 // Debug the dbase package
 // If debug is true, debug messages will be printed to the defined io.Writter (default: os.Stdout)
