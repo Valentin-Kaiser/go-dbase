@@ -39,9 +39,9 @@ If the vulnerability is declined:
 
 ## Security Updates
 
-To ensure the security of DDNS Updater, it is crucial that all users update to the latest supported version promptly. Users of older versions that are no longer supported are strongly recommended to upgrade to a supported version to stay protected against potential security threats.
+To ensure the security of go-dbase, it is crucial that all users update to the latest supported version promptly. Users of older versions that are no longer supported are strongly recommended to upgrade to a supported version to stay protected against potential security threats.
 
-Thank you for helping me make DDNS Updater more secure. Your cooperation and responsible disclosure are essential to maintaining the integrity and trustworthiness of this project.
+Thank you for helping me make go-dbase more secure. Your cooperation and responsible disclosure are essential to maintaining the integrity and trustworthiness of this project.
 
 Please note that this security policy is subject to change over time, so it is advisable to check this document periodically for any updates.
 
