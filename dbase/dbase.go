@@ -1,4 +1,4 @@
-// Package dbase offers tools for managing dBase-format database files.
+// This go-dbase package offers tools for managing dBase-format database files.
 // It supports tailored I/O operations for Unix and Windows platforms,
 // provides flexible data representations like maps, JSON, and Go structs,
 // and ensures safe concurrent operations with built-in mutex locks.

@@ -1,4 +1,8 @@
-# Microsoft Visual FoxPro DBF for Go
+<p align="center">
+  <img src="go-dbase.png" width="200">
+</p>
+
+# Microsoft Visual FoxPro / dbase library for Go
 
 [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/Valentin-Kaiser/go-dbase)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://github.com/Valentin-Kaiser/go-dbase/blob/main/LICENSE)
@@ -8,6 +12,19 @@
 [![Go Report](https://goreportcard.com/badge/github.com/Valentin-Kaiser/go-dbase)](https://goreportcard.com/report/github.com/Valentin-Kaiser/go-dbase)
 
 **Golang package for reading and writing FoxPro dBase table and memo files.**
+
+This go-dbase package offers tools for managing dBase-format database files.
+It supports tailored I/O operations for Unix and Windows platforms,
+provides flexible data representations like maps, JSON, and Go structs,
+and ensures safe concurrent operations with built-in mutex locks.
+
+The package facilitates defining, manipulating, and querying columns
+and rows in dBase tables, converting between dBase-specific data types
+and Go data types, and performing systematic error handling.
+
+Typical use cases include data retrieval from legacy dBase systems,
+conversion of dBase files to modern formats, and building applications
+that interface with dBase databases.
 
 ## Features 
 
@@ -64,7 +81,9 @@ The supported column types with their return Go types are:
 | P | Picture | []byte |
 
 
-> If you need more information about dbase data types take a look here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
+> You can find more information about dbase data types here: [Microsoft Visual Studio Foxpro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/74zkxe2k(v=vs.80))
+
+> If you need additional column types, feel free to open an issue and I will add them. Or you can add them yourself and create a pull request.
 
 ### Supported encodings
 
@@ -89,17 +108,12 @@ The following encodings are supported by this package:
 
 > All encodings are converted from and to UTF-8.
 
+> If you need additional encodings, feel free to open an issue and I will add them. Or you can add them yourself and create a pull request.
+
 ## Installation
 ``` 
 go get github.com/Valentin-Kaiser/go-dbase@latest
 ```
-
-## Projects
-
-Projects using this package:
-
-- [👻 G(h)oST](https://github.com/Plaenkler/GoST)
-- [🦊 Exporter](https://github.com/LaKiS-GbR/go-dbase-export)
 
 ## Examples
 
