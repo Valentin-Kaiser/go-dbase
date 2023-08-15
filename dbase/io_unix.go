@@ -589,7 +589,7 @@ func (u UnixIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, error
 	}
 	debugf("Searching for value: %v in field: %s", field.GetValue(), field.column.Name())
 	// convert the value to a string
-	val, err := file.GetRepresentation(field, !exactMatch)
+	val, err := file.Represent(field, !exactMatch)
 	if err != nil {
 		return nil, newError("dbase-io-unix-search-3", err)
 	}
