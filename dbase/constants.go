@@ -29,7 +29,7 @@ const (
 	FoxPro2Memo     FileVersion = 0xF5
 )
 
-// Table file extenstions
+// Allowed file extensions for the different file types
 type FileExtension string
 
 const (
@@ -125,3 +125,9 @@ func (t DataType) Reflect() (reflect.Type, error) {
 		return nil, ErrUnknownDataType
 	}
 }
+
+// nullFlagColumn is a reserved column name that is placed at the end of the column list
+// It indicates wether a column is nullable or has a variable length. The value of the column
+// is a byte arry where one bit indicates wether the column is nullable and another bit indicates
+// wether the column has a variable length.
+var nullFlagColumn = [11]byte{0x5F, 0x4E, 0x75, 0x6C, 0x6C, 0x46, 0x6C, 0x61, 0x67, 0x73}
