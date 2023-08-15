@@ -2,23 +2,7 @@ package dbase
 
 import (
 	"fmt"
-	"sync"
 )
-
-// File is the main struct to handle a dBase file.
-// Each file type is basically a Table or a Memo file.
-type File struct {
-	config         *Config     // The config used when working with the DBF file.
-	handle         interface{} // DBase file handle.
-	relatedHandle  interface{} // Memo file handle.
-	io             IO          // The IO interface used to work with the DBF file.
-	header         *Header     // DBase file header containing relevant information.
-	memoHeader     *MemoHeader // Memo file header containing relevant information.
-	dbaseMutex     *sync.Mutex // Mutex locks for concurrent writing access to the DBF file.
-	memoMutex      *sync.Mutex // Mutex locks for concurrent writing access to the FPT file.
-	table          *Table      // Containing the columns and internal row pointer.
-	nullFlagColumn *Column     // The column containing the null flag column (if varchar or varbinary field exists).
-}
 
 // IO is the interface to work with the DBF file.
 // Three implementations are available:
