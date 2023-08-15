@@ -18,6 +18,8 @@ var (
 	// Returned when an invalid column position is used (x<1 or x>number of columns)
 	ErrInvalidPosition = errors.New("INVALID_POSITION")
 	ErrInvalidEncoding = errors.New("INVALID_ENCODING")
+	// Returned when an invalid data type is used
+	ErrUnknownDataType = errors.New("UNKNOWN_DATA_TYPE")
 )
 
 // Error is a wrapper for errors that occur in the dbase package
@@ -26,7 +28,6 @@ type Error struct {
 	err     error
 }
 
-// newError creates a new Error
 func newError(context string, err error) Error {
 	errorf("%s:%s", context, GetErrorTrace(err))
 	if err != nil {
@@ -47,7 +48,7 @@ func newError(context string, err error) Error {
 	}
 }
 
-// Error returns the error message
+// Error returns the error message of the underlying error
 func (e Error) Error() string {
 	return e.err.Error()
 }

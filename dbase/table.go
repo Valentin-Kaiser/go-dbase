@@ -411,7 +411,7 @@ func (c *Column) Type() string {
 	return string(c.DataType)
 }
 
-func (c *Column) Reflect() reflect.Type {
+func (c *Column) Reflect() (reflect.Type, error) {
 	return DataType(c.DataType).Reflect()
 }
 
