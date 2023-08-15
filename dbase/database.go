@@ -12,8 +12,8 @@ type Database struct {
 	tables map[string]*File
 }
 
-// Open a database and all related tables
-// Only works with default IO implementation
+// OpenDatabase opens a dbase/foxpro database file and all related tables
+// The database file must be a DBC file and the tables must be DBF files and in the same directory as the database
 func OpenDatabase(config *Config) (*Database, error) {
 	if config == nil {
 		return nil, newError("dbase-io-opendatabase-1", fmt.Errorf("missing config"))

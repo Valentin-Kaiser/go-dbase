@@ -177,7 +177,7 @@ func setStructField(tags map[string]string, obj interface{}, name string, value 
 		return newError("dbase-conversion-setstructfield-1", fmt.Errorf("cannot set %s field value", name))
 	}
 	structFieldType := structFieldValue.Type()
-	value = dynamicCast(value, structFieldType)
+	value = cast(value, structFieldType)
 	val := reflect.ValueOf(value)
 
 	if structFieldType.Kind() == reflect.Ptr {
@@ -208,8 +208,8 @@ func structTags(v interface{}) map[string]string {
 	return tags
 }
 
-// dynamicCast casts the given value to the given type if possible
-func dynamicCast(v interface{}, t reflect.Type) interface{} {
+// cast converts a value to the given type if possible
+func cast(v interface{}, t reflect.Type) interface{} {
 	if v == nil {
 		return nil
 	}

@@ -21,8 +21,6 @@ type DefaultConverter struct {
 	encoding *charmap.Charmap
 }
 
-// Win1250Decoder translates a Windows-1250 DBF to UTF8 and back
-
 // Decode decodes a specified encoding to byte slice to a UTF8 byte slice
 func (c DefaultConverter) Decode(in []byte) ([]byte, error) {
 	if utf8.Valid(in) {
