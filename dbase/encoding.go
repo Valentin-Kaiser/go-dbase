@@ -10,7 +10,7 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// EncodingConverter is the interface as passed to Open
+// EncodingConverter is an interface for encoding conversion between UTF8 and other encoding
 type EncodingConverter interface {
 	Decode(in []byte) ([]byte, error)
 	Encode(in []byte) ([]byte, error)

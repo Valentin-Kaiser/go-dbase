@@ -692,7 +692,7 @@ func (w WindowsIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, er
 	}
 	debugf("Searching for value: %v in field: %s", field.GetValue(), field.column.Name())
 	// convert the value to bytes
-	val, err := file.GetRepresentation(field, !exactMatch)
+	val, err := file.Represent(field, !exactMatch)
 	if err != nil {
 		return nil, newError("dbase-io-windows-search-3", err)
 	}
