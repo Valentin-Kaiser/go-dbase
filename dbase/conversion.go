@@ -104,7 +104,7 @@ func toUTF8String(raw []byte, converter EncodingConverter) (string, error) {
 }
 
 // fromUTF8String converts a UTF8 string to a byte slice using the given converter
-func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
+func fromUTF8String(raw []byte, converter EncodingConverter) ([]byte, error) {
 	utf8, err := converter.Encode(raw)
 	if err != nil {
 		return raw, newError("dbase-conversion-fromutf8string-1", err)

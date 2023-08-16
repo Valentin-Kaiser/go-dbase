@@ -205,7 +205,7 @@ func (file *File) getCharacterRepresentation(field *Field, skipSpacing bool) ([]
 		return nil, newError("dbase-interpreter-getcharacterrepresentation-1", fmt.Errorf("invalid data type %T, expected string on column field: %v", field.value, field.Name()))
 	}
 	raw := make([]byte, field.column.Length)
-	bin, err := fromUtf8String([]byte(c), file.config.Converter)
+	bin, err := fromUTF8String([]byte(c), file.config.Converter)
 	if err != nil {
 		return nil, newError("dbase-interpreter-getcharacterrepresentation-2", fmt.Errorf("parsing from utf8 string at column field: %v failed with error %w", field.Name(), err))
 	}
