@@ -160,6 +160,10 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 				if str, ok := val.(string); ok {
 					val = strings.TrimSpace(str)
 				}
+
+				if bslice, ok := val.([]byte); ok {
+					val = sanitizeString(bslice)
+				}
 			}
 			if mod.Convert != nil {
 				debugf("Converting field %v due to modification", field.Name())
