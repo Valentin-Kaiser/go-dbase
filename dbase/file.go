@@ -224,6 +224,10 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 			if str, ok := val.(string); ok {
 				val = strings.TrimSpace(str)
 			}
+
+			if bslice, ok := val.([]byte); ok {
+				val = sanitizeString(bslice)
+			}
 		}
 		rec.fields = append(rec.fields, &Field{
 			column: column,
