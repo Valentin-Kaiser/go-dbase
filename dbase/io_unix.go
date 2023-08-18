@@ -67,6 +67,7 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	}
 	file.nullFlagColumn = nullFlag
 	file.table = &Table{
+		name:    strings.TrimSuffix(strings.ToUpper(filepath.Base(fileName)), string(fileExtension)),
 		columns: columns,
 		mods:    make([]*Modification, len(columns)),
 	}
