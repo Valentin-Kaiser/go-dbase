@@ -71,6 +71,195 @@ func (row *Row) ValueByName(name string) (interface{}, error) {
 	return row.Value(pos), nil
 }
 
+// Returns the value of a row at the given column name
+// MustValueByName panics if the value is not found
+func (row *Row) MustValueByName(name string) interface{} {
+	val, err := row.ValueByName(name)
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
+
+// Returns the value of a row at the given column name as a string
+// If the value is neither a string nor a byte slice, an error is returned
+func (row *Row) StringValueByName(name string) (string, error) {
+	val, err := row.ValueByName(name)
+	if err != nil {
+		return "", newError("dbase-table-stringvaluebyname-1", err)
+	}
+	if val != nil {
+		str, ok := val.(string)
+		if ok {
+			return str, nil
+		}
+		bslice, ok := val.([]byte)
+		if ok {
+			return string(sanitizeString(bslice)), nil
+		}
+		return "", newError("dbase-table-stringvaluebyname-2", fmt.Errorf("value is not a string"))
+	}
+	return "", nil
+}
+
+// Returns the value of a row at the given column name as a string
+// MustStringValueByName panics if the value is not found or not a string
+func (row *Row) MustStringValueByName(name string) string {
+	val, err := row.StringValueByName(name)
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
+
+// Returns the value of a row at the given column name as an int64
+// If the value is not castable to an int64, an error is returned
+func (row *Row) IntValueByName(name string) (int64, error) {
+	val, err := row.ValueByName(name)
+	if err != nil {
+		return 0, newError("dbase-table-intvaluebyname-1", err)
+	}
+	if val != nil {
+		val = cast(val, reflect.TypeOf(int64(0)))
+		intVal, ok := val.(int64)
+		if ok {
+			return intVal, nil
+		}
+		return 0, newError("dbase-table-intvaluebyname-2", fmt.Errorf("value is not an int"))
+	}
+	return 0, nil
+}
+
+// Returns the value of a row at the given column name as an int32
+// MustIntValueByName panics if the value is not found or not an int32
+func (row *Row) MustIntValueByName(name string) int64 {
+	val, err := row.IntValueByName(name)
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
+
+// Returns the value of a row at the given column name as a float64
+// If the value is not castable to a float64, an error is returned
+func (row *Row) FloatValueByName(name string) (float64, error) {
+	val, err := row.ValueByName(name)
+	if err != nil {
+		return 0, newError("dbase-table-floatvaluebyname-1", err)
+	}
+	if val != nil {
+		val = cast(val, reflect.TypeOf(float64(0)))
+		floatVal, ok := val.(float64)
+		if ok {
+			return floatVal, nil
+		}
+		return 0, newError("dbase-table-floatvaluebyname-2", fmt.Errorf("value is not a float"))
+	}
+	return 0, nil
+}
+
+// Returns the value of a row at the given column name as a float64
+// MustFloatValueByName panics if the value is not found or not a float64
+func (row *Row) MustFloatValueByName(name string) float64 {
+	val, err := row.FloatValueByName(name)
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
+
+// Returns the value of a row at the given column name as a bool
+// If the value is not a bool, an error is returned
+func (row *Row) BoolValueByName(name string) (bool, error) {
+	val, err := row.ValueByName(name)
+	if err != nil {
+		return false, newError("dbase-table-boolvaluebyname-1", err)
+	}
+	if val != nil {
+		boolVal, ok := val.(bool)
+		if ok {
+			return boolVal, nil
+		}
+		return false, newError("dbase-table-boolvaluebyname-2", fmt.Errorf("value is not a bool"))
+	}
+
+	return false, nil
+}
+
+// Returns the value of a row at the given column name as a bool
+// MustBoolValueByName panics if the value is not found or not a bool
+func (row *Row) MustBoolValueByName(name string) bool {
+	val, err := row.BoolValueByName(name)
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
+
+// Returns the value of a row at the given column name as a time.Time
+// If the value is not a time.Time, an error is returned
+func (row *Row) TimeValueByName(name string) (time.Time, error) {
+	val, err := row.ValueByName(name)
+	if err != nil {
+		return time.Time{}, newError("dbase-table-timevaluebyname-1", err)
+	}
+	if val != nil {
+		val = cast(val, reflect.TypeOf(time.Time{}))
+		timeVal, ok := val.(time.Time)
+		if ok {
+			return timeVal, nil
+		}
+		return time.Time{}, newError("dbase-table-timevaluebyname-2", fmt.Errorf("value is not a time"))
+	}
+	return time.Time{}, nil
+}
+
+// Returns the value of a row at the given column name as a time.Time
+// MustTimeValueByName panics if the value is not found or not a time.Time
+func (row *Row) MustTimeValueByName(name string) time.Time {
+	val, err := row.TimeValueByName(name)
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
+
+// Returns the value of a row at the given column name as a []byte
+// If the value is not a []byte, []uint8 or string, an error is returned
+func (row *Row) BytesValueByName(name string) ([]byte, error) {
+	val, err := row.ValueByName(name)
+	if err != nil {
+		return nil, newError("dbase-table-bytesvaluebyname-1", err)
+	}
+	if val != nil {
+		val = cast(val, reflect.TypeOf([]byte{}))
+		bytesVal, ok := val.([]byte)
+		if ok {
+			return bytesVal, nil
+		}
+		uint8Val, ok := val.([]uint8)
+		if ok {
+			return []byte(uint8Val), nil
+		}
+		strVal, ok := val.(string)
+		if ok {
+			return []byte(strVal), nil
+		}
+		return nil, newError("dbase-table-bytesvaluebyname-2", fmt.Errorf("value is not a byte slice"))
+	}
+	return nil, nil
+}
+
+// Returns the value of a row at the given column name as a []byte
+// MustBytesValueByName panics if the value is not found or not a []byte
+func (row *Row) MustBytesValueByName(name string) []byte {
+	val, err := row.BytesValueByName(name)
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
+
 // Returns all fields of the current row
 func (row *Row) Fields() []*Field {
 	return row.fields
