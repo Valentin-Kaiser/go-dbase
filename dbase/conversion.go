@@ -169,7 +169,7 @@ func setNthBit(b byte, n int) byte {
 
 // setStructField sets the field with the key or dbase tag of name of the struct obj to the given value
 func setStructField(tags map[string]string, obj interface{}, name string, value interface{}) error {
-	if fieldName, ok := tags[name]; ok {
+	if fieldName, ok := tags[strings.ToUpper(name)]; ok {
 		name = fieldName
 	}
 	structValue := reflect.ValueOf(obj).Elem()
@@ -204,7 +204,7 @@ func structTags(v interface{}) map[string]string {
 	structValue := reflect.ValueOf(v).Elem()
 	for i := 0; i < structValue.NumField(); i++ {
 		field := structValue.Type().Field(i)
-		tag := field.Tag.Get("dbase")
+		tag := strings.ToUpper(field.Tag.Get("dbase"))
 		if len(tag) > 0 {
 			tags[tag] = field.Name
 		}
