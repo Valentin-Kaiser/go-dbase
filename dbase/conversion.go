@@ -175,6 +175,15 @@ func setStructField(tags map[string]string, obj interface{}, name string, value 
 	structValue := reflect.ValueOf(obj).Elem()
 	structFieldValue := structValue.FieldByName(name)
 	if !structFieldValue.IsValid() {
+		for i := 0; i < structValue.NumField(); i++ {
+			field := structValue.Type().Field(i)
+			if field.Anonymous && field.Type.Kind() == reflect.Struct {
+				err := setStructField(tags, structValue.Field(i).Addr().Interface(), name, value)
+				if err == nil {
+					return nil
+				}
+			}
+		}
 		return nil
 	}
 	if !structFieldValue.CanSet() {
@@ -199,17 +208,27 @@ func setStructField(tags map[string]string, obj interface{}, name string, value 
 }
 
 // structTags extracts the dbase tag from the struct fields
-func structTags(v interface{}) map[string]string {
+func getStructTags(v interface{}) map[string]string {
 	tags := make(map[string]string)
-	structValue := reflect.ValueOf(v).Elem()
+	extractTags(reflect.ValueOf(v).Elem(), tags)
+	return tags
+}
+
+func extractTags(structValue reflect.Value, tags map[string]string) {
 	for i := 0; i < structValue.NumField(); i++ {
 		field := structValue.Type().Field(i)
+
+		// Check if this field is an embedded struct
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			extractTags(structValue.Field(i), tags)
+			continue
+		}
+
 		tag := strings.ToUpper(field.Tag.Get("dbase"))
 		if len(tag) > 0 {
 			tags[tag] = field.Name
 		}
 	}
-	return tags
 }
 
 // cast converts a value to the given type if possible

@@ -400,7 +400,7 @@ func (row *Row) ToStruct(v interface{}) error {
 	if err != nil {
 		return newError("dbase-table-struct-2", err)
 	}
-	tags := structTags(v)
+	tags := getStructTags(v)
 	for tag := range tags {
 		if strings.Contains(tag, ".") {
 			// Split the tag by the dot to get the TableName and ColumnName
