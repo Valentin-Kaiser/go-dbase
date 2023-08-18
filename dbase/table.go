@@ -409,7 +409,7 @@ func (row *Row) ToStruct(v interface{}) error {
 				continue
 			}
 			// Check if the TableName matches the current table
-			if parts[0] != strings.ToUpper(row.handle.table.name) {
+			if parts[0] != row.handle.table.name {
 				delete(tags, tag)
 				continue
 			}
