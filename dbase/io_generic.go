@@ -5,7 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 )
@@ -22,6 +24,8 @@ func (g GenericIO) OpenTable(config *Config) (*File, error) {
 		return nil, newError("dbase-io-generic-opentable-1", fmt.Errorf("missing configuration"))
 	}
 	debugf("Opening table from custom io interface - Untested: %v - Trim spaces: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Untested, config.TrimSpaces, config.ValidateCodePage, config.InterpretCodePage)
+	fileName := filepath.Clean(config.Filename)
+	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
 	file := &File{
 		config:        config,
 		io:            g,
@@ -44,6 +48,7 @@ func (g GenericIO) OpenTable(config *Config) (*File, error) {
 	}
 	file.nullFlagColumn = nullFlag
 	file.table = &Table{
+		name:    strings.TrimSuffix(filepath.Base(fileName), string(fileExtension)),
 		columns: columns,
 		mods:    make([]*Modification, len(columns)),
 	}

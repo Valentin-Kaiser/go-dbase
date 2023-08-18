@@ -23,6 +23,10 @@ type File struct {
 	nullFlagColumn *Column     // The column containing the null flag column (if varchar or varbinary field exists).
 }
 
+func (file *File) TableName() string {
+	return file.table.name
+}
+
 // Returns if the internal row pointer is at end of file
 func (file *File) EOF() bool {
 	return file.table.rowPointer >= file.header.RowsCount

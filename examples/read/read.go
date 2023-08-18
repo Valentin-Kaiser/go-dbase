@@ -10,22 +10,24 @@ import (
 )
 
 type Product struct {
-	ID          int32     `dbase:"PRODUCTID"`
-	Name        string    `dbase:"PRODNAME"`
-	Price       float64   `dbase:"PRICE"`
-	Double      float64   `dbase:"DOUBLE"`
-	Date        time.Time `dbase:"DATE"`
-	DateTime    time.Time `dbase:"DATETIME"`
-	Integer     int32     `dbase:"INTEGER"`
-	Float       float64   `dbase:"FLOAT"`
-	Active      bool      `dbase:"ACTIVE"`
-	Description string    `dbase:"DESC"`
-	Tax         float64   `dbase:"TAX"`
-	Stock       int64     `dbase:"INSTOCK"`
-	Blob        []byte    `dbase:"BLOB"`
-	Varbinary   []byte    `dbase:"VARBIN_NIL"`
-	Varchar     string    `dbase:"VAR_NIL"`
-	Var         string    `dbase:"VAR"`
+	// The dbase tag contains the table name and column name separated by a dot.
+	// The column name is case insensitive.
+	ID          int32     `dbase:"TEST.PRODUCTID"`
+	Name        string    `dbase:"TEST.PRODNAME"`
+	Price       float64   `dbase:"TEST.PRICE"`
+	Double      float64   `dbase:"TEST.DOUBLE"`
+	Date        time.Time `dbase:"TEST.DATE"`
+	DateTime    time.Time `dbase:"TEST.DATETIME"`
+	Integer     int32     `dbase:"TEST.INTEGER"`
+	Float       float64   `dbase:"TEST.FLOAT"`
+	Active      bool      `dbase:"TEST.ACTIVE"`
+	Description string    `dbase:"TEST.DESC"`
+	Tax         float64   `dbase:"TEST.TAX"`
+	Stock       int64     `dbase:"TEST.INSTOCK"`
+	Blob        []byte    `dbase:"TEST.BLOB"`
+	Varbinary   []byte    `dbase:"TEST.VARBIN_NIL"`
+	Varchar     string    `dbase:"TEST.VAR_NIL"`
+	Var         string    `dbase:"TEST.VAR"`
 }
 
 func main() {
@@ -36,7 +38,7 @@ func main() {
 		return
 	}
 
-	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
+	dbase.Debug(false, io.MultiWriter(os.Stdout, f))
 
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{

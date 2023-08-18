@@ -13,6 +13,7 @@ import (
 
 // Table is a struct containing the table columns, modifications and the row pointer
 type Table struct {
+	name       string          // Name of the table
 	columns    []*Column       // Columns defined in this table
 	mods       []*Modification // Modification to change values or name of fields
 	rowPointer uint32          // Internal row pointer, can be moved
@@ -388,7 +389,7 @@ func (row *Row) ToJSON() ([]byte, error) {
 
 // Converts a row to a struct.
 // The struct must have the same field names as the columns in the table or the dbase tag must be set.
-// The dbase tag can be used to name the field. For example: `dbase:"my_field_name"`
+// dbase tags can be used to name the field. For example: `dbase:"<table_name>.<field_name>"` or `dbase:"<field_name>"`
 func (row *Row) ToStruct(v interface{}) error {
 	rt := reflect.TypeOf(v)
 	if rt.Kind() != reflect.Ptr {
@@ -400,6 +401,25 @@ func (row *Row) ToStruct(v interface{}) error {
 		return newError("dbase-table-struct-2", err)
 	}
 	tags := structTags(v)
+	for tag := range tags {
+		if strings.Contains(tag, ".") {
+			// Split the tag by the dot to get the TableName and ColumnName
+			parts := strings.Split(tag, ".")
+			if len(parts) != 2 {
+				continue
+			}
+			// Check if the TableName matches the current table
+			if parts[0] != strings.ToUpper(row.handle.table.name) {
+				delete(tags, tag)
+				continue
+			}
+
+			// Apply the ColumnName as the new tag
+			tags[parts[1]] = tags[tag]
+			delete(tags, tag)
+		}
+	}
+
 	for k, val := range m {
 		err := setStructField(tags, v, k, val)
 		if err != nil {
