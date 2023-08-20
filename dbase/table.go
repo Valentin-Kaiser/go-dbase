@@ -475,11 +475,8 @@ func (field Field) Column() *Column {
 // Create a new DBF file with the specified version, configuration and columns
 // Please only use this for development and testing purposes and dont build new applications with it
 func NewTable(version FileVersion, config *Config, columns []*Column, memoBlockSize uint16, io IO) (*File, error) {
-	if len(columns) == 0 {
-		return nil, errors.New("no columns defined")
-	}
-	if config.Converter == nil {
-		return nil, errors.New("no converter defined")
+	if len(columns) == 0 || config.Converter == nil {
+		return nil, newError("dbase-table-newtable-1", errors.New("invalid parameters"))
 	}
 	file := &File{
 		config: config,
@@ -552,39 +549,20 @@ func NewTable(version FileVersion, config *Config, columns []*Column, memoBlockS
 		file.header.RowLength += uint16(length)
 		debugf("Initializing null flag column - length: %v", length)
 	}
-	// Create the files
-	err := file.Create()
+
+	err := file.Init()
 	if err != nil {
-		return nil, err
+		return nil, newError("dbase-table-newtable-1", err)
 	}
-	// Write the headers
-	err = file.WriteHeader()
-	if err != nil {
-		return nil, err
-	}
-	// Write the columns
-	err = file.WriteColumns()
-	if err != nil {
-		return nil, err
-	}
-	// Write the memo header
-	if file.memoHeader != nil {
-		err = file.WriteMemoHeader(0)
-		if err != nil {
-			return nil, err
-		}
-	}
+
 	return file, nil
 }
 
 // Create a new column with the specified name, data type, length, decimals and nullable flag
 // The length is only used for character, varbinary, varchar, numeric and float data types
 func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nullable bool) (*Column, error) {
-	if len(name) == 0 {
-		return nil, errors.New("no column name defined")
-	}
-	if len(name) > 10 {
-		return nil, newError("dbase-table-newcolumn-1", errors.New("column name can only be 10 characters long"))
+	if len(name) == 0 || len(name) > 10 {
+		return nil, newError("dbase-table-newcolumn-1", errors.New("column name must be between 1 and 10 characters long"))
 	}
 	column := &Column{
 		FieldName: [11]byte{},
@@ -605,45 +583,21 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 	}
 	// Check for data type to specify the length
 	switch dataType {
-	case Character:
-		if length > 254 {
-			return nil, newError("dbase-table-newcolumn-2", errors.New("character length can only be 254 bytes long"))
-		}
-		if length == 0 {
-			return nil, newError("dbase-table-newcolumn-3", errors.New("character length can not be 0"))
-		}
-		column.Length = length
 	case Varbinary:
-		if length > 254 {
-			return nil, newError("dbase-table-newcolumn-4", errors.New("varbinary length can only be 254 bytes long"))
-		}
-		if length == 0 {
-			return nil, newError("dbase-table-newcolumn-5", errors.New("varbinary length can not be 0"))
-		}
-		column.Length = length
 		column.Flag |= byte(BinaryFlag)
+		fallthrough
 	case Varchar:
-		if length > 254 {
-			return nil, newError("dbase-table-newcolumn-6", errors.New("varchar length can only be 254 bytes long"))
-		}
-		if length == 0 {
-			return nil, newError("dbase-table-newcolumn-7", errors.New("varchar length can not be 0"))
+		fallthrough
+	case Character:
+		if length == 0 || length > 254 {
+			return nil, newError("dbase-table-newcolumn-2", errors.New("character, varbinary and varchar values can only be between 1 to 254 characters long"))
 		}
 		column.Length = length
 	case Numeric:
-		if length > 20 {
-			return nil, newError("dbase-table-newcolumn-8", errors.New("numeric length can only be 20 bytes long"))
-		}
-		if length == 0 {
-			return nil, newError("dbase-table-newcolumn-9", errors.New("numeric length can not be 0"))
-		}
-		column.Length = length
+		fallthrough
 	case Float:
-		if length > 20 {
-			return nil, newError("dbase-table-newcolumn-10", errors.New("float length can only be 20 bytes long"))
-		}
-		if length == 0 {
-			return nil, newError("dbase-table-newcolumn-11", errors.New("float length can not be 0"))
+		if length == 0 || length > 20 {
+			return nil, newError("dbase-table-newcolumn-3", errors.New("numeric and float values can only be between 1 to 20 characters long"))
 		}
 		column.Length = length
 	case Logical:
@@ -653,7 +607,7 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 	case Currency, Date, DateTime, Double:
 		column.Length = 8
 	default:
-		return nil, newError("dbase-table-newcolumn-12", fmt.Errorf("invalid data type %v specified", dataType))
+		return nil, newError("dbase-table-newcolumn-4", fmt.Errorf("invalid data type %v specified", dataType))
 	}
 	return column, nil
 }

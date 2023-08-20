@@ -124,6 +124,34 @@ func (file *File) GetColumnModification(position int) *Modification {
 	return file.table.mods[position]
 }
 
+// Write creates the dbase files and writes the header and columns to it
+func (file *File) Init() error {
+	// Create the files
+	err := file.Create()
+	if err != nil {
+		return err
+	}
+	// Write the headers
+	err = file.WriteHeader()
+	if err != nil {
+		return err
+	}
+	// Write the columns
+	err = file.WriteColumns()
+	if err != nil {
+		return err
+	}
+	// Write the memo header
+	if file.memoHeader != nil {
+		err = file.WriteMemoHeader(0)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Returns all rows as a slice
 func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 	rows := make([]*Row, 0)

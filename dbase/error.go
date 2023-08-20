@@ -48,6 +48,10 @@ func newError(context string, err error) Error {
 	}
 }
 
+func newErrorf(context string, format string, a ...interface{}) Error {
+	return newError(context, fmt.Errorf(format, a...))
+}
+
 // Error returns the error message of the underlying error
 func (e Error) Error() string {
 	return e.err.Error()
