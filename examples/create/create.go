@@ -9,6 +9,13 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
+type Test struct {
+	ID   int32  `dbase:"ID"`
+	Name string `dbase:"NAME"`
+	Memo string `dbase:"MEMO"`
+	Var  string `dbase:"VAR"`
+}
+
 func main() {
 	// Open debug log file so we see what's going on
 	f, err := os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -18,6 +25,54 @@ func main() {
 	}
 	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
 
+	// When creating a new table you need to define table type
+	// For more information about table types see the constants.go file
+	file, err := dbase.NewTable(
+		dbase.FoxProVar,
+		&dbase.Config{
+			Filename:   "test.dbf",
+			Converter:  dbase.NewDefaultConverter(charmap.Windows1250),
+			TrimSpaces: true,
+		},
+		columns(),
+		64,
+		nil,
+	)
+	if err != nil {
+		panic(dbase.GetErrorTrace(err))
+	}
+	defer file.Close()
+
+	fmt.Printf(
+		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
+		file.Header().Modified(0),
+		file.Header().ColumnsCount(),
+		file.Header().RecordsCount(),
+		file.Header().FileSize(),
+	)
+
+	// Print all database column infos.
+	for _, column := range file.Columns() {
+		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
+	}
+
+	row, err := file.RowFromStruct(&Test{
+		ID:   1,
+		Name: "Test",
+		Memo: "Memo",
+		Var:  "Var",
+	})
+	if err != nil {
+		panic(dbase.GetErrorTrace(err))
+	}
+
+	err = row.Add()
+	if err != nil {
+		panic(dbase.GetErrorTrace(err))
+	}
+}
+
+func columns() []*dbase.Column {
 	// Integer are allways 4 bytes long
 	idCol, err := dbase.NewColumn("ID", dbase.Integer, 0, 0, false)
 	if err != nil {
@@ -42,88 +97,10 @@ func main() {
 		panic(dbase.GetErrorTrace(err))
 	}
 
-	// When creating a new table you need to define table type
-	// For more information about table types see the constants.go file
-	file, err := dbase.NewTable(
-		dbase.FoxProVar,
-		&dbase.Config{
-			Filename:   "test.dbf",
-			Converter:  dbase.NewDefaultConverter(charmap.Windows1250),
-			TrimSpaces: true,
-		},
-		[]*dbase.Column{
-			idCol,
-			nameCol,
-			memoCol,
-			varCol,
-		},
-		64,
-		nil,
-	)
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-	defer file.Close()
-
-	fmt.Printf(
-		"Last modified: %v Columns count: %v Record count: %v File size: %v \n",
-		file.Header().Modified(0),
-		file.Header().ColumnsCount(),
-		file.Header().RecordsCount(),
-		file.Header().FileSize(),
-	)
-
-	// Print all database column infos.
-	for _, column := range file.Columns() {
-		fmt.Printf("Name: %v - Type: %v \n", column.Name(), column.Type())
-	}
-
-	// Write a new record
-	row := file.NewRow()
-
-	err = row.FieldByName("ID").SetValue(int32(1))
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	err = row.FieldByName("NAME").SetValue("TOTALLY_NEW_ROW")
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	err = row.FieldByName("MEMO").SetValue("This is a memo field")
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	err = row.FieldByName("VAR").SetValue("This is a varchar field")
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	err = row.Add()
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	// Read all records
-	for !file.EOF() {
-		row, err := file.Next()
-		if err != nil {
-			panic(dbase.GetErrorTrace(err))
-		}
-
-		// Skip deleted rows.
-		if row.Deleted {
-			fmt.Printf("Deleted row at position: %v \n", row.Position)
-			continue
-		}
-
-		name, err := row.ValueByName("NAME")
-		if err != nil {
-			panic(dbase.GetErrorTrace(err))
-		}
-
-		fmt.Printf("Row at position: %v => %v \n", row.Position, name)
+	return []*dbase.Column{
+		idCol,
+		nameCol,
+		memoCol,
+		varCol,
 	}
 }

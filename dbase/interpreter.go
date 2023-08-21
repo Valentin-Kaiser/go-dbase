@@ -32,121 +32,97 @@ import (
 //
 // Not all available column types have been implemented because we don't use them in our DBFs
 func (file *File) Interpret(raw []byte, column *Column) (interface{}, error) {
-	if len(raw) != int(column.Length) {
-		return nil, newError("dbase-interpreter-datatovalue-1", fmt.Errorf("invalid length %v Bytes != %v Bytes at column field: %v", len(raw), column.Length, column.Name()))
-	}
-	switch DataType(column.DataType) {
-	case Memo:
+	var funcs = map[DataType]func([]byte, *Column) (interface{}, error){
 		// M values contain the address in the FPT file from where to read data
-		return file.parseMemo(raw, column)
-	case Character:
+		Memo: file.parseMemo,
 		// C values are stored as strings, the returned string is not trimmed
-		return file.parseCharacter(raw, column)
-	case Integer:
+		Character: file.parseCharacter,
 		// I values are stored as numeric values
-		return file.parseInteger(raw)
-	case Double:
+		Integer: file.parseInteger,
+		// Y values are currency values stored as ints with 4 decimal places
+		Currency: file.parseCurrency,
+		// F values are stored as string values
+		Float: file.parseFloat,
 		// B (double) values are stored as numeric values
-		return file.parseDouble(raw)
-	case Date:
+		Double: file.parseDouble,
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
-		return file.parseDate(raw, column)
-	case DateTime:
+		Date: file.parseDate,
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
-		return file.parseDateTime(raw)
-	case Logical:
+		DateTime: file.parseDateTime,
 		// L values are stored as strings T or F, we only check for T, the rest is false...
-		return file.parseLogical(raw)
-	case Currency:
-		// Y values are currency values stored as ints with 4 decimal places
-		return file.parseCurrency(raw)
-	case Numeric:
+		Logical: file.parseLogical,
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
-		return file.parseNumeric(raw, column)
-	case Float:
-		// F values are stored as string values
-		return file.parseFloat(raw, column)
-	case Varchar:
-		// V values just return the raw value
-		return file.parseVarchar(raw, column)
-	case Varbinary:
-		// Q values just return the raw value
-		return file.parseVarbinary(raw, column)
-	case Blob:
-		// W values just return the raw value
-		fallthrough
-	case Picture:
-		// P values just return the raw value
-		fallthrough
-	case General:
-		// G values just return the raw value
-		return file.parseRaw(raw, column)
-	default:
-		return nil, newError("dbase-interpreter-datatovalue-2", fmt.Errorf("unsupported column data type: %s", string(column.DataType)))
+		Numeric: file.parseNumeric,
+		// V and Q values just return the raw value
+		Varchar:   file.parseVarchar,
+		Varbinary: file.parseVarbinary,
+		// W, P and G values just return the raw value
+		Blob:    file.parseRaw,
+		Picture: file.parseRaw,
+		General: file.parseRaw,
 	}
+
+	if len(raw) != int(column.Length) {
+		return nil, newErrorf("dbase-interpreter-datatovalue-1", "invalid length %v Bytes != %v Bytes at column field: %v", len(raw), column.Length, column.Name())
+	}
+
+	f, ok := funcs[DataType(column.DataType)]
+	if !ok {
+		return nil, newErrorf("dbase-interpreter-datatovalue-2", "unsupported column data type: %s at column field: %v", DataType(column.DataType), column.Name())
+	}
+
+	return f(raw, column)
 }
 
 // Represent converts column data to the byte representation of the columns data type
 // For M values the data is written to the memo file and the address is returned
-func (file *File) Represent(field *Field, skipSpacing bool) ([]byte, error) {
-	// if value is nil, return empty byte array
-	if field.GetValue() == nil {
-		return make([]byte, field.column.Length), nil
-	}
-	switch DataType(field.column.DataType) {
-	case Memo:
-		return file.getMemoRepresentation(field)
-	case Character:
+func (file *File) Represent(field *Field, padding bool) ([]byte, error) {
+	var funcs = map[DataType]func(*Field, bool) ([]byte, error){
+		// M values contain the address in the FPT file from where to read data
+		Memo: file.getMemoRepresentation,
 		// C values are stored as strings, the returned string is not trimmed
-		return file.getCharacterRepresentation(field, skipSpacing)
-	case Integer:
+		Character: file.getCharacterRepresentation,
 		// I values (int32)
-		return file.getIntegerRepresentation(field)
-	case Currency:
+		Integer: file.getIntegerRepresentation,
 		// Y (currency)
-		return file.getCurrencyRepresentation(field)
-	case Float:
+		Currency: file.getCurrencyRepresentation,
 		// F (Float)
-		return file.getFloatRepresentation(field, skipSpacing)
-	case Double:
+		Float: file.getFloatRepresentation,
 		// B (double)
-		return file.getDoubleRepresentation(field)
-	case Date:
+		Double: file.getDoubleRepresentation,
 		// D values are stored as string in format YYYYMMDD, convert to time.Time
-		return file.getDateRepresentation(field)
-	case DateTime:
+		Date: file.getDateRepresentation,
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
 		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
-		return file.getDateTimeRepresentation(field)
-	case Logical:
+		DateTime: file.getDateTimeRepresentation,
 		// L (bool) values are stored as strings T or F, we only check for T, the rest is false...
-		return file.getLogicalRepresentation(field)
-	case Numeric:
+		Logical: file.getLogicalRepresentation,
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
-		return file.getNumericRepresentation(field, skipSpacing)
-	case Varchar:
-		// V values just return the raw value
-		return file.getVarcharRepresentation(field)
-	case Varbinary:
-		// Q values just return the raw value
-		return file.getVarbinaryRepresentation(field)
-	case Blob:
-		// W values just return the raw value
-		fallthrough
-	case Picture:
-		// P values just return the raw value
-		fallthrough
-	case General:
-		// G values just return the raw value
-		return file.getRawRepresentation(field)
-	default:
-		return nil, newError("dbase-interpreter-getrepresentation-1", fmt.Errorf("unsupported column data type: %s at column field: %v", field.Type(), field.Name()))
+		Numeric: file.getNumericRepresentation,
+		// V and Q values just return the raw value
+		Varchar:   file.getVarcharRepresentation,
+		Varbinary: file.getVarbinaryRepresentation,
+		// W, P and G values just return the raw value
+		Blob:    file.getRawRepresentation,
+		Picture: file.getRawRepresentation,
+		General: file.getRawRepresentation,
 	}
+
+	if field.GetValue() == nil {
+		return make([]byte, field.column.Length), nil
+	}
+
+	f, ok := funcs[DataType(field.column.DataType)]
+	if !ok {
+		return nil, newErrorf("dbase-interpreter-valuetodata-1", "unsupported column data type: %s at column field: %v", DataType(field.column.DataType), field.Name())
+	}
+
+	return f(field, padding)
 }
 
 // Returns the value from the memo file as string or []byte
@@ -163,7 +139,7 @@ func (file *File) parseMemo(raw []byte, column *Column) (interface{}, error) {
 }
 
 // Saves the value to the memo file and returns the address in the FPT file
-func (file *File) getMemoRepresentation(field *Field) ([]byte, error) {
+func (file *File) getMemoRepresentation(field *Field, _ bool) ([]byte, error) {
 	memo := make([]byte, 0)
 	txt := false
 	s, sok := field.value.(string)
@@ -179,7 +155,6 @@ func (file *File) getMemoRepresentation(field *Field) ([]byte, error) {
 	if !ok && !sok {
 		return nil, newError("dbase-interpreter-getmemorepresentation-1", fmt.Errorf("invalid type for memo field: %T", field.value))
 	}
-	// Write the memo to the memo file
 	address, err := file.WriteMemo(memo, txt, len(memo))
 	if err != nil {
 		return nil, newError("dbase-interpreter-getmrepresentation-2", fmt.Errorf("writing to memo file at column field: %v failed with error: %w", field.Name(), err))
@@ -221,12 +196,12 @@ func (file *File) getCharacterRepresentation(field *Field, skipSpacing bool) ([]
 }
 
 // Returns the value as int32
-func (file *File) parseInteger(raw []byte) (interface{}, error) {
+func (file *File) parseInteger(raw []byte, _ *Column) (interface{}, error) {
 	return int32(binary.LittleEndian.Uint32(raw)), nil
 }
 
 // Returns the int32 value as byte representation
-func (file *File) getIntegerRepresentation(field *Field) ([]byte, error) {
+func (file *File) getIntegerRepresentation(field *Field, _ bool) ([]byte, error) {
 	// I values (int32)
 	i, ok := field.value.(int32)
 	if !ok {
@@ -234,7 +209,7 @@ func (file *File) getIntegerRepresentation(field *Field) ([]byte, error) {
 		if !ok {
 			return nil, newError("dbase-interpreter-getintegerrepresentation-1", fmt.Errorf("invalid data type %T, expected int32 at column field: %v", field.value, field.Name()))
 		}
-		// check for lower and uppper bounds
+		// check for lower and uppper bounds to prevent overflow
 		if f > 0 && f <= math.MaxInt32 {
 			i = int32(f)
 		}
@@ -252,17 +227,17 @@ func (file *File) getIntegerRepresentation(field *Field) ([]byte, error) {
 }
 
 // Returns the value as float64
-func (file *File) parseCurrency(raw []byte) (interface{}, error) {
+func (file *File) parseCurrency(raw []byte, _ *Column) (interface{}, error) {
 	return float64(int64(binary.LittleEndian.Uint64(raw))) / 10000, nil
 }
 
 // Returns the float64 value as byte representation
-func (file *File) getCurrencyRepresentation(field *Field) ([]byte, error) {
+func (file *File) getCurrencyRepresentation(field *Field, _ bool) ([]byte, error) {
 	f, ok := field.value.(float64)
 	if !ok {
 		return nil, newError("dbase-interpreter-getcurrencyrepresentation-1", fmt.Errorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name()))
 	}
-	// Cast to int64 and multiply by 10000
+	// Cast to int64 and multiply by 10000 to get the value as int64 with 4 decimals
 	i := int64(f * 10000)
 	raw := make([]byte, field.column.Length)
 	bin, err := toBinary(i)
@@ -307,12 +282,12 @@ func (file *File) getFloatRepresentation(field *Field, skipSpacing bool) ([]byte
 }
 
 // Returns the value as float64
-func (file *File) parseDouble(raw []byte) (interface{}, error) {
+func (file *File) parseDouble(raw []byte, _ *Column) (interface{}, error) {
 	return math.Float64frombits(binary.LittleEndian.Uint64(raw)), nil
 }
 
 // Returns the float64 value as byte representation
-func (file *File) getDoubleRepresentation(field *Field) ([]byte, error) {
+func (file *File) getDoubleRepresentation(field *Field, _ bool) ([]byte, error) {
 	b, ok := field.value.(float64)
 	if !ok {
 		return nil, newError("dbase-interpreter-getdoublerepresentation-1", fmt.Errorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name()))
@@ -340,7 +315,7 @@ func (file *File) parseDate(raw []byte, column *Column) (interface{}, error) {
 }
 
 // Get the time.Time value as byte representation
-func (file *File) getDateRepresentation(field *Field) ([]byte, error) {
+func (file *File) getDateRepresentation(field *Field, _ bool) ([]byte, error) {
 	d, ok := field.value.(time.Time)
 	if !ok {
 		s, ok := field.value.(string)
@@ -363,12 +338,12 @@ func (file *File) getDateRepresentation(field *Field) ([]byte, error) {
 }
 
 // Returns the value as time.Time
-func (file *File) parseDateTime(raw []byte) (interface{}, error) {
+func (file *File) parseDateTime(raw []byte, _ *Column) (interface{}, error) {
 	return parseDateTime(raw), nil
 }
 
 // Get the time.Time value as byte representation consisting of 4 bytes for julian date and 4 bytes for time
-func (file *File) getDateTimeRepresentation(field *Field) ([]byte, error) {
+func (file *File) getDateTimeRepresentation(field *Field, _ bool) ([]byte, error) {
 	t, ok := field.value.(time.Time)
 	if !ok {
 		s, ok := field.value.(string)
@@ -401,12 +376,12 @@ func (file *File) getDateTimeRepresentation(field *Field) ([]byte, error) {
 }
 
 // Return the value (T or F) as bool
-func (file *File) parseLogical(raw []byte) (interface{}, error) {
+func (file *File) parseLogical(raw []byte, _ *Column) (interface{}, error) {
 	return string(raw) == "T", nil
 }
 
 // Get the bool value as byte representation (T or F)
-func (file *File) getLogicalRepresentation(field *Field) ([]byte, error) {
+func (file *File) getLogicalRepresentation(field *Field, _ bool) ([]byte, error) {
 	l, ok := field.value.(bool)
 	if !ok {
 		return nil, newError("dbase-interpreter-getlogicalrepresentation-1", fmt.Errorf("invalid data type %T, expected bool at column field: %v", field.value, field.Name()))
@@ -424,7 +399,7 @@ func (file *File) parseRaw(raw []byte, column *Column) (interface{}, error) {
 }
 
 // Get the raw value as byte representation (only type check for []byte is performed)
-func (file *File) getRawRepresentation(field *Field) ([]byte, error) {
+func (file *File) getRawRepresentation(field *Field, _ bool) ([]byte, error) {
 	// If string is passed, convert to []byte
 	if s, ok := field.value.(string); ok {
 		return []byte(s), nil
@@ -492,7 +467,7 @@ func (file *File) parseVarchar(raw []byte, column *Column) (interface{}, error) 
 	return string(raw), nil
 }
 
-func (file *File) getVarcharRepresentation(field *Field) ([]byte, error) {
+func (file *File) getVarcharRepresentation(field *Field, _ bool) ([]byte, error) {
 	s, ok := field.value.(string)
 	if ok {
 		return []byte(s), nil
@@ -519,7 +494,7 @@ func (file *File) parseVarbinary(raw []byte, column *Column) (interface{}, error
 	return raw, nil
 }
 
-func (file *File) getVarbinaryRepresentation(field *Field) ([]byte, error) {
+func (file *File) getVarbinaryRepresentation(field *Field, _ bool) ([]byte, error) {
 	raw, ok := field.value.([]byte)
 	if !ok {
 		return nil, newError("dbase-interpreter-getvarbinaryrepresentation-1", fmt.Errorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name()))

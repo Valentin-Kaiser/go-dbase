@@ -443,9 +443,8 @@ func (g GenericIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 			if c == column {
 				break
 			}
+			bitCount++
 			if c.Flag == byte(NullableFlag) || c.Flag == byte(NullableFlag|BinaryFlag) {
-				bitCount += 2
-			} else {
 				bitCount++
 			}
 		}
