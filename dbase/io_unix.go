@@ -94,7 +94,6 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 		}
 		relatedFile, err := _findFile(strings.TrimSuffix(fileName, path.Ext(fileName)) + string(ext))
 		if err != nil {
-			relatedFile, err = _findFile(strings.TrimSuffix(fileName, path.Ext(fileName)) + strings.ToLower(string(ext)))
 			return nil, newError("dbase-io-unix-opentable-9", err)
 		}
 		debugf("Opening related file: %s\n", relatedFile)
