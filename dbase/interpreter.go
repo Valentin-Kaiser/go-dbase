@@ -113,7 +113,6 @@ func (file *File) Represent(field *Field, padding bool) ([]byte, error) {
 		General: file.getRawRepresentation,
 	}
 
-	// if value is nil, return empty byte array
 	if field.GetValue() == nil {
 		return make([]byte, field.column.Length), nil
 	}
@@ -156,7 +155,6 @@ func (file *File) getMemoRepresentation(field *Field, _ bool) ([]byte, error) {
 	if !ok && !sok {
 		return nil, newError("dbase-interpreter-getmemorepresentation-1", fmt.Errorf("invalid type for memo field: %T", field.value))
 	}
-	// Write the memo to the memo file
 	address, err := file.WriteMemo(memo, txt, len(memo))
 	if err != nil {
 		return nil, newError("dbase-interpreter-getmrepresentation-2", fmt.Errorf("writing to memo file at column field: %v failed with error: %w", field.Name(), err))
@@ -211,7 +209,7 @@ func (file *File) getIntegerRepresentation(field *Field, _ bool) ([]byte, error)
 		if !ok {
 			return nil, newError("dbase-interpreter-getintegerrepresentation-1", fmt.Errorf("invalid data type %T, expected int32 at column field: %v", field.value, field.Name()))
 		}
-		// check for lower and uppper bounds
+		// check for lower and uppper bounds to prevent overflow
 		if f > 0 && f <= math.MaxInt32 {
 			i = int32(f)
 		}
@@ -239,7 +237,7 @@ func (file *File) getCurrencyRepresentation(field *Field, _ bool) ([]byte, error
 	if !ok {
 		return nil, newError("dbase-interpreter-getcurrencyrepresentation-1", fmt.Errorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name()))
 	}
-	// Cast to int64 and multiply by 10000
+	// Cast to int64 and multiply by 10000 to get the value as int64 with 4 decimals
 	i := int64(f * 10000)
 	raw := make([]byte, field.column.Length)
 	bin, err := toBinary(i)
