@@ -55,15 +55,15 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	}
 	err = file.ReadHeader()
 	if err != nil {
-		return nil, newError("dbase-io-unix-preparedbf-1", err)
+		return nil, newError("dbase-io-unix-opentable-5", err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
 	if err := ValidateFileVersion(file.header.FileType, config.Untested); err != nil {
-		return nil, newError("dbase-io-unix-preparedbf-2", err)
+		return nil, newError("dbase-io-unix-opentable-6", err)
 	}
 	columns, nullFlag, err := file.ReadColumns()
 	if err != nil {
-		return nil, newError("dbase-io-unix-preparedbf-3", err)
+		return nil, newError("dbase-io-unix-opentable-7", err)
 	}
 	file.nullFlagColumn = nullFlag
 	file.table = &Table{
@@ -82,7 +82,7 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	}
 	// Check if the code page mark is matchin the converter
 	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePage() {
-		return nil, newError("dbase-io-unix-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
+		return nil, newError("dbase-io-unix-opentable-8", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
 	}
 	// Check if there is an FPT according to the header.
 	// If there is we will try to open it in the same dir (using the same filename and case).
@@ -92,16 +92,20 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 		if fileExtension == DBC {
 			ext = DCT
 		}
-		relatedFile := strings.TrimSuffix(fileName, path.Ext(fileName)) + string(ext)
+		relatedFile, err := _findFile(strings.TrimSuffix(fileName, path.Ext(fileName)) + string(ext))
+		if err != nil {
+			relatedFile, err = _findFile(strings.TrimSuffix(fileName, path.Ext(fileName)) + strings.ToLower(string(ext)))
+			return nil, newError("dbase-io-unix-opentable-9", err)
+		}
 		debugf("Opening related file: %s\n", relatedFile)
 		relatedHandle, err := os.OpenFile(relatedFile, mode, 0600)
 		if err != nil {
-			return nil, newError("dbase-io-unix-opentable-7", fmt.Errorf("opening FPT file failed with error: %w", err))
+			return nil, newError("dbase-io-unix-opentable-10", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
 		file.relatedHandle = relatedHandle
 		err = file.ReadMemoHeader()
 		if err != nil {
-			return nil, newError("dbase-io-unix-opentable-8", err)
+			return nil, newError("dbase-io-unix-opentable-11", err)
 		}
 	}
 	return file, nil
