@@ -196,7 +196,7 @@ func setStructField(tags map[string]string, obj interface{}, name string, value 
 	if structFieldType.Kind() == reflect.Ptr {
 		// Convert the value to a pointer to match the field type
 		ptr := reflect.New(structFieldType.Elem())
-		ptr.Elem().Set(val)
+		ptr.Elem().Set(reflect.ValueOf(cast(value, structFieldType.Elem())))
 		val = ptr
 	}
 
