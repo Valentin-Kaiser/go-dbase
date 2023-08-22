@@ -394,7 +394,7 @@ func (file *File) getLogicalRepresentation(field *Field, _ bool) ([]byte, error)
 }
 
 // Get the raw value as byte representation
-func (file *File) parseRaw(raw []byte, column *Column) (interface{}, error) {
+func (file *File) parseRaw(raw []byte, _ *Column) (interface{}, error) {
 	return raw, nil
 }
 

@@ -47,6 +47,22 @@ type Field struct {
 	value  interface{} // Value of the field
 }
 
+// nullFlagPosition calculates position of this column in the null flag
+func (table *Table) nullFlagPosition(column *Column) int {
+	bitCount := 0
+	for _, c := range table.columns {
+		if c.DataType != byte(Varchar) && c.DataType != byte(Varbinary) || c == column {
+			break
+		}
+		bitCount++
+		if c.Flag == byte(NullableFlag) || c.Flag == byte(NullableFlag|BinaryFlag) {
+			bitCount++
+		}
+	}
+
+	return bitCount
+}
+
 // Returns all values of a row as a slice of interface{}
 func (row *Row) Values() []interface{} {
 	values := make([]interface{}, 0)
@@ -240,7 +256,7 @@ func (row *Row) BytesValueByName(name string) ([]byte, error) {
 		}
 		uint8Val, ok := val.([]uint8)
 		if ok {
-			return []byte(uint8Val), nil
+			return uint8Val, nil
 		}
 		strVal, ok := val.(string)
 		if ok {
@@ -586,16 +602,12 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 	case Varbinary:
 		column.Flag |= byte(BinaryFlag)
 		fallthrough
-	case Varchar:
-		fallthrough
-	case Character:
+	case Varchar, Character:
 		if length == 0 || length > 254 {
 			return nil, newError("dbase-table-newcolumn-2", errors.New("character, varbinary and varchar values can only be between 1 to 254 characters long"))
 		}
 		column.Length = length
-	case Numeric:
-		fallthrough
-	case Float:
+	case Numeric, Float:
 		if length == 0 || length > 20 {
 			return nil, newError("dbase-table-newcolumn-3", errors.New("numeric and float values can only be between 1 to 20 characters long"))
 		}

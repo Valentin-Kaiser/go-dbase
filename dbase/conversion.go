@@ -13,27 +13,27 @@ import (
 // Convert year, month and day to a julian day number.
 // (Julian day number -> days since 01-01-4712 BC)
 // This method is based on Fliegel/van Flandern algorithm.
-func julianDate(Y, M, D int) int {
-	return (1461*(Y+4800+(M-14)/12))/4 +
-		(367*(M-2-12*((M-14)/12)))/12 -
-		(3*((Y+4900+(M-14)/12)/100))/4 +
-		D - 32075
+func julianDate(y, m, d int) int {
+	return (1461*(y+4800+(m-14)/12))/4 +
+		(367*(m-2-12*((m-14)/12)))/12 -
+		(3*((y+4900+(m-14)/12)/100))/4 +
+		d - 32075
 }
 
 // Convert julian day number to year, month and day.
 // (Julian day number -> days since 01-01-4712 BC)
-func julianToDate(JD int) (int, int, int) {
-	L := JD + 68569
-	N := (4 * L) / 146097
-	L = L - (146097*N+3)/4
-	I := (4000 * (L + 1)) / 1461001
-	L = L - (1461*I)/4 + 31
-	J := (80 * L) / 2447
-	D := L - (2447*J)/80
-	L = J / 11
-	M := J + 2 - 12*L
-	Y := 100*(N-49) + I + L
-	return Y, M, D
+func julianToDate(jd int) (int, int, int) {
+	l := jd + 68569
+	n := (4 * l) / 146097
+	l -= (146097*n + 3) / 4
+	i := (4000 * (l + 1)) / 1461001
+	l -= (1461*i)/4 + 31
+	j := (80 * l) / 2447
+	d := l - (2447*j)/80
+	l = j / 11
+	m := j + 2 - 12*l
+	y := 100*(n-49) + i + l
+	return y, m, d
 }
 
 // parseDate parses a date string from a byte slice and returns a time.Time

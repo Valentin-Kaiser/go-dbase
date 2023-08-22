@@ -24,19 +24,101 @@ var DefaultIO WindowsIO
 type WindowsIO struct{}
 
 func (w WindowsIO) OpenTable(config *Config) (*File, error) {
-	if config == nil {
-		return nil, newError("dbase-io-windows-opentable-1", fmt.Errorf("missing configuration"))
+	if config == nil || len(strings.TrimSpace(config.Filename)) == 0 {
+		return nil, newError("dbase-io-windows-opentable-1", fmt.Errorf("missing configuration or filename"))
 	}
 	debugf("Opening table: %s - Read-only: %v - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.ReadOnly, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
-	if len(strings.TrimSpace(config.Filename)) == 0 {
-		return nil, newError("dbase-io-windows-opentable-2", fmt.Errorf("missing filename"))
+	var err error
+	config.Filename, err = _findFile(filepath.Clean(config.Filename))
+	if err != nil {
+		return nil, newError("dbase-io-windows-opentable-2", err)
 	}
-	fileName := filepath.Clean(config.Filename)
-	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
-	fileName, err := _findFile(fileName)
+	file, err := w.initFile(config)
 	if err != nil {
 		return nil, newError("dbase-io-windows-opentable-3", err)
 	}
+	err = w.initTable(config, file)
+	if err != nil {
+		return nil, newError("dbase-io-windows-opentable-4", err)
+	}
+	err = w.initRelated(config, file)
+	if err != nil {
+		return nil, newError("dbase-io-windows-opentable-5", err)
+	}
+	return file, nil
+}
+
+func (w WindowsIO) initFile(config *Config) (*File, error) {
+	fd, err := windows.Open(config.Filename, w.fileMode(config), 0644)
+	if err != nil {
+		return nil, newError("dbase-io-windows-initfile-1", fmt.Errorf("opening DBF file %v failed with error: %w", config.Filename, err))
+	}
+	return &File{
+		config:     config,
+		io:         w,
+		handle:     &fd,
+		dbaseMutex: &sync.Mutex{},
+		memoMutex:  &sync.Mutex{},
+	}, nil
+}
+
+func (w WindowsIO) initTable(config *Config, file *File) error {
+	err := file.ReadHeader()
+	if err != nil {
+		return newError("dbase-io-windows-inittable-1", err)
+	}
+	// Check if the fileversion flag is expected, expand validFileVersion if needed
+	if err := ValidateFileVersion(file.header.FileType, config.Untested); err != nil {
+		return newError("dbase-io-windows-inittable-2", err)
+	}
+	columns, nullFlag, err := file.ReadColumns()
+	if err != nil {
+		return newError("dbase-io-windows-inittable-3", err)
+	}
+	file.nullFlagColumn = nullFlag
+	file.table = &Table{
+		name:    strings.TrimSuffix(strings.ToUpper(filepath.Base(config.Filename)), filepath.Ext(config.Filename)),
+		columns: columns,
+		mods:    make([]*Modification, len(columns)),
+	}
+	// Interpret the code page mark if needed
+	if config.InterpretCodePage || config.Converter == nil {
+		debugf("Interpreting code page mark...")
+		file.config.Converter = ConverterFromCodePage(file.header.CodePage)
+		debugf("Code page: 0x%02x => interpreted: 0x%02x", file.header.CodePage, file.config.Converter.CodePage())
+	}
+	// Check if the code page mark is matchin the converter
+	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePage() {
+		return newError("dbase-io-windows-inittable-4", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
+	}
+	return nil
+}
+
+// Check if there is an FPT according to the header.
+// If there is we will try to open it in the same dir (using the same filename and case).
+// If the FPT file does not exist an error is returned.
+func (w WindowsIO) initRelated(config *Config, file *File) error {
+	if MemoFlag.Defined(file.header.TableFlags) {
+		ext := FPT
+		if FileExtension(filepath.Ext(config.Filename)) == DBC {
+			ext = DCT
+		}
+		relatedFile := strings.TrimSuffix(config.Filename, path.Ext(config.Filename)) + string(ext)
+		debugf("Opening related file: %s\n", relatedFile)
+		relatedFD, err := windows.Open(relatedFile, w.fileMode(config), 0644)
+		if err != nil {
+			return newError("dbase-io-windows-initrelated-1", fmt.Errorf("opening related file %v failed with error: %w", relatedFile, err))
+		}
+		file.relatedHandle = &relatedFD
+		err = file.ReadMemoHeader()
+		if err != nil {
+			return newError("dbase-io-windows-initrelated-2", err)
+		}
+	}
+	return nil
+}
+
+func (w WindowsIO) fileMode(config *Config) int {
 	mode := windows.O_RDWR | windows.O_CLOEXEC | windows.O_NONBLOCK
 	if config.ReadOnly {
 		mode = os.O_RDONLY | windows.O_CLOEXEC | windows.O_NONBLOCK
@@ -44,69 +126,7 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	if config.Exclusive {
 		mode = windows.O_RDWR | windows.O_CLOEXEC | windows.O_EXCL
 	}
-	fd, err := windows.Open(fileName, mode, 0644)
-	if err != nil {
-		return nil, newError("dbase-io-windows-opentable-3", fmt.Errorf("opening DBF file %v failed with error: %w", fileName, err))
-	}
-	file := &File{
-		config:     config,
-		io:         w,
-		handle:     &fd,
-		dbaseMutex: &sync.Mutex{},
-		memoMutex:  &sync.Mutex{},
-	}
-	err = file.ReadHeader()
-	if err != nil {
-		return nil, newError("dbase-io-windows-preparedbf-1", err)
-	}
-	// Check if the fileversion flag is expected, expand validFileVersion if needed
-	if err := ValidateFileVersion(file.header.FileType, config.Untested); err != nil {
-		return nil, newError("dbase-io-windows-preparedbf-2", err)
-	}
-	columns, nullFlag, err := file.ReadColumns()
-	if err != nil {
-		return nil, newError("dbase-io-windows-preparedbf-3", err)
-	}
-	file.nullFlagColumn = nullFlag
-	file.table = &Table{
-		name:    strings.TrimSuffix(strings.ToUpper(filepath.Base(fileName)), string(fileExtension)),
-		columns: columns,
-		mods:    make([]*Modification, len(columns)),
-	}
-	// Interpret the code page mark if needed
-	if config.InterpretCodePage || config.Converter == nil {
-		if config.Converter == nil {
-			debugf("No encoding converter defined, falling back to default (interpreting)")
-		}
-		debugf("Interpreting code page mark...")
-		file.config.Converter = ConverterFromCodePage(file.header.CodePage)
-		debugf("Code page: 0x%02x => interpreted: 0x%02x", file.header.CodePage, file.config.Converter.CodePage())
-	}
-	// Check if the code page mark is matchin the converter
-	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePage() {
-		return nil, newError("dbase-io-windows-opentable-6", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
-	}
-	// Check if there is an FPT according to the header.
-	// If there is we will try to open it in the same dir (using the same filename and case).
-	// If the FPT file does not exist an error is returned.
-	if MemoFlag.Defined(file.header.TableFlags) {
-		ext := FPT
-		if fileExtension == DBC {
-			ext = DCT
-		}
-		relatedFile := strings.TrimSuffix(fileName, path.Ext(fileName)) + string(ext)
-		debugf("Opening related file: %s\n", relatedFile)
-		relatedFD, err := windows.Open(relatedFile, mode, 0644)
-		if err != nil {
-			return nil, newError("dbase-io-windows-opentable-7", fmt.Errorf("opening related file %v failed with error: %w", relatedFile, err))
-		}
-		file.relatedHandle = &relatedFD
-		err = file.ReadMemoHeader()
-		if err != nil {
-			return nil, newError("dbase-io-windows-opentable-8", err)
-		}
-	}
-	return file, nil
+	return mode
 }
 
 func (w WindowsIO) Close(file *File) error {
@@ -367,27 +387,10 @@ func (w WindowsIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 	if err != nil {
 		return false, false, newError("dbase-io-windows-readnullflag-1", err)
 	}
-	if file.nullFlagColumn == nil {
-		return false, false, newError("dbase-io-windows-readnullflag-2", fmt.Errorf("null flag column is nil"))
+	if file.nullFlagColumn == nil || (column.DataType != byte(Varchar) && column.DataType != byte(Varbinary)) {
+		return false, false, newError("dbase-io-windows-readnullflag-2", fmt.Errorf("null flag column is nil or column is not varchar or varbinary"))
 	}
-	if column.DataType != byte(Varchar) && column.DataType != byte(Varbinary) {
-		return false, false, newError("dbase-io-windows-readnullflag-3", fmt.Errorf("column is not of type varchar or varbinary"))
-	}
-	// count what number of varchar field this field is
-	bitCount := 0
-	for _, c := range file.table.columns {
-		if c.DataType == byte(Varchar) || c.DataType == byte(Varbinary) {
-			if c == column {
-				break
-			}
-			if c.Flag == byte(NullableFlag) || c.Flag == byte(NullableFlag|BinaryFlag) {
-				bitCount += 2
-			} else {
-				bitCount++
-			}
-		}
-	}
-	// Read the null flag field
+	nullFlagPosition := file.table.nullFlagPosition(column)
 	pos := uint64(file.header.FirstRow) + position*uint64(file.header.RowLength) + uint64(file.nullFlagColumn.Position)
 	_, err = windows.Seek(*handle, int64(pos), 0)
 	if err != nil {
@@ -402,11 +405,11 @@ func (w WindowsIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 		return false, false, newError("dbase-io-windows-readnullflag-3", fmt.Errorf("read %d bytes, expected %d", n, file.nullFlagColumn.Length))
 	}
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
-		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, bitCount), getNthBit(buf, bitCount+1))
-		return getNthBit(buf, bitCount), getNthBit(buf, bitCount+1), nil
+		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, nullFlagPosition), getNthBit(buf, nullFlagPosition+1))
+		return getNthBit(buf, nullFlagPosition), getNthBit(buf, nullFlagPosition+1), nil
 	}
-	debugf("Read _NullFlag for column %s => varlength: %v ", column.Name(), getNthBit(buf, bitCount))
-	return getNthBit(buf, bitCount), false, nil
+	debugf("Read _NullFlag for column %s => varlength: %v ", column.Name(), getNthBit(buf, nullFlagPosition))
+	return getNthBit(buf, nullFlagPosition), false, nil
 }
 
 func (w WindowsIO) ReadMemoHeader(file *File) error {

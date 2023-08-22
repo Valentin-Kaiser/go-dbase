@@ -430,26 +430,10 @@ func (g GenericIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 	if err != nil {
 		return false, false, newError("dbase-io-generic-readnullflag-1", err)
 	}
-	if file.nullFlagColumn == nil {
-		return false, false, newError("dbase-io-generic-readnullflag-2", fmt.Errorf("null flag column missing"))
+	if file.nullFlagColumn == nil || (column.DataType != byte(Varchar) && column.DataType != byte(Varbinary)) {
+		return false, false, newError("dbase-io-generic-readnullflag-2", fmt.Errorf("null flag column missing or not a varchar/varbinary field"))
 	}
-	if column.DataType != byte(Varchar) && column.DataType != byte(Varbinary) {
-		return false, false, newError("dbase-io-generic-readnullflag-3", fmt.Errorf("column not a varchar or varbinary"))
-	}
-	// count what number of varchar field this field is
-	bitCount := 0
-	for _, c := range file.table.columns {
-		if c.DataType == byte(Varchar) || c.DataType == byte(Varbinary) {
-			if c == column {
-				break
-			}
-			bitCount++
-			if c.Flag == byte(NullableFlag) || c.Flag == byte(NullableFlag|BinaryFlag) {
-				bitCount++
-			}
-		}
-	}
-	// Read the null flag field
+	nullFlagPosition := file.table.nullFlagPosition(column)
 	position = uint64(file.header.FirstRow) + position*uint64(file.header.RowLength) + uint64(file.nullFlagColumn.Position)
 	_, err = handle.Seek(int64(position), 0)
 	if err != nil {
@@ -464,11 +448,11 @@ func (g GenericIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 		return false, false, newError("dbase-io-generic-readnullflag-6", fmt.Errorf("read %d bytes, expected %d", n, file.nullFlagColumn.Length))
 	}
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
-		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, bitCount), getNthBit(buf, bitCount+1))
-		return getNthBit(buf, bitCount), getNthBit(buf, bitCount+1), nil
+		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, nullFlagPosition), getNthBit(buf, nullFlagPosition+1))
+		return getNthBit(buf, nullFlagPosition), getNthBit(buf, nullFlagPosition+1), nil
 	}
-	debugf("Read _NullFlag for column %s => varlength: %v ", column.Name(), getNthBit(buf, bitCount))
-	return getNthBit(buf, bitCount), false, nil
+	debugf("Read _NullFlag for column %s => varlength: %v ", column.Name(), getNthBit(buf, nullFlagPosition))
+	return getNthBit(buf, nullFlagPosition), false, nil
 }
 
 func (g GenericIO) ReadRow(file *File, position uint32) ([]byte, error) {

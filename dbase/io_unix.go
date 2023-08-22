@@ -22,13 +22,10 @@ var DefaultIO UnixIO
 type UnixIO struct{}
 
 func (u UnixIO) OpenTable(config *Config) (*File, error) {
-	if config == nil {
-		return nil, newError("dbase-io-unix-opentable-1", fmt.Errorf("missing configuration"))
+	if config == nil || len(strings.TrimSpace(config.Filename)) == 0 {
+		return nil, newError("dbase-io-unix-opentable-1", fmt.Errorf("missing configuration or filename"))
 	}
 	debugf("Opening table: %s - Read-only: %v - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.ReadOnly, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
-	if len(strings.TrimSpace(config.Filename)) == 0 {
-		return nil, newError("dbase-io-unix-opentable-2", fmt.Errorf("missing filename"))
-	}
 	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
 	fileName := filepath.Clean(config.Filename)
 	fileName, err := _findFile(fileName)
@@ -73,9 +70,6 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	}
 	// Interpret the code page mark if needed
 	if config.InterpretCodePage || config.Converter == nil {
-		if config.Converter == nil {
-			debugf("No encoding converter defined, falling back to default (interpreting)")
-		}
 		debugf("Interpreting code page mark...")
 		file.config.Converter = ConverterFromCodePage(file.header.CodePage)
 		debugf("Code page: 0x%02x => interpreted: 0x%02x", file.header.CodePage, file.config.Converter.CodePage())
@@ -331,21 +325,7 @@ func (u UnixIO) ReadNullFlag(file *File, rowPosition uint64, column *Column) (bo
 	if column.DataType != byte(Varchar) && column.DataType != byte(Varbinary) {
 		return false, false, newError("dbase-io-unix-readnullflag-3", fmt.Errorf("column is not a varchar or varbinary column"))
 	}
-	// count what number of varchar field this field is
-	bitCount := 0
-	for _, c := range file.table.columns {
-		if c.DataType == byte(Varchar) || c.DataType == byte(Varbinary) {
-			if c == column {
-				break
-			}
-			if c.Flag == byte(NullableFlag) || c.Flag == byte(NullableFlag|BinaryFlag) {
-				bitCount += 2
-			} else {
-				bitCount++
-			}
-		}
-	}
-	// Read the null flag field
+	nullFlagPosition := file.table.nullFlagPosition(column)
 	position := uint64(file.header.FirstRow) + rowPosition*uint64(file.header.RowLength) + uint64(file.nullFlagColumn.Position)
 	_, err = handle.Seek(int64(position), 0)
 	if err != nil {
@@ -361,12 +341,12 @@ func (u UnixIO) ReadNullFlag(file *File, rowPosition uint64, column *Column) (bo
 	}
 
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
-		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, bitCount), getNthBit(buf, bitCount+1))
-		return getNthBit(buf, bitCount), getNthBit(buf, bitCount+1), nil
+		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, nullFlagPosition), getNthBit(buf, nullFlagPosition+1))
+		return getNthBit(buf, nullFlagPosition), getNthBit(buf, nullFlagPosition+1), nil
 	}
 
-	debugf("Read _NullFlag for column %s => varlength: %v", column.Name(), getNthBit(buf, bitCount))
-	return getNthBit(buf, bitCount), false, nil
+	debugf("Read _NullFlag for column %s => varlength: %v", column.Name(), getNthBit(buf, nullFlagPosition))
+	return getNthBit(buf, nullFlagPosition), false, nil
 }
 
 func (u UnixIO) ReadMemoHeader(file *File) error {
