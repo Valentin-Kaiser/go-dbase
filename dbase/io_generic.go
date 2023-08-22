@@ -394,7 +394,7 @@ func (g GenericIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 		return nil, newError("dbase-io-generic-writememo-2", err)
 	}
 	// Put the block data together
-	data := make([]byte, 0)
+	data := make([]byte, 8)
 	// The first 4 bytes are the signature, 1 for text, 0 for binary(image)
 	if text {
 		binary.BigEndian.PutUint32(data[:4], 1)

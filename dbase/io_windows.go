@@ -98,7 +98,7 @@ func (w WindowsIO) initTable(config *Config, file *File) error {
 // If there is we will try to open it in the same dir (using the same filename and case).
 // If the FPT file does not exist an error is returned.
 func (w WindowsIO) initRelated(config *Config, file *File) error {
-	if !MemoFlag.Defined(file.header.TableFlags) {
+	if MemoFlag.Defined(file.header.TableFlags) {
 		ext := FPT
 		if FileExtension(filepath.Ext(config.Filename)) == DBC {
 			ext = DCT
@@ -511,7 +511,7 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 		return nil, newError("dbase-io-windows-writememo-2", err)
 	}
 	// Put the block data together
-	data := make([]byte, 0)
+	data := make([]byte, 8)
 	// The first 4 bytes are the signature, 1 for text, 0 for binary(image)
 	if text {
 		binary.BigEndian.PutUint32(data[:4], 1)
