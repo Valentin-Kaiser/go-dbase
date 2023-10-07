@@ -79,7 +79,7 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 		return nil, newError("dbase-io-unix-opentable-8", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
 	}
 
-	err = u.openMemo(file)
+	err = u.openMemo(file, fileName, mode, fileExtension == DBC)
 	if err != nil {
 		return nil, newError("dbase-io-unix-opentable-9", err)
 	}
@@ -90,27 +90,29 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 // Check if there is an FPT according to the header.
 // If there is we will try to open it in the same dir (using the same filename and case).
 // If the FPT file does not exist an error is returned.
-func (u UnixIO) openMemo(file *File) error {
+func (u UnixIO) openMemo(file *File, filename string, mode int, container bool) error {
 	if MemoFlag.Defined(file.header.TableFlags) {
 		ext := FPT
-		if fileExtension == DBC {
+		if container {
 			ext = DCT
 		}
-		relatedFile, err := _findFile(strings.TrimSuffix(fileName, path.Ext(fileName)) + string(ext))
+		relatedFile, err := _findFile(strings.TrimSuffix(filename, path.Ext(filename)) + string(ext))
 		if err != nil {
-			return nil, newError("dbase-io-unix-opentable-9", err)
+			return newError("dbase-io-unix-opentable-9", err)
 		}
 		debugf("Opening related file: %s\n", relatedFile)
 		relatedHandle, err := os.OpenFile(relatedFile, mode, 0600)
 		if err != nil {
-			return nil, newError("dbase-io-unix-opentable-10", fmt.Errorf("opening FPT file failed with error: %w", err))
+			return newError("dbase-io-unix-opentable-10", fmt.Errorf("opening FPT file failed with error: %w", err))
 		}
 		file.relatedHandle = relatedHandle
 		err = file.ReadMemoHeader()
 		if err != nil {
-			return nil, newError("dbase-io-unix-opentable-11", err)
+			return newError("dbase-io-unix-opentable-11", err)
 		}
 	}
+
+	return nil
 }
 
 func (u UnixIO) Close(file *File) error {
