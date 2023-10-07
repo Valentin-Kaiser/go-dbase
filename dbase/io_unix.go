@@ -78,9 +78,19 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePage() {
 		return nil, newError("dbase-io-unix-opentable-8", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
 	}
-	// Check if there is an FPT according to the header.
-	// If there is we will try to open it in the same dir (using the same filename and case).
-	// If the FPT file does not exist an error is returned.
+
+	err = u.openMemo(file)
+	if err != nil {
+		return nil, newError("dbase-io-unix-opentable-9", err)
+	}
+
+	return file, nil
+}
+
+// Check if there is an FPT according to the header.
+// If there is we will try to open it in the same dir (using the same filename and case).
+// If the FPT file does not exist an error is returned.
+func (u UnixIO) openMemo(file *File) error {
 	if MemoFlag.Defined(file.header.TableFlags) {
 		ext := FPT
 		if fileExtension == DBC {
@@ -101,7 +111,6 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 			return nil, newError("dbase-io-unix-opentable-11", err)
 		}
 	}
-	return file, nil
 }
 
 func (u UnixIO) Close(file *File) error {
