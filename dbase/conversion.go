@@ -25,9 +25,9 @@ func julianDate(y, m, d int) int {
 func julianToDate(jd int) (int, int, int) {
 	l := jd + 68569
 	n := (4 * l) / 146097
-	l -= (146097*n + 3) / 4
+	l = l - (146097*n+3)/4
 	i := (4000 * (l + 1)) / 1461001
-	l -= (1461*i)/4 + 31
+	l = l - (1461*i)/4 + 31
 	j := (80 * l) / 2447
 	d := l - (2447*j)/80
 	l = j / 11
