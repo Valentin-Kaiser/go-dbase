@@ -9,7 +9,6 @@ import (
 // - WindowsIO (for direct file access with Windows)
 // - UnixIO (for direct file access with Unix)
 // - GenericIO (for any custom file access implementing io.ReadWriteSeeker)
-// The IO interface can be implemented for any custom file access.
 type IO interface {
 	OpenTable(config *Config) (*File, error)
 	Close(file *File) error
