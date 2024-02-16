@@ -114,7 +114,7 @@ func (row *Row) StringValueByName(name string) (string, error) {
 		if ok {
 			return string(sanitizeString(bslice)), nil
 		}
-		return "", newError("dbase-table-stringvaluebyname-2", fmt.Errorf("value is not a string"))
+		return "", newError("dbase-table-stringvaluebyname-2", errors.New("value is not a string"))
 	}
 	return "", nil
 }
@@ -142,7 +142,7 @@ func (row *Row) IntValueByName(name string) (int64, error) {
 		if ok {
 			return intVal, nil
 		}
-		return 0, newError("dbase-table-intvaluebyname-2", fmt.Errorf("value is not an int"))
+		return 0, newError("dbase-table-intvaluebyname-2", errors.New("value is not an int"))
 	}
 	return 0, nil
 }
@@ -170,7 +170,7 @@ func (row *Row) FloatValueByName(name string) (float64, error) {
 		if ok {
 			return floatVal, nil
 		}
-		return 0, newError("dbase-table-floatvaluebyname-2", fmt.Errorf("value is not a float"))
+		return 0, newError("dbase-table-floatvaluebyname-2", errors.New("value is not a float"))
 	}
 	return 0, nil
 }
@@ -197,7 +197,7 @@ func (row *Row) BoolValueByName(name string) (bool, error) {
 		if ok {
 			return boolVal, nil
 		}
-		return false, newError("dbase-table-boolvaluebyname-2", fmt.Errorf("value is not a bool"))
+		return false, newError("dbase-table-boolvaluebyname-2", errors.New("value is not a bool"))
 	}
 
 	return false, nil
@@ -226,7 +226,7 @@ func (row *Row) TimeValueByName(name string) (time.Time, error) {
 		if ok {
 			return timeVal, nil
 		}
-		return time.Time{}, newError("dbase-table-timevaluebyname-2", fmt.Errorf("value is not a time"))
+		return time.Time{}, newError("dbase-table-timevaluebyname-2", errors.New("value is not a time"))
 	}
 	return time.Time{}, nil
 }
@@ -262,7 +262,7 @@ func (row *Row) BytesValueByName(name string) ([]byte, error) {
 		if ok {
 			return []byte(strVal), nil
 		}
-		return nil, newError("dbase-table-bytesvaluebyname-2", fmt.Errorf("value is not a byte slice"))
+		return nil, newError("dbase-table-bytesvaluebyname-2", errors.New("value is not a byte slice"))
 	}
 	return nil, nil
 }
@@ -462,7 +462,7 @@ func (c *Column) Reflect() (reflect.Type, error) {
 // SetValue allows to change the field value
 func (field *Field) SetValue(value interface{}) error {
 	if field == nil {
-		return newError("dbase-table-setvalue-1", fmt.Errorf("field is not defined by table"))
+		return newError("dbase-table-setvalue-1", errors.New("field is not defined by table"))
 	}
 	field.value = value
 	return nil

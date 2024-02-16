@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 )
 
@@ -268,8 +269,8 @@ func (file *File) getFloatRepresentation(field *Field, skipSpacing bool) ([]byte
 	}
 	var bin []byte
 	if b == float64(int64(b)) {
-		// if the value is an integer, store as integer
-		bin = []byte(fmt.Sprintf("%d", int64(b)))
+		// if the value has no decimals, store as integer
+		bin = []byte(strconv.FormatInt(int64(b), 10))
 	} else {
 		// if the value is a float, store as float
 		expression := fmt.Sprintf("%%.%df", field.column.Decimals)
@@ -431,8 +432,8 @@ func (file *File) getNumericRepresentation(field *Field, skipSpacing bool) ([]by
 	f, fok := field.value.(float64)
 	if fok {
 		if f == float64(int64(f)) {
-			// if the value is an integer, store as integer
-			bin = []byte(fmt.Sprintf("%d", int64(f)))
+			// if the value has no decimals, store as integer
+			bin = []byte(strconv.FormatInt(int64(f), 10))
 		} else {
 			// if the value is a float, store as float
 			expression := fmt.Sprintf("%%.%df", field.column.Decimals)

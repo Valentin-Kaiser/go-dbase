@@ -1,6 +1,7 @@
 package dbase
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -16,10 +17,10 @@ type Database struct {
 // The database file must be a DBC file and the tables must be DBF files and in the same directory as the database
 func OpenDatabase(config *Config) (*Database, error) {
 	if config == nil {
-		return nil, newError("dbase-io-opendatabase-1", fmt.Errorf("missing config"))
+		return nil, newError("dbase-io-opendatabase-1", errors.New("missing config"))
 	}
 	if len(strings.TrimSpace(config.Filename)) == 0 {
-		return nil, newError("dbase-io-opendatabase-2", fmt.Errorf("missing filename"))
+		return nil, newError("dbase-io-opendatabase-2", errors.New("missing filename"))
 	}
 	if strings.ToUpper(filepath.Ext(config.Filename)) != string(DBC) {
 		return nil, newError("dbase-io-opendatabase-3", fmt.Errorf("invalid file name: %v", config.Filename))
@@ -47,7 +48,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 		}
 		tableName, ok := objectName.(string)
 		if !ok {
-			return nil, newError("dbase-io-opendatabase-8", fmt.Errorf("table name is not a string"))
+			return nil, newError("dbase-io-opendatabase-8", errors.New("table name is not a string"))
 		}
 		tableName = strings.Trim(tableName, " ")
 		if tableName == "" {

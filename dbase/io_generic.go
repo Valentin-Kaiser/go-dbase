@@ -3,6 +3,7 @@ package dbase
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -21,7 +22,7 @@ type GenericIO struct {
 
 func (g GenericIO) OpenTable(config *Config) (*File, error) {
 	if config == nil {
-		return nil, newError("dbase-io-generic-opentable-1", fmt.Errorf("missing configuration"))
+		return nil, newError("dbase-io-generic-opentable-1", errors.New("missing configuration"))
 	}
 	debugf("Opening table from custom io interface - Untested: %v - Trim spaces: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Untested, config.TrimSpaces, config.ValidateCodePage, config.InterpretCodePage)
 	fileName := filepath.Clean(config.Filename)
@@ -71,7 +72,7 @@ func (g GenericIO) OpenTable(config *Config) (*File, error) {
 	// If the FPT file does not exist an error is returned.
 	if MemoFlag.Defined(file.header.TableFlags) {
 		if file.relatedHandle == nil {
-			return nil, newError("dbase-io-generic-opentable-6", fmt.Errorf("no related handle defined"))
+			return nil, newError("dbase-io-generic-opentable-6", errors.New("no related handle defined"))
 		}
 		err = file.ReadMemoHeader()
 		if err != nil {
@@ -431,7 +432,7 @@ func (g GenericIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 		return false, false, newError("dbase-io-generic-readnullflag-1", err)
 	}
 	if file.nullFlagColumn == nil || (column.DataType != byte(Varchar) && column.DataType != byte(Varbinary)) {
-		return false, false, newError("dbase-io-generic-readnullflag-2", fmt.Errorf("null flag column missing or not a varchar/varbinary field"))
+		return false, false, newError("dbase-io-generic-readnullflag-2", errors.New("null flag column missing or not a varchar/varbinary field"))
 	}
 	nullFlagPosition := file.table.nullFlagPosition(column)
 	position = uint64(file.header.FirstRow) + position*uint64(file.header.RowLength) + uint64(file.nullFlagColumn.Position)
@@ -519,7 +520,7 @@ func (g GenericIO) WriteRow(file *File, row *Row) error {
 
 func (g GenericIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, error) {
 	if field.column.DataType == 'M' {
-		return nil, newError("dbase-io-generic-search-1", fmt.Errorf("searching memo fields is not supported"))
+		return nil, newError("dbase-io-generic-search-1", errors.New("searching memo fields is not supported"))
 	}
 	handle, err := g.getHandle(file)
 	if err != nil {
