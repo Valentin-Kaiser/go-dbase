@@ -2,6 +2,7 @@ package dbase
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -238,7 +239,7 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 	rec.Deleted = Marker(data[0]) == Deleted
 	if !rec.Deleted && Marker(data[0]) != Active {
-		return nil, newError("dbase-table-bytestorow-2", fmt.Errorf("invalid row data, no delete flag found at beginning of row"))
+		return nil, newError("dbase-table-bytestorow-2", errors.New("invalid row data, no delete flag found at beginning of row"))
 	}
 	// deleted flag already read
 	offset := uint16(1)

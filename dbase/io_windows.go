@@ -6,6 +6,7 @@ package dbase
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -25,7 +26,7 @@ type WindowsIO struct{}
 
 func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	if config == nil || len(strings.TrimSpace(config.Filename)) == 0 {
-		return nil, newError("dbase-io-windows-opentable-1", fmt.Errorf("missing configuration or filename"))
+		return nil, newError("dbase-io-windows-opentable-1", errors.New("missing configuration or filename"))
 	}
 	debugf("Opening table: %s - Read-only: %v - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.ReadOnly, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
 	var err error
@@ -161,7 +162,7 @@ func (w WindowsIO) Create(file *File) error {
 	file.config.Filename = strings.ToUpper(strings.TrimSpace(file.config.Filename))
 	// Check for valid file name
 	if len(file.config.Filename) == 0 {
-		return newError("dbase-io-windows-create-1", fmt.Errorf("missing filename"))
+		return newError("dbase-io-windows-create-1", errors.New("missing filename"))
 	}
 	dbfname, err := windows.UTF16FromString(file.config.Filename)
 	if err != nil {
@@ -170,7 +171,7 @@ func (w WindowsIO) Create(file *File) error {
 	// Check if file exists already
 	_, err = windows.GetFileAttributes(&dbfname[0])
 	if err == nil {
-		return newError("dbase-io-windows-create-3", fmt.Errorf("file already exists"))
+		return newError("dbase-io-windows-create-3", errors.New("file already exists"))
 	}
 	// Create the file
 	debugf("Creating file: %s", file.config.Filename)
@@ -388,7 +389,7 @@ func (w WindowsIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 		return false, false, newError("dbase-io-windows-readnullflag-1", err)
 	}
 	if file.nullFlagColumn == nil || (column.DataType != byte(Varchar) && column.DataType != byte(Varbinary)) {
-		return false, false, newError("dbase-io-windows-readnullflag-2", fmt.Errorf("null flag column is nil or column is not varchar or varbinary"))
+		return false, false, newError("dbase-io-windows-readnullflag-2", errors.New("null flag column is nil or column is not varchar or varbinary"))
 	}
 	nullFlagPosition := file.table.nullFlagPosition(column)
 	pos := uint64(file.header.FirstRow) + position*uint64(file.header.RowLength) + uint64(file.nullFlagColumn.Position)
@@ -688,7 +689,7 @@ func (w WindowsIO) WriteRow(file *File, row *Row) (err error) {
 
 func (w WindowsIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, error) {
 	if field.column.DataType == 'M' {
-		return nil, newError("dbase-io-windows-search-1", fmt.Errorf("searching memo fields is not supported"))
+		return nil, newError("dbase-io-windows-search-1", errors.New("searching memo fields is not supported"))
 	}
 	handle, err := w.getHandle(file)
 	if err != nil {
