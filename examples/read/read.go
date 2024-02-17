@@ -42,7 +42,7 @@ func main() {
 
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
-		Filename:   "../test_data/table/TEST123.DBF",
+		Filename:   "../test_data/table/TEST.DBF",
 		TrimSpaces: true,
 	})
 	if err != nil {
