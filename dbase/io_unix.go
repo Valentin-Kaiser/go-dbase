@@ -573,7 +573,7 @@ func (u UnixIO) WriteRow(file *File, row *Row) (err error) {
 		return NewError("failed to seek to the row position").Details(err)
 	}
 	// Write the row
-	wrote, err = handle.Write(r)
+	wrote, err := handle.Write(r)
 	if err != nil {
 		return NewError("failed to write row").Details(err)
 	}
@@ -699,7 +699,7 @@ func _findFile(name string) (string, error) {
 func (u UnixIO) getHandle(file *File) (*os.File, error) {
 	handle, ok := file.handle.(*os.File)
 	if !ok {
-		return nil, NewError("handle is of wrong type %T expected *os.File", file.handle)
+		return nil, NewErrorf("handle is of wrong type %T expected *os.File", file.handle)
 	}
 	if handle == nil || reflect.ValueOf(handle).IsNil() {
 		return nil, WrapError(ErrNoDBF)
