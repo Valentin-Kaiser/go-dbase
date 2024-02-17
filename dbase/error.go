@@ -37,7 +37,7 @@ func NewError(err string) Error {
 		trace:   make([]string, 0),
 		details: make([]error, 0),
 	}
-	e.trace = trace(e, 3)
+	e.trace = trace(e, 2)
 	return e
 }
 
@@ -47,7 +47,7 @@ func NewErrorf(format string, a ...interface{}) Error {
 		trace:   make([]string, 0),
 		details: make([]error, 0),
 	}
-	e.trace = trace(e, 3)
+	e.trace = trace(e, 2)
 	return e
 }
 
@@ -95,13 +95,8 @@ func WrapError(err error) Error {
 }
 
 func trace(e Error, level int) []string {
-	pc, file, line, ok := runtime.Caller(level)
+	_, file, line, ok := runtime.Caller(level)
 	if !ok {
-		return e.trace
-	}
-
-	if f := runtime.FuncForPC(pc); f != nil {
-		e.trace = append(e.trace, fmt.Sprintf("%v:%v", f.Name(), line))
 		return e.trace
 	}
 
