@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"time"
 
@@ -16,8 +17,8 @@ type Product struct {
 	Double      float64   `dbase:"DOUBLE"`
 	Date        time.Time `dbase:"DATE"`
 	DateTime    time.Time `dbase:"DATETIME"`
-	Integer     int32     `dbase:"INTEGER"`
-	Float       float64   `dbase:"FLOAT"`
+	Integer     float64   `dbase:"INTEGER"`
+	Float       int32     `dbase:"FLOAT"`
 	Active      bool      `dbase:"ACTIVE"`
 	Description string    `dbase:"DESC"`
 	Tax         float64   `dbase:"TAX"`
@@ -35,7 +36,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	dbase.Debug(true, io.MultiWriter(os.Stdout, f))
+	dbase.Debug(false, io.MultiWriter(os.Stdout, f))
 
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{
@@ -44,7 +45,7 @@ func main() {
 		WriteLock:  true,
 	})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 	defer table.Close()
 
@@ -56,85 +57,127 @@ func main() {
 		table.Header().FileSize(),
 	)
 
-	// Read the first row (rowPointer start at the first row).
-	row, err := table.Row()
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	// Get the company name field by column name.
-	err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	// Change a memo field value.
-	err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	// Write the changed row to the database table.
-	err = row.Write()
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	// === Modifications ===
-
-	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
-	err = table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	err = table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
-	if err != nil {
-		panic(dbase.GetErrorTrace(err))
-	}
-
-	// Create a new row with the same structure as the database table.
+	// A struct with the maximum possible field values.
 	p := Product{
-		ID:          99,
-		Name:        "NEW_PRODUCT",
-		Price:       99.99,
-		Tax:         19.99,
-		Stock:       999,
+		Name:        "PRODUCT_NAME_12345678901234567890123456789012345678901234567890123456789012345678901234567890",
+		Price:       math.MaxFloat64,
+		Double:      math.MaxFloat64,
 		Date:        time.Now(),
 		DateTime:    time.Now(),
-		Description: "NEW_PRODUCT_DESCRIPTION",
+		Integer:     math.MaxFloat64,
+		Float:       math.MaxInt32,
 		Active:      true,
-		Float:       105.67,
-		Integer:     104,
-		Double:      103.45,
-		Varchar:     "VARCHAR",
+		Description: "PRODUCT_DESCRIPTION_12345678901234567890123456789012345678901234567890123456789012345678901234567890",
+		Tax:         math.MaxFloat64,
+		Stock:       math.MaxInt64,
 	}
 
-	row, err = table.RowFromStruct(p)
+	// Write the struct to the table.
+	row, err := table.RowFromStruct(p)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
-	// Add the new row to the database table.
+	table.Skip(int64(table.RowsCount()))
 	err = row.Write()
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
-	// Print all rows.
-	for !table.EOF() {
-		row, err := table.Next()
-		if err != nil {
-			panic(dbase.GetErrorTrace(err))
-		}
-
-		// Skip deleted rows.
-		if row.Deleted {
-			fmt.Printf("Deleted row at position: %v \n", row.Position)
-			continue
-		}
-
-		// Print the current row values.
-		fmt.Println(row.Values()...)
+	// Read the last row.
+	raw, err := table.ReadRow(table.Pointer())
+	if err != nil {
+		panic(err)
 	}
+
+	fmt.Println(len(raw), raw)
+
+	row, err = table.Row()
+	if err != nil {
+		panic(err)
+	}
+
+	var p2 Product
+	err = row.ToStruct(&p2)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%+v \n", p2)
+
+	// // Get the company name field by column name.
+	// err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// // Change a memo field value.
+	// err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// // Write the changed row to the database table.
+	// err = row.Write()
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// // === Modifications ===
+
+	// // Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
+	// err = table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// err = table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// // Create a new row with the same structure as the database table.
+	// p := Product{
+	// 	ID:          99,
+	// 	Name:        "NEW_PRODUCT",
+	// 	Price:       99.99,
+	// 	Tax:         19.99,
+	// 	Stock:       999,
+	// 	Date:        time.Now(),
+	// 	DateTime:    time.Now(),
+	// 	Description: "NEW_PRODUCT_DESCRIPTION",
+	// 	Active:      true,
+	// 	Float:       105.67,
+	// 	Integer:     104,
+	// 	Double:      103.45,
+	// 	Varchar:     "VARCHAR",
+	// }
+
+	// row, err = table.RowFromStruct(p)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// // Add the new row to the database table.
+	// err = row.Write()
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// // Print all rows.
+	// for !table.EOF() {
+	// 	row, err := table.Next()
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+
+	// 	// Skip deleted rows.
+	// 	if row.Deleted {
+	// 		fmt.Printf("Deleted row at position: %v \n", row.Position)
+	// 		continue
+	// 	}
+
+	// 	// Print the current row values.
+	// 	fmt.Println(row.Values()...)
+	// }
 }

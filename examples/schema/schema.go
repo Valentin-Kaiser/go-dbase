@@ -23,7 +23,7 @@ func main() {
 		Filename: "../test_data/database/EXPENSES.DBC",
 	})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 	defer db.Close()
 

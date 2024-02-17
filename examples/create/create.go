@@ -39,7 +39,7 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 	defer file.Close()
 
@@ -63,12 +63,12 @@ func main() {
 		Var:  "Var",
 	})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	err = row.Add()
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 }
 
@@ -76,25 +76,25 @@ func columns() []*dbase.Column {
 	// Integer are allways 4 bytes long
 	idCol, err := dbase.NewColumn("ID", dbase.Integer, 0, 0, false)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Field name are always saved uppercase
 	nameCol, err := dbase.NewColumn("Name", dbase.Character, 20, 0, false)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Memo fields need no length the memo block size is defined as last parameter when calling New()
 	memoCol, err := dbase.NewColumn("Memo", dbase.Memo, 0, 0, false)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Some fields can be null this is defined by the last parameter
 	varCol, err := dbase.NewColumn("Var", dbase.Varchar, 64, 0, true)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	return []*dbase.Column{
