@@ -27,9 +27,3 @@ func debugf(format string, v ...interface{}) {
 		debugLogger.Printf(format, v...)
 	}
 }
-
-func errorf(format string, v ...interface{}) {
-	if debug {
-		errorLogger.Printf(format, v...)
-	}
-}
