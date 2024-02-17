@@ -3,8 +3,6 @@ package dbase
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
-	"fmt"
 	"io"
 	"path/filepath"
 	"reflect"
@@ -22,7 +20,7 @@ type GenericIO struct {
 
 func (g GenericIO) OpenTable(config *Config) (*File, error) {
 	if config == nil {
-		return nil, newError("dbase-io-generic-opentable-1", errors.New("missing configuration"))
+		return nil, NewError("missing dbase configuration")
 	}
 	debugf("Opening table from custom io interface - Untested: %v - Trim spaces: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Untested, config.TrimSpaces, config.ValidateCodePage, config.InterpretCodePage)
 	fileName := filepath.Clean(config.Filename)
@@ -37,15 +35,15 @@ func (g GenericIO) OpenTable(config *Config) (*File, error) {
 	}
 	err := file.ReadHeader()
 	if err != nil {
-		return nil, newError("dbase-io-generic-preparedbf-2", err)
+		return nil, WrapError(err)
 	}
 	// Check if the fileversion flag is expected, expand validFileVersion if needed
 	if err := ValidateFileVersion(file.header.FileType, config.Untested); err != nil {
-		return nil, newError("dbase-io-generic-preparedbf-3", err)
+		return nil, WrapError(err)
 	}
 	columns, nullFlag, err := file.ReadColumns()
 	if err != nil {
-		return nil, newError("dbase-io-generic-preparedbf-4", err)
+		return nil, WrapError(err)
 	}
 	file.nullFlagColumn = nullFlag
 	file.table = &Table{
@@ -64,7 +62,7 @@ func (g GenericIO) OpenTable(config *Config) (*File, error) {
 	}
 	// Check if the code page mark is matchin the converter
 	if config.ValidateCodePage && file.header.CodePage != file.config.Converter.CodePage() {
-		return nil, newError("dbase-io-generic-opentable-5", fmt.Errorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage()))
+		return nil, NewErrorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage())
 	}
 
 	// Check if there is an FPT according to the header.
@@ -72,11 +70,11 @@ func (g GenericIO) OpenTable(config *Config) (*File, error) {
 	// If the FPT file does not exist an error is returned.
 	if MemoFlag.Defined(file.header.TableFlags) {
 		if file.relatedHandle == nil {
-			return nil, newError("dbase-io-generic-opentable-6", errors.New("no related handle defined"))
+			return nil, NewError("no related handle defined")
 		}
 		err = file.ReadMemoHeader()
 		if err != nil {
-			return nil, newError("dbase-io-generic-opentable-7", err)
+			return nil, WrapError(err)
 		}
 	}
 	return file, nil
@@ -86,25 +84,25 @@ func (g GenericIO) Close(file *File) error {
 	if file.handle != nil {
 		handle, ok := file.handle.(io.Closer)
 		if !ok {
-			return newError("dbase-io-generic-close-1", fmt.Errorf("handle is of wrong type %T expected io.Closer", file.handle))
+			return NewErrorf("handle is of wrong type %T expected io.Closer", file.handle)
 		}
 
 		debugf("Closing file: %s", file.config.Filename)
 		err := handle.Close()
 		if err != nil {
-			return newError("dbase-io-generic-close-2", fmt.Errorf("closing DBF failed with error: %w", err))
+			return NewErrorf("closing DBF failed").Details(err)
 		}
 	}
 	if file.relatedHandle != nil {
 		relatedHandle, ok := file.relatedHandle.(io.Closer)
 		if !ok {
-			return newError("dbase-io-generic-close-3", fmt.Errorf("handle is of wrong type %T expected *windows.Handle", file.handle))
+			return NewErrorf("handle is of wrong type %T expected io.Closer", file.relatedHandle)
 		}
 
 		debugf("Closing related file: %s", file.config.Filename)
 		err := relatedHandle.Close()
 		if err != nil {
-			return newError("dbase-io-generic-close-4", fmt.Errorf("closing FPT failed with error: %w", err))
+			return NewErrorf("closing FPT failed").Details(err)
 		}
 	}
 	return nil
@@ -122,22 +120,22 @@ func (g GenericIO) ReadHeader(file *File) error {
 	debugf("Reading header...")
 	handle, err := g.getHandle(file)
 	if err != nil {
-		return newError("dbase-io-generic-readheader-1", err)
+		return WrapError(err)
 	}
 	_, err = handle.Seek(0, 0)
 	if err != nil {
-		return newError("dbase-io-generic-generic-readheader-2", err)
+		return NewErrorf("failed to start on the beginning of the file").Details(err)
 	}
 	b := make([]byte, 30)
 	n, err := handle.Read(b)
 	if err != nil {
-		return newError("dbase-io-generic-generic-readheader-3", err)
+		return NewErrorf("failed to read header").Details(err)
 	}
 	h := &Header{}
 	// LittleEndian - Integers in table files are stored with the least significant byte first.
 	err = binary.Read(bytes.NewReader(b[:n]), binary.LittleEndian, h)
 	if err != nil {
-		return newError("dbase-io-generic-generic-readheader-4", err)
+		return NewErrorf("failed to read header").Details(err)
 	}
 	file.header = h
 	return nil
@@ -147,11 +145,11 @@ func (g GenericIO) WriteHeader(file *File) error {
 	debugf("Writing header...")
 	handle, err := g.getHandle(file)
 	if err != nil {
-		return newError("dbase-io-generic-writeheader-1", err)
+		return WrapError(err)
 	}
 	_, err = handle.Seek(0, 0)
 	if err != nil {
-		return newError("dbase-io-generic-generic-writeheader-2", err)
+		return NewErrorf("failed to start on the beginning of the file").Details(err)
 	}
 	// Change the last modification date to the current date
 	file.header.Year = uint8(time.Now().Year() - 2000)
@@ -161,16 +159,16 @@ func (g GenericIO) WriteHeader(file *File) error {
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.LittleEndian, file.header)
 	if err != nil {
-		return newError("dbase-io-generic-generic-writeheader-3", err)
+		return NewErrorf("failed to write header").Details(err)
 	}
 
 	b, err := handle.Write(buf.Bytes())
 	if err != nil {
-		return newError("dbase-io-generic-generic-writeheader-4", err)
+		return NewErrorf("failed to write header").Details(err)
 	}
 
 	if b != len(buf.Bytes()) {
-		return newError("dbase-io-generic-generic-writeheader-5", fmt.Errorf("wrote %d bytes, expected %d", b, len(buf.Bytes())))
+		return NewErrorf("wrote %d bytes, expected %d", b, len(buf.Bytes()))
 	}
 
 	return nil
@@ -180,7 +178,7 @@ func (g GenericIO) ReadColumns(file *File) ([]*Column, *Column, error) {
 	debugf("Reading columns...")
 	handle, err := g.getHandle(file)
 	if err != nil {
-		return nil, nil, newError("dbase-io-generic-readcolumns-1", err)
+		return nil, nil, WrapError(err)
 	}
 	var nullFlag *Column
 	columns := make([]*Column, 0)
@@ -189,27 +187,27 @@ func (g GenericIO) ReadColumns(file *File) ([]*Column, *Column, error) {
 	for {
 		// Check if we are at 0x0D by reading one byte ahead
 		if _, err := handle.Seek(offset, 0); err != nil {
-			return nil, nil, newError("dbase-io-generic-generic-readcolumns-2", err)
+			return nil, nil, NewErrorf("failed to seek to offset %d", offset).Details(err)
 		}
 		if _, err := handle.Read(b); err != nil {
-			return nil, nil, newError("dbase-io-generic-generic-readcolumns-3", err)
+			return nil, nil, NewErrorf("failed to read byte at offset %d", offset).Details(err)
 		}
 		if Marker(b[0]) == ColumnEnd {
 			break
 		}
 		// Position back one byte and read the column
 		if _, err := handle.Seek(-1, 1); err != nil {
-			return nil, nil, newError("dbase-io-generic-generic-readcolumns-4", err)
+			return nil, nil, NewErrorf("failed to seek back one byte").Details(err)
 		}
 		buf := make([]byte, 33)
 		n, err := handle.Read(buf)
 		if err != nil {
-			return nil, nil, newError("dbase-io-generic-generic-readcolumns-5", err)
+			return nil, nil, NewErrorf("failed to read column at offset %d", offset).Details(err)
 		}
 		column := &Column{}
 		err = binary.Read(bytes.NewReader(buf[:n]), binary.LittleEndian, column)
 		if err != nil {
-			return nil, nil, newError("dbase-io-generic-generic-readcolumns-6", err)
+			return nil, nil, NewErrorf("failed to read column at offset %d", offset).Details(err)
 		}
 		if column.Name() == "_NullFlags" {
 			debugf("Found null flag column: %s", column.Name())
@@ -228,12 +226,12 @@ func (g GenericIO) WriteColumns(file *File) error {
 	debugf("Writing columns...")
 	handle, err := g.getHandle(file)
 	if err != nil {
-		return newError("dbase-io-generic-writecolumns-1", err)
+		return WrapError(err)
 	}
 	// Seek to the beginning of the file
 	_, err = handle.Seek(32, 0)
 	if err != nil {
-		return newError("dbase-io-generic-generic-writecolumns-2", err)
+		return NewErrorf("failed to seek to beginning of file").Details(err)
 	}
 	// Write the columns
 	buf := new(bytes.Buffer)
@@ -241,24 +239,24 @@ func (g GenericIO) WriteColumns(file *File) error {
 		debugf("Writing column: %+v", column)
 		err = binary.Write(buf, binary.LittleEndian, column)
 		if err != nil {
-			return newError("dbase-io-generic-generic-writecolumns-3", err)
+			return NewErrorf("failed to write column %s", column.Name()).Details(err)
 		}
 	}
 	if file.nullFlagColumn != nil {
 		debugf("Writing null flag column: %s", file.nullFlagColumn.Name())
 		err = binary.Write(buf, binary.LittleEndian, file.nullFlagColumn)
 		if err != nil {
-			return newError("dbase-io-generic-generic-writecolumns-4", err)
+			return NewError("failed to write null flag column").Details(err)
 		}
 	}
 	_, err = handle.Write(buf.Bytes())
 	if err != nil {
-		return newError("dbase-io-generic-generic-writecolumns-5", err)
+		return NewErrorf("failed to write columns").Details(err)
 	}
 	// Write the column terminator
 	_, err = handle.Write([]byte{byte(ColumnEnd)})
 	if err != nil {
-		return newError("dbase-io-generic-generic-writecolumns-6", err)
+		return NewErrorf("failed to write column terminator").Details(err)
 	}
 	// Write null till the end of the header
 	pos := file.header.FirstRow - uint16(len(file.table.columns)*32) - 33
@@ -267,7 +265,7 @@ func (g GenericIO) WriteColumns(file *File) error {
 	}
 	_, err = handle.Write(make([]byte, pos))
 	if err != nil {
-		return newError("dbase-io-generic-writecolumns-7", err)
+		return NewErrorf("failed to write null till end of header").Details(err)
 	}
 	return nil
 }
@@ -276,20 +274,21 @@ func (g GenericIO) ReadMemoHeader(file *File) error {
 	debugf("Reading memo header...")
 	relatedHandle, err := g.getRelatedHandle(file)
 	if err != nil {
-		return newError("dbase-io-generic-readmemoheader-1", err)
+		return WrapError(err)
 	}
 	h := &MemoHeader{}
 	if _, err := relatedHandle.Seek(0, 0); err != nil {
-		return newError("dbase-io-generic-readmemoheader-2", err)
+		return NewErrorf("failed to seek to beginning of file").Details(err)
 	}
 	b := make([]byte, 8)
 	n, err := relatedHandle.Read(b)
 	if err != nil {
-		return newError("dbase-io-generic-readmemoheader-3", err)
+		// return newError("dbase-io-generic-readmemoheader-3", err)
+		return NewErrorf("failed to read memo header").Details(err)
 	}
 	err = binary.Read(bytes.NewReader(b[:n]), binary.BigEndian, h)
 	if err != nil {
-		return newError("dbase-io-generic-readmemoheader-4", err)
+		return NewErrorf("failed to read memo header").Details(err)
 	}
 	debugf("Memo header: %+v", h)
 	file.memoHeader = h
@@ -299,13 +298,13 @@ func (g GenericIO) ReadMemoHeader(file *File) error {
 func (g GenericIO) WriteMemoHeader(file *File, size int) error {
 	relatedHandle, err := g.getRelatedHandle(file)
 	if err != nil {
-		return newError("dbase-io-generic-writeheader-1", err)
+		return WrapError(err)
 	}
 	debugf("Writing memo header...")
 	// Seek to the beginning of the file
 	_, err = relatedHandle.Seek(0, 0)
 	if err != nil {
-		return newError("dbase-io-generic-writememoheader-3", err)
+		return NewErrorf("failed to seek to beginning of file").Details(err)
 	}
 	// Calculate the next free block
 	file.memoHeader.NextFree += uint32(size)
@@ -316,12 +315,12 @@ func (g GenericIO) WriteMemoHeader(file *File, size int) error {
 	debugf("Writing memo header - next free: %d, block size: %d", file.memoHeader.NextFree, file.memoHeader.BlockSize)
 	_, err = relatedHandle.Write(buf)
 	if err != nil {
-		return newError("dbase-io-generic-writememoheader-5", err)
+		return NewErrorf("failed to write memo header").Details(err)
 	}
 	// Write null till end of header
 	_, err = relatedHandle.Write(make([]byte, 512-8))
 	if err != nil {
-		return newError("dbase-io-generic-writememoheader-6", err)
+		return NewErrorf("failed to write null till end of header").Details(err)
 	}
 	return nil
 }
@@ -329,7 +328,7 @@ func (g GenericIO) WriteMemoHeader(file *File, size int) error {
 func (g GenericIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	relatedHandle, err := g.getRelatedHandle(file)
 	if err != nil {
-		return nil, false, newError("dbase-io-generic-readmemo-1", err)
+		return nil, false, WrapError(err)
 	}
 	// Determine the block number
 	block := binary.LittleEndian.Uint32(address)
@@ -341,7 +340,7 @@ func (g GenericIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	// The position in the file is blocknumber*blocksize
 	_, err = relatedHandle.Seek(position, 0)
 	if err != nil {
-		return nil, false, newError("dbase-io-generic-readmemo-2", err)
+		return nil, false, NewErrorf("failed to seek to position %d", position).Details(err)
 	}
 	// Read the memo block header, instead of reading into a struct using binary.Read we just read the two
 	// uints in one buffer and then convert, this saves seconds for large DBF files with many memo columns
@@ -349,7 +348,7 @@ func (g GenericIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	hbuf := make([]byte, 8)
 	_, err = relatedHandle.Read(hbuf)
 	if err != nil {
-		return nil, false, newError("dbase-io-generic-readmemo-3", err)
+		return nil, false, NewErrorf("failed to read memo block header").Details(err)
 	}
 	sign := binary.BigEndian.Uint32(hbuf[:4])
 	leng := binary.BigEndian.Uint32(hbuf[4:])
@@ -362,15 +361,15 @@ func (g GenericIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	buf := make([]byte, leng)
 	read, err := relatedHandle.Read(buf)
 	if err != nil {
-		return buf, false, newError("dbase-io-generic-readmemo-4", err)
+		return buf, sign == 1, NewErrorf("failed to read memo block data").Details(err)
 	}
 	if read != int(leng) {
-		return buf, sign == 1, newError("dbase-io-generic-readmemo-5", ErrIncomplete)
+		return buf, sign == 1, NewErrorf("read %d bytes, expected %d", read, leng)
 	}
 	if sign == 1 {
 		buf, err = file.config.Converter.Decode(buf)
 		if err != nil {
-			return []byte{}, false, newError("dbase-io-generic-readmemo-6", err)
+			return buf, sign == 1, NewErrorf("failed to decode memo data").Details(err)
 		}
 	}
 	return buf, sign == 1, nil
@@ -381,7 +380,7 @@ func (g GenericIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	defer file.memoMutex.Unlock()
 	relatedHandle, err := g.getRelatedHandle(file)
 	if err != nil {
-		return nil, newError("dbase-io-generic-writememo-1", err)
+		return nil, WrapError(err)
 	}
 	// Get the block position
 	blockPosition := file.memoHeader.NextFree
@@ -392,7 +391,7 @@ func (g GenericIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	// Write the memo header
 	err = file.WriteMemoHeader(blocks)
 	if err != nil {
-		return nil, newError("dbase-io-generic-writememo-2", err)
+		return nil, WrapError(err)
 	}
 	// Put the block data together
 	data := make([]byte, 8)
@@ -411,17 +410,17 @@ func (g GenericIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	// Seek to new the next free block
 	_, err = relatedHandle.Seek(position, 0)
 	if err != nil {
-		return nil, newError("dbase-io-generic-writememo-4", err)
+		return nil, NewErrorf("failed to seek to position %d", position).Details(err)
 	}
 	// Write the memo data
 	_, err = relatedHandle.Write(data)
 	if err != nil {
-		return nil, newError("dbase-io-generic-writememo-5", err)
+		return nil, NewErrorf("failed to write memo data").Details(err)
 	}
 	// Convert the block number to []byte
 	address, err := toBinary(blockPosition)
 	if err != nil {
-		return nil, newError("dbase-io-generic-writememo-6", err)
+		return nil, WrapError(err)
 	}
 	return address, nil
 }
@@ -429,24 +428,24 @@ func (g GenericIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 func (g GenericIO) ReadNullFlag(file *File, position uint64, column *Column) (bool, bool, error) {
 	handle, err := g.getHandle(file)
 	if err != nil {
-		return false, false, newError("dbase-io-generic-readnullflag-1", err)
+		return false, false, WrapError(err)
 	}
 	if file.nullFlagColumn == nil || (column.DataType != byte(Varchar) && column.DataType != byte(Varbinary)) {
-		return false, false, newError("dbase-io-generic-readnullflag-2", errors.New("null flag column missing or not a varchar/varbinary field"))
+		return false, false, NewError("null flag column missing or not a varchar/varbinary field")
 	}
 	nullFlagPosition := file.table.nullFlagPosition(column)
 	position = uint64(file.header.FirstRow) + position*uint64(file.header.RowLength) + uint64(file.nullFlagColumn.Position)
 	_, err = handle.Seek(int64(position), 0)
 	if err != nil {
-		return false, false, newError("dbase-io-generic-readnullflag-4", err)
+		return false, false, NewErrorf("failed to seek to position %d", position).Details(err)
 	}
 	buf := make([]byte, file.nullFlagColumn.Length)
 	n, err := handle.Read(buf)
 	if err != nil {
-		return false, false, newError("dbase-io-generic-readnullflag-5", err)
+		return false, false, NewErrorf("failed to read null flag data").Details(err)
 	}
 	if n != int(file.nullFlagColumn.Length) {
-		return false, false, newError("dbase-io-generic-readnullflag-6", fmt.Errorf("read %d bytes, expected %d", n, file.nullFlagColumn.Length))
+		return false, false, NewErrorf("read %d bytes, expected %d", n, file.nullFlagColumn.Length)
 	}
 	if column.Flag == byte(NullableFlag) || column.Flag == byte(NullableFlag|BinaryFlag) {
 		debugf("Read _NullFlag for column %s => varlength: %v - null: %v", column.Name(), getNthBit(buf, nullFlagPosition), getNthBit(buf, nullFlagPosition+1))
@@ -459,24 +458,24 @@ func (g GenericIO) ReadNullFlag(file *File, position uint64, column *Column) (bo
 func (g GenericIO) ReadRow(file *File, position uint32) ([]byte, error) {
 	handle, err := g.getHandle(file)
 	if err != nil {
-		return nil, newError("dbase-io-generic-readrow-1", err)
+		return nil, WrapError(err)
 	}
 	if position >= file.header.RowsCount {
-		return nil, newError("dbase-io-generic-readrow-2", ErrEOF)
+		return nil, NewErrorf("position %d > rows count %d", position, file.header.RowsCount)
 	}
 	pos := int64(file.header.FirstRow) + (int64(position) * int64(file.header.RowLength))
 	debugf("Reading row: %d at offset: %v", position, pos)
 	buf := make([]byte, file.header.RowLength)
 	_, err = handle.Seek(pos, 0)
 	if err != nil {
-		return buf, newError("dbase-io-generic-readrow-3", err)
+		return buf, NewErrorf("failed to seek to position %d", pos).Details(err)
 	}
 	read, err := handle.Read(buf)
 	if err != nil {
-		return buf, newError("dbase-io-generic-readrow-4", err)
+		return buf, NewErrorf("failed to read row data").Details(err)
 	}
 	if read != int(file.header.RowLength) {
-		return buf, newError("dbase-io-generic-readrow-5", ErrIncomplete)
+		return buf, NewErrorf("read %d bytes, expected %d", read, file.header.RowLength)
 	}
 	return buf, nil
 }
@@ -487,12 +486,12 @@ func (g GenericIO) WriteRow(file *File, row *Row) error {
 	defer row.handle.dbaseMutex.Unlock()
 	handle, err := g.getHandle(file)
 	if err != nil {
-		return newError("dbase-io-generic-writerow-1", err)
+		return WrapError(err)
 	}
 	// Convert the row to raw bytes
 	r, err := row.ToBytes()
 	if err != nil {
-		return newError("dbase-io-generic-writerow-2", err)
+		return WrapError(err)
 	}
 	// Update the header
 	position := int64(row.handle.header.FirstRow) + (int64(row.Position) * int64(row.handle.header.RowLength))
@@ -502,35 +501,35 @@ func (g GenericIO) WriteRow(file *File, row *Row) error {
 	}
 	err = row.handle.WriteHeader()
 	if err != nil {
-		return newError("dbase-io-generic-writerow-3", err)
+		return WrapError(err)
 	}
 	debugf("Writing row: %d at offset: %v", row.Position, position)
 	// Seek to the correct position
 	_, err = handle.Seek(position, 0)
 	if err != nil {
-		return newError("dbase-io-generic-writerow-4", err)
+		return NewErrorf("failed to seek to position %d", position).Details(err)
 	}
 	// Write the row
 	_, err = handle.Write(r)
 	if err != nil {
-		return newError("dbase-io-generic-writerow-5", err)
+		return NewErrorf("failed to write row data").Details(err)
 	}
 	return nil
 }
 
 func (g GenericIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, error) {
 	if field.column.DataType == 'M' {
-		return nil, newError("dbase-io-generic-search-1", errors.New("searching memo fields is not supported"))
+		return nil, NewError("searching memo fields is not supported")
 	}
 	handle, err := g.getHandle(file)
 	if err != nil {
-		return nil, newError("dbase-io-generic-search-2", err)
+		return nil, WrapError(err)
 	}
 	debugf("Searching for value: %v in field: %s", field.GetValue(), field.column.Name())
 	// convert the value to bytes
 	val, err := file.Represent(field, !exactMatch)
 	if err != nil {
-		return nil, newError("dbase-io-generic-search-3", err)
+		return nil, WrapError(err)
 	}
 	// Search for the value
 	rows := make([]*Row, 0)
@@ -572,7 +571,7 @@ func (g GenericIO) Search(file *File, field *Field, exactMatch bool) ([]*Row, er
 func (g GenericIO) GoTo(file *File, row uint32) error {
 	if row > file.header.RowsCount {
 		file.table.rowPointer = file.header.RowsCount
-		return newError("dbase-io-generic-goto-1", fmt.Errorf("%w, go to %v > %v", ErrEOF, row, file.header.RowsCount))
+		return NewErrorf("%v, go to %v > %v", ErrEOF, row, file.header.RowsCount)
 	}
 	debugf("Going to row: %d", row)
 	file.table.rowPointer = row
@@ -593,24 +592,25 @@ func (g GenericIO) Skip(file *File, offset int64) {
 
 func (g GenericIO) Deleted(file *File) (bool, error) {
 	if file.table.rowPointer >= file.header.RowsCount {
-		return false, newError("dbase-io-generic-deleted-1", ErrEOF)
+		return false, WrapError(ErrEOF)
 	}
 	handle, ok := file.handle.(io.ReadWriteSeeker)
 	if !ok {
-		return false, newError("dbase-io-generic-deleted-2", fmt.Errorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle))
+		return false, NewErrorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle)
 	}
 
-	_, err := handle.Seek(int64(file.header.FirstRow)+(int64(file.table.rowPointer)*int64(file.header.RowLength)), 0)
+	position := int64(file.header.FirstRow) + (int64(file.table.rowPointer) * int64(file.header.RowLength))
+	_, err := handle.Seek(position, 0)
 	if err != nil {
-		return false, newError("dbase-io-generic-deleted-3", err)
+		return false, NewErrorf("failed to seek to position %d", position).Details(err)
 	}
 	buf := make([]byte, 1)
 	read, err := handle.Read(buf)
 	if err != nil {
-		return false, newError("dbase-io-generic-deleted-4", err)
+		return false, NewErrorf("failed to read deleted flag").Details(err)
 	}
 	if read != 1 {
-		return false, newError("dbase-io-generic-deleted-5", ErrIncomplete)
+		return false, NewErrorf("read %d bytes, expected 1", read)
 	}
 	return Marker(buf[0]) == Deleted, nil
 }
@@ -618,10 +618,10 @@ func (g GenericIO) Deleted(file *File) (bool, error) {
 func (g GenericIO) getHandle(file *File) (io.ReadWriteSeeker, error) {
 	handle, ok := file.handle.(io.ReadWriteSeeker)
 	if !ok {
-		return nil, newError("dbase-io-generic-gethandle-1", fmt.Errorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle))
+		return nil, NewErrorf("handle is of wrong type %T expected io.ReadWriteSeeker", file.handle)
 	}
 	if handle == nil || reflect.ValueOf(handle).IsNil() {
-		return nil, newError("dbase-io-generic-gethandle-2", ErrNoDBF)
+		return nil, WrapError(ErrNoDBF)
 	}
 	return handle, nil
 }
@@ -629,10 +629,10 @@ func (g GenericIO) getHandle(file *File) (io.ReadWriteSeeker, error) {
 func (g GenericIO) getRelatedHandle(file *File) (io.ReadWriteSeeker, error) {
 	handle, ok := file.relatedHandle.(io.ReadWriteSeeker)
 	if !ok {
-		return nil, newError("dbase-io-generic-getrelatedhandle-1", fmt.Errorf("memo handle is of wrong type %T expected io.ReadWriteSeeker", file.relatedHandle))
+		return nil, NewErrorf("memo handle is of wrong type %T expected io.ReadWriteSeeker", file.relatedHandle)
 	}
 	if handle == nil || reflect.ValueOf(handle).IsNil() {
-		return nil, newError("dbase-io-generic-getrelatedhandle-2", ErrNoFPT)
+		return nil, WrapError(ErrNoFPT)
 	}
 	return handle, nil
 }

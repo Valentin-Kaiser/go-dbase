@@ -2,8 +2,6 @@ package dbase
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -114,7 +112,7 @@ func (file *File) SetColumnModification(position int, mod *Modification) {
 func (file *File) SetColumnModificationByName(name string, mod *Modification) error {
 	position := file.ColumnPosByName(name)
 	if position < 0 {
-		return newError("dbase-table-setcolumnmodificationbyname-1", fmt.Errorf("Column '%s' not found", name))
+		return NewErrorf("Column '%s' not found", name)
 	}
 	file.SetColumnModification(position, mod)
 	return nil
@@ -158,7 +156,7 @@ func (file *File) Rows(skipInvalid bool, skipDeleted bool) ([]*Row, error) {
 			if skipInvalid {
 				continue
 			}
-			return nil, newError("dbase-table-rows-1", err)
+			return nil, WrapError(err)
 		}
 
 		// skip deleted rows
@@ -175,7 +173,7 @@ func (file *File) Next() (*Row, error) {
 	row, err := file.Row()
 	file.Skip(1)
 	if err != nil {
-		return nil, newError("dbase-table-next-1", err)
+		return nil, WrapError(err)
 	}
 	return row, err
 }
@@ -184,7 +182,7 @@ func (file *File) Next() (*Row, error) {
 func (file *File) Row() (*Row, error) {
 	data, err := file.ReadRow(file.table.rowPointer)
 	if err != nil {
-		return nil, newError("dbase-table-row-1", err)
+		return nil, WrapError(err)
 	}
 	return file.BytesToRow(data)
 }
@@ -211,7 +209,7 @@ func (file *File) NewRow() *Row {
 func (file *File) NewField(pos int, value interface{}) (*Field, error) {
 	column := file.Column(pos)
 	if column == nil {
-		return nil, newError("dbase-table-newfield-1", fmt.Errorf("column at position %v not found", pos))
+		return nil, NewErrorf("column at position %v not found", pos)
 	}
 	return &Field{column: column, value: value}, nil
 }
@@ -220,7 +218,7 @@ func (file *File) NewField(pos int, value interface{}) (*Field, error) {
 func (file *File) NewFieldByName(name string, value interface{}) (*Field, error) {
 	pos := file.ColumnPosByName(name)
 	if pos < 0 {
-		return nil, newError("dbase-table-newfieldbyname-1", fmt.Errorf("column '%s' not found", name))
+		return nil, NewErrorf("column '%s' not found", name)
 	}
 	return file.NewField(pos, value)
 }
@@ -234,12 +232,12 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 	rec.handle = file
 	rec.fields = make([]*Field, 0)
 	if len(data) < int(file.header.RowLength) {
-		return nil, newError("dbase-table-bytestorow-1", fmt.Errorf("invalid row data size %v Bytes < %v Bytes", len(data), int(file.header.RowLength)))
+		return nil, NewErrorf("invalid row data size %v Bytes < %v Bytes", len(data), int(file.header.RowLength))
 	}
 	// a row should start with te delete flag, a space ACTIVE(0x20) or DELETED(0x2A)
 	rec.Deleted = Marker(data[0]) == Deleted
 	if !rec.Deleted && Marker(data[0]) != Active {
-		return nil, newError("dbase-table-bytestorow-2", errors.New("invalid row data, no delete flag found at beginning of row"))
+		return nil, NewError("invalid row data, no delete flag found at beginning of row")
 	}
 	// deleted flag already read
 	offset := uint16(1)
@@ -247,7 +245,7 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 		column := file.table.columns[i]
 		val, err := file.Interpret(data[offset:offset+uint16(column.Length)], file.table.columns[i])
 		if err != nil {
-			return rec, newError("dbase-table-bytestorow-3", err)
+			return nil, WrapError(err)
 		}
 		if file.config.TrimSpaces {
 			if str, ok := val.(string); ok {
@@ -292,7 +290,7 @@ func (file *File) RowFromMap(m map[string]interface{}) (*Row, error) {
 	}
 	err := row.Increment()
 	if err != nil {
-		return nil, newError("dbase-file-rowfrommap-1", err)
+		return nil, WrapError(err)
 	}
 	return row, nil
 }
@@ -303,11 +301,11 @@ func (file *File) RowFromJSON(j []byte) (*Row, error) {
 	m := make(map[string]interface{})
 	err := json.Unmarshal(j, &m)
 	if err != nil {
-		return nil, newError("dbase-table-fromjson-1", err)
+		return nil, NewError("unable to unmarshal JSON").Details(err)
 	}
 	row, err := file.RowFromMap(m)
 	if err != nil {
-		return nil, newError("dbase-table-fromjson-2", err)
+		return nil, WrapError(err)
 	}
 	return row, nil
 }
@@ -336,7 +334,7 @@ func (file *File) RowFromStruct(v interface{}) (*Row, error) {
 	}
 	row, err := file.RowFromMap(m)
 	if err != nil {
-		return nil, newError("dbase-table-fromstruct-1", err)
+		return nil, WrapError(err)
 	}
 	return row, nil
 }

@@ -29,7 +29,7 @@ func (c DefaultConverter) Decode(in []byte) ([]byte, error) {
 	r := transform.NewReader(bytes.NewReader(in), c.encoding.NewDecoder())
 	data, err := io.ReadAll(r)
 	if err != nil {
-		return nil, newError("dbase-encoding-decode-1", err)
+		return nil, NewError("decoding with default converter failed").Details(err)
 	}
 	return data, nil
 }
@@ -40,7 +40,7 @@ func (c DefaultConverter) Encode(in []byte) ([]byte, error) {
 	enc := c.encoding.NewEncoder()
 	nDst, _, err := enc.Transform(out, in, false)
 	if err != nil {
-		return nil, newError("dbase-encoding-encode-1", err)
+		return nil, NewError("encoding with default converter failed").Details(err)
 	}
 	return out[:nDst], nil
 }

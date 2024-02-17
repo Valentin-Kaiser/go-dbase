@@ -1,7 +1,6 @@
 package dbase
 
 import (
-	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -17,38 +16,38 @@ type Database struct {
 // The database file must be a DBC file and the tables must be DBF files and in the same directory as the database
 func OpenDatabase(config *Config) (*Database, error) {
 	if config == nil {
-		return nil, newError("dbase-io-opendatabase-1", errors.New("missing config"))
+		return nil, NewError("missing dbase configuration")
 	}
 	if len(strings.TrimSpace(config.Filename)) == 0 {
-		return nil, newError("dbase-io-opendatabase-2", errors.New("missing filename"))
+		return nil, NewError("missing dbase filename")
 	}
 	if strings.ToUpper(filepath.Ext(config.Filename)) != string(DBC) {
-		return nil, newError("dbase-io-opendatabase-3", fmt.Errorf("invalid file name: %v", config.Filename))
+		return nil, NewError("invalid dbase filename").Details(fmt.Errorf("file extension must be %v", DBC))
 	}
 	debugf("Opening database: %v", config.Filename)
 	databaseTable, err := OpenTable(config)
 	if err != nil {
-		return nil, newError("dbase-io-opendatabase-4", fmt.Errorf("opening database table failed with error: %w", err))
+		return nil, WrapError(err)
 	}
 	// Search by all records where object type is table
 	typeField, err := databaseTable.NewFieldByName("OBJECTTYPE", "Table")
 	if err != nil {
-		return nil, newError("dbase-io-opendatabase-5", fmt.Errorf("creating type field failed with error: %w", err))
+		return nil, WrapError(err)
 	}
 	rows, err := databaseTable.Search(typeField, true)
 	if err != nil {
-		return nil, newError("dbase-io-opendatabase-6", fmt.Errorf("searching for type field failed with error: %w", err))
+		return nil, WrapError(err)
 	}
 	// Try to load the table files
 	tables := make(map[string]*File, 0)
 	for _, row := range rows {
 		objectName, err := row.ValueByName("OBJECTNAME")
 		if err != nil {
-			return nil, newError("dbase-io-opendatabase-7", fmt.Errorf("getting table name failed with error: %w", err))
+			return nil, WrapError(err)
 		}
 		tableName, ok := objectName.(string)
 		if !ok {
-			return nil, newError("dbase-io-opendatabase-8", errors.New("table name is not a string"))
+			return nil, NewError("table name is not a string")
 		}
 		tableName = strings.Trim(tableName, " ")
 		if tableName == "" {
@@ -75,7 +74,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 		// Load the table
 		table, err := OpenTable(tableConfig)
 		if err != nil {
-			return nil, newError("dbase-io-opendatabase-9", fmt.Errorf("opening table failed with error: %w", err))
+			return nil, WrapError(err)
 		}
 		if table != nil {
 			tables[tableName] = table
@@ -88,7 +87,7 @@ func OpenDatabase(config *Config) (*Database, error) {
 func (db *Database) Close() error {
 	for _, table := range db.tables {
 		if err := table.Close(); err != nil {
-			return newError("dbase-io-close-1", err)
+			return WrapError(err)
 		}
 	}
 	return db.file.Close()
