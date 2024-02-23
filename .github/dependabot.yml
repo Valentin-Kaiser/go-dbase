@@ -6,3 +6,15 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    assignees:
+      - "Valentin-Kaiser"
+    reviewers:
+      - "Valentin-Kaiser"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    assignees:
+      - "Valentin-Kaiser"
+    reviewers:
+      - "Valentin-Kaiser"
