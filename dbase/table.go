@@ -606,7 +606,6 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 		fallthrough
 	case Varchar, Character:
 		if length == 0 || length > MaxCharacterLength {
-			// return nil, newError("dbase-table-newcolumn-2", errors.New("character, varbinary and varchar values can only be between 1 to 254 characters long"))
 			return nil, NewErrorf("character, varbinary and varchar values can only be between 1 to 254 characters long")
 		}
 		column.Length = length

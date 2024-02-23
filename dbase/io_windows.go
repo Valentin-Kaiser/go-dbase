@@ -164,7 +164,6 @@ func (w WindowsIO) Create(file *File) error {
 	}
 	dbfname, err := windows.UTF16FromString(file.config.Filename)
 	if err != nil {
-		// return newError("dbase-io-windows-create-2", fmt.Errorf("converting filename to UTF16 failed with error: %w", err))
 		return NewErrorf("converting filename to UTF16 failed").Details(err)
 	}
 	// Check if file exists already
