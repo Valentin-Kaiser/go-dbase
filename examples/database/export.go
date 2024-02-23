@@ -57,7 +57,7 @@ func main() {
 		TrimSpaces: true,
 	})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 	defer db.Close()
 

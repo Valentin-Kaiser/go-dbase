@@ -50,7 +50,7 @@ func main() {
 	// Open the example database table.
 	table, err := dbase.OpenTable(&dbase.Config{TrimSpaces: true, IO: dbase.GenericIO{Handle: dbf, RelatedHandle: memo}})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 	defer table.Close()
 
@@ -66,7 +66,7 @@ func main() {
 	for !table.EOF() {
 		row, err := table.Next()
 		if err != nil {
-			panic(dbase.GetErrorTrace(err))
+			panic(err)
 		}
 
 		// Skip deleted rows.
@@ -81,30 +81,30 @@ func main() {
 
 	err = table.GoTo(0)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Read the first row.
 	row, err := table.Row()
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Get the company name field by column name and change it.
 	err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Change a memo field value.
 	err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Write the changed row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 }

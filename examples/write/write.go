@@ -44,7 +44,7 @@ func main() {
 		WriteLock:  true,
 	})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 	defer table.Close()
 
@@ -59,25 +59,25 @@ func main() {
 	// Read the first row (rowPointer start at the first row).
 	row, err := table.Row()
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Get the company name field by column name.
 	err = row.FieldByName("PRODNAME").SetValue("CHANGED_PRODUCT_NAME")
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Change a memo field value.
 	err = row.FieldByName("DESC").SetValue("MEMO_TEST_VALUE")
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Write the changed row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// === Modifications ===
@@ -85,12 +85,12 @@ func main() {
 	// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
 	err = table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	err = table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Create a new row with the same structure as the database table.
@@ -112,20 +112,20 @@ func main() {
 
 	row, err = table.RowFromStruct(p)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Add the new row to the database table.
 	err = row.Write()
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Print all rows.
 	for !table.EOF() {
 		row, err := table.Next()
 		if err != nil {
-			panic(dbase.GetErrorTrace(err))
+			panic(err)
 		}
 
 		// Skip deleted rows.

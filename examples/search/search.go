@@ -22,7 +22,7 @@ func main() {
 		Filename: "../test_data/table/TEST.DBF",
 	})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 	defer table.Close()
 
@@ -38,13 +38,13 @@ func main() {
 	// Search for a product containing the word "test" in the name.
 	field, err := table.NewFieldByName("PRODNAME", "TEST")
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Execute the search with an exact match.
 	records, err := table.Search(field, false)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Print all found records.
@@ -61,7 +61,7 @@ func main() {
 	// Execute the search without exact match.
 	records, err = table.Search(field, true)
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 
 	// Print all found records.

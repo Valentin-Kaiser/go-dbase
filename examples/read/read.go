@@ -46,7 +46,7 @@ func main() {
 		TrimSpaces: true,
 	})
 	if err != nil {
-		panic(dbase.GetErrorTrace(err))
+		panic(err)
 	}
 	defer table.Close()
 
@@ -67,7 +67,7 @@ func main() {
 	for !table.EOF() {
 		row, err := table.Next()
 		if err != nil {
-			panic(dbase.GetErrorTrace(err))
+			panic(err)
 		}
 
 		// Skip deleted rows.
@@ -99,18 +99,18 @@ func main() {
 		// Disable space trimming for the company name
 		err = table.SetColumnModificationByName("PRODNAME", &dbase.Modification{TrimSpaces: false})
 		if err != nil {
-			panic(dbase.GetErrorTrace(err))
+			panic(err)
 		}
 
 		// Add a column modification to switch the names of "INTEGER" and "Float" to match the data types
 		err = table.SetColumnModificationByName("INTEGER", &dbase.Modification{TrimSpaces: true, ExternalKey: "FLOAT"})
 		if err != nil {
-			panic(dbase.GetErrorTrace(err))
+			panic(err)
 		}
 
 		err = table.SetColumnModificationByName("FLOAT", &dbase.Modification{TrimSpaces: true, ExternalKey: "INTEGER"})
 		if err != nil {
-			panic(dbase.GetErrorTrace(err))
+			panic(err)
 		}
 
 		// === Struct Conversion ===
@@ -119,7 +119,7 @@ func main() {
 		p := &Product{}
 		err = row.ToStruct(p)
 		if err != nil {
-			panic(dbase.GetErrorTrace(err))
+			panic(err)
 		}
 
 		fmt.Printf("Product: %+v \n", p)

@@ -44,7 +44,7 @@ func parseDate(raw []byte) (time.Time, error) {
 	}
 	t, err := time.Parse("20060102", string(raw))
 	if err != nil {
-		return t, newError("dbase-interpreter-parsedate-1", err)
+		return t, NewError("failed to parse date").Details(err)
 	}
 	return t, nil
 }
@@ -76,7 +76,7 @@ func parseNumericInt(raw []byte) (int64, error) {
 	}
 	i, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil {
-		return i, newError("dbase-conversion-parseint-1", err)
+		return i, NewError("failed to parse int").Details(err)
 	}
 	return i, nil
 }
@@ -89,7 +89,7 @@ func parseFloat(raw []byte) (float64, error) {
 	}
 	f, err := strconv.ParseFloat(strings.TrimSpace(trimmed), 64)
 	if err != nil {
-		return f, newError("dbase-conversion-parsefloat-1", err)
+		return f, NewError("failed to parse float").Details(err)
 	}
 	return f, nil
 }
@@ -98,7 +98,7 @@ func parseFloat(raw []byte) (float64, error) {
 func toUTF8String(raw []byte, converter EncodingConverter) (string, error) {
 	utf8, err := converter.Decode(raw)
 	if err != nil {
-		return string(raw), newError("dbase-conversion-toutf8string-1", err)
+		return string(raw), WrapError(err)
 	}
 	return string(utf8), nil
 }
@@ -107,7 +107,7 @@ func toUTF8String(raw []byte, converter EncodingConverter) (string, error) {
 func fromUtf8String(raw []byte, converter EncodingConverter) ([]byte, error) {
 	utf8, err := converter.Encode(raw)
 	if err != nil {
-		return raw, newError("dbase-conversion-fromutf8string-1", err)
+		return raw, WrapError(err)
 	}
 	return utf8, nil
 }
@@ -117,7 +117,7 @@ func toBinary(data interface{}) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.LittleEndian, data)
 	if err != nil {
-		return nil, newError("dbase-interpreter-tobinary-1", err)
+		return nil, NewError("failed to convert to binary").Details(err)
 	}
 	return buf.Bytes(), nil
 }
@@ -187,7 +187,7 @@ func setStructField(tags map[string]string, obj interface{}, name string, value 
 		return nil
 	}
 	if !structFieldValue.CanSet() {
-		return newError("dbase-conversion-setstructfield-1", fmt.Errorf("cannot set %s field value", name))
+		return NewError("failed to set struct field value").Details(fmt.Errorf("cannot set %s field value", name))
 	}
 	structFieldType := structFieldValue.Type()
 	value = cast(value, structFieldType)
@@ -201,7 +201,7 @@ func setStructField(tags map[string]string, obj interface{}, name string, value 
 	}
 
 	if structFieldType != val.Type() {
-		return newError("dbase-conversion-setstructfield-2", fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
+		return NewError("provided value type didn't match obj field type").Details(fmt.Errorf("provided value type %v didn't match obj field type %v", val.Type(), structFieldType))
 	}
 	structFieldValue.Set(val)
 	return nil

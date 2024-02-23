@@ -3,6 +3,7 @@ package dbase
 import (
 	"errors"
 	"fmt"
+	"runtime"
 )
 
 var (
@@ -24,62 +25,81 @@ var (
 
 // Error is a wrapper for errors that occur in the dbase package
 type Error struct {
-	context []string
-	err     error
+	trace   []string
+	details []error
+	msg     string
 }
 
-func newError(context string, err error) Error {
-	errorf("%s:%s", context, GetErrorTrace(err))
-	if err != nil {
-		var dbaseError Error
-		if errors.As(err, &dbaseError) {
-			ctx := dbaseError.Context()
-			ctx = append(ctx, context)
-			dbaseError = Error{
-				context: ctx,
-				err:     err,
-			}
-			return dbaseError
-		}
+// NewError creates a new Error
+func NewError(err string) Error {
+	e := Error{
+		msg:     err,
+		trace:   make([]string, 0),
+		details: make([]error, 0),
 	}
-	return Error{
-		context: []string{context},
-		err:     err,
+	e.trace = trace(e, 2)
+	return e
+}
+
+func NewErrorf(format string, a ...interface{}) Error {
+	e := Error{
+		msg:     fmt.Sprintf(format, a...),
+		trace:   make([]string, 0),
+		details: make([]error, 0),
 	}
+	e.trace = trace(e, 2)
+	return e
 }
 
-func newErrorf(context string, format string, a ...interface{}) Error {
-	return newError(context, fmt.Errorf(format, a...))
+func (e Error) Details(err error) Error {
+	e.details = append(e.details, err)
+	return e
 }
 
-// Error returns the error message of the underlying error
 func (e Error) Error() string {
-	return e.err.Error()
-}
-
-// Context returns the context of the error in the dbase package
-func (e Error) Context() []string {
-	return e.context
-}
-
-// trace returns the context of the error in the dbase package as a string
-func (e Error) trace() string {
-	trace := ""
-	// append reverse order
-	for i := len(e.context) - 1; i >= 0; i-- {
-		trace += e.context[i] + ":"
+	details := ""
+	for _, d := range e.details {
+		details += "=> " + d.Error()
 	}
-	return trace
+
+	if debug && len(e.trace) > 0 {
+		trace := ""
+		for i := len(e.trace) - 1; i >= 0; i-- {
+			trace += e.trace[i]
+			if i > 0 {
+				trace += " -> "
+			}
+		}
+
+		return fmt.Sprintf("%s: %s %s", trace, e.msg, details)
+	}
+
+	return fmt.Sprintf("%s %s", e.msg, details)
 }
 
-// GetErrorTrace returns the context and the error produced by the dbase package as a string
-func GetErrorTrace(err error) error {
+func WrapError(err error) Error {
 	if err == nil {
-		return nil
+		return NewError("unknown error occurred - cant wrap nil error")
 	}
-	var dbaseError Error
-	if errors.As(err, &dbaseError) {
-		return fmt.Errorf("%s%w", dbaseError.trace(), dbaseError)
+	if e, ok := err.(Error); ok {
+		e.trace = trace(e, 2)
+		return e
 	}
-	return err
+	e := Error{
+		msg:     err.Error(),
+		trace:   make([]string, 0),
+		details: make([]error, 0),
+	}
+	e.trace = trace(e, 2)
+	return e
+}
+
+func trace(e Error, level int) []string {
+	_, file, line, ok := runtime.Caller(level)
+	if !ok {
+		return e.trace
+	}
+
+	e.trace = append(e.trace, fmt.Sprintf("%s:%d", file, line))
+	return e.trace
 }

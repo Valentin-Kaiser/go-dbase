@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -83,7 +82,7 @@ func (row *Row) Value(pos int) interface{} {
 func (row *Row) ValueByName(name string) (interface{}, error) {
 	pos := row.handle.ColumnPosByName(name)
 	if pos < 0 {
-		return nil, newError("dbase-table-valuebyname-1", fmt.Errorf("column %v not found", name))
+		return nil, NewErrorf("column %v not found", name)
 	}
 	return row.Value(pos), nil
 }
@@ -103,7 +102,7 @@ func (row *Row) MustValueByName(name string) interface{} {
 func (row *Row) StringValueByName(name string) (string, error) {
 	val, err := row.ValueByName(name)
 	if err != nil {
-		return "", newError("dbase-table-stringvaluebyname-1", err)
+		return "", WrapError(err)
 	}
 	if val != nil {
 		str, ok := val.(string)
@@ -114,7 +113,7 @@ func (row *Row) StringValueByName(name string) (string, error) {
 		if ok {
 			return string(sanitizeString(bslice)), nil
 		}
-		return "", newError("dbase-table-stringvaluebyname-2", errors.New("value is not a string"))
+		return "", NewErrorf("value of type %T is not a string", val)
 	}
 	return "", nil
 }
@@ -134,7 +133,7 @@ func (row *Row) MustStringValueByName(name string) string {
 func (row *Row) IntValueByName(name string) (int64, error) {
 	val, err := row.ValueByName(name)
 	if err != nil {
-		return 0, newError("dbase-table-intvaluebyname-1", err)
+		return 0, WrapError(err)
 	}
 	if val != nil {
 		val = cast(val, reflect.TypeOf(int64(0)))
@@ -142,7 +141,7 @@ func (row *Row) IntValueByName(name string) (int64, error) {
 		if ok {
 			return intVal, nil
 		}
-		return 0, newError("dbase-table-intvaluebyname-2", errors.New("value is not an int"))
+		return 0, NewErrorf("value of type %T is not an int", val)
 	}
 	return 0, nil
 }
@@ -162,7 +161,7 @@ func (row *Row) MustIntValueByName(name string) int64 {
 func (row *Row) FloatValueByName(name string) (float64, error) {
 	val, err := row.ValueByName(name)
 	if err != nil {
-		return 0, newError("dbase-table-floatvaluebyname-1", err)
+		return 0, WrapError(err)
 	}
 	if val != nil {
 		val = cast(val, reflect.TypeOf(float64(0)))
@@ -170,7 +169,7 @@ func (row *Row) FloatValueByName(name string) (float64, error) {
 		if ok {
 			return floatVal, nil
 		}
-		return 0, newError("dbase-table-floatvaluebyname-2", errors.New("value is not a float"))
+		return 0, NewErrorf("value of type %T is not a float", val)
 	}
 	return 0, nil
 }
@@ -190,14 +189,14 @@ func (row *Row) MustFloatValueByName(name string) float64 {
 func (row *Row) BoolValueByName(name string) (bool, error) {
 	val, err := row.ValueByName(name)
 	if err != nil {
-		return false, newError("dbase-table-boolvaluebyname-1", err)
+		return false, WrapError(err)
 	}
 	if val != nil {
 		boolVal, ok := val.(bool)
 		if ok {
 			return boolVal, nil
 		}
-		return false, newError("dbase-table-boolvaluebyname-2", errors.New("value is not a bool"))
+		return false, NewErrorf("value of type %T is not a bool", val)
 	}
 
 	return false, nil
@@ -218,7 +217,7 @@ func (row *Row) MustBoolValueByName(name string) bool {
 func (row *Row) TimeValueByName(name string) (time.Time, error) {
 	val, err := row.ValueByName(name)
 	if err != nil {
-		return time.Time{}, newError("dbase-table-timevaluebyname-1", err)
+		return time.Time{}, WrapError(err)
 	}
 	if val != nil {
 		val = cast(val, reflect.TypeOf(time.Time{}))
@@ -226,7 +225,7 @@ func (row *Row) TimeValueByName(name string) (time.Time, error) {
 		if ok {
 			return timeVal, nil
 		}
-		return time.Time{}, newError("dbase-table-timevaluebyname-2", errors.New("value is not a time"))
+		return time.Time{}, NewErrorf("value of type %T is not a time", val)
 	}
 	return time.Time{}, nil
 }
@@ -246,7 +245,7 @@ func (row *Row) MustTimeValueByName(name string) time.Time {
 func (row *Row) BytesValueByName(name string) ([]byte, error) {
 	val, err := row.ValueByName(name)
 	if err != nil {
-		return nil, newError("dbase-table-bytesvaluebyname-1", err)
+		return nil, WrapError(err)
 	}
 	if val != nil {
 		val = cast(val, reflect.TypeOf([]byte{}))
@@ -262,7 +261,7 @@ func (row *Row) BytesValueByName(name string) ([]byte, error) {
 		if ok {
 			return []byte(strVal), nil
 		}
-		return nil, newError("dbase-table-bytesvaluebyname-2", errors.New("value is not a byte slice"))
+		return nil, NewErrorf("value of type %T is not a byte slice", val)
 	}
 	return nil, nil
 }
@@ -312,7 +311,7 @@ func (row *Row) ToBytes() ([]byte, error) {
 	for _, field := range row.fields {
 		val, err := row.handle.Represent(field, false)
 		if err != nil {
-			return nil, newError("dbase-table-rowtobytes-1", err)
+			return nil, WrapError(err)
 		}
 		// Get null and length if variable length field
 		if field.column.DataType == byte(Varbinary) || field.column.DataType == byte(Varchar) {
@@ -375,7 +374,7 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 				debugf("Converting field %v due to modification", field.Name())
 				val, err = mod.Convert(val)
 				if err != nil {
-					return nil, newError("dbase-table-tomap-1", err)
+					return nil, WrapError(err)
 				}
 			}
 			if len(mod.ExternalKey) != 0 {
@@ -394,11 +393,11 @@ func (row *Row) ToJSON() ([]byte, error) {
 	debugf("Converting row %v to JSON...", row.Position)
 	m, err := row.ToMap()
 	if err != nil {
-		return nil, newError("dbase-table-tojson-1", err)
+		return nil, WrapError(err)
 	}
 	j, err := json.Marshal(m)
 	if err != nil {
-		return j, newError("dbase-table-tojson-2", err)
+		return nil, NewError("unable to marshal row to JSON").Details(err)
 	}
 	return j, nil
 }
@@ -409,12 +408,12 @@ func (row *Row) ToJSON() ([]byte, error) {
 func (row *Row) ToStruct(v interface{}) error {
 	rt := reflect.TypeOf(v)
 	if rt.Kind() != reflect.Ptr {
-		return newError("dbase-table-struct-1", fmt.Errorf("expected pointer, got %v", rt.Kind()))
+		return NewErrorf("expected pointer, got %v", rt.Kind())
 	}
 	debugf("Converting row %v to struct...", row.Position)
 	m, err := row.ToMap()
 	if err != nil {
-		return newError("dbase-table-struct-2", err)
+		return WrapError(err)
 	}
 	tags := getStructTags(v)
 	for tag := range tags {
@@ -439,7 +438,7 @@ func (row *Row) ToStruct(v interface{}) error {
 	for k, val := range m {
 		err := setStructField(tags, v, k, val)
 		if err != nil {
-			return newError("dbase-table-tostruct-2", err)
+			return WrapError(err)
 		}
 	}
 	return nil
@@ -462,7 +461,7 @@ func (c *Column) Reflect() (reflect.Type, error) {
 // SetValue allows to change the field value
 func (field *Field) SetValue(value interface{}) error {
 	if field == nil {
-		return newError("dbase-table-setvalue-1", errors.New("field is not defined by table"))
+		return errors.New("field is not defined by table")
 	}
 	field.value = value
 	return nil
@@ -491,8 +490,11 @@ func (field Field) Column() *Column {
 // Create a new DBF file with the specified version, configuration and columns
 // Please only use this for development and testing purposes and dont build new applications with it
 func NewTable(version FileVersion, config *Config, columns []*Column, memoBlockSize uint16, io IO) (*File, error) {
-	if len(columns) == 0 || config.Converter == nil {
-		return nil, newError("dbase-table-newtable-1", errors.New("invalid parameters"))
+	if len(columns) == 0 {
+		return nil, errors.New("no columns specified")
+	}
+	if config.Converter == nil {
+		return nil, errors.New("no converter specified")
 	}
 	file := &File{
 		config: config,
@@ -568,7 +570,7 @@ func NewTable(version FileVersion, config *Config, columns []*Column, memoBlockS
 
 	err := file.Init()
 	if err != nil {
-		return nil, newError("dbase-table-newtable-1", err)
+		return nil, WrapError(err)
 	}
 
 	return file, nil
@@ -577,8 +579,8 @@ func NewTable(version FileVersion, config *Config, columns []*Column, memoBlockS
 // Create a new column with the specified name, data type, length, decimals and nullable flag
 // The length is only used for character, varbinary, varchar, numeric and float data types
 func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nullable bool) (*Column, error) {
-	if len(name) == 0 || len(name) > 10 {
-		return nil, newError("dbase-table-newcolumn-1", errors.New("column name must be between 1 and 10 characters long"))
+	if len(name) == 0 || len(name) > MaxColumnNameLength {
+		return nil, NewErrorf("column name must be between 1 and 10 characters long")
 	}
 	column := &Column{
 		FieldName: [11]byte{},
@@ -591,7 +593,7 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 		Step:      uint16(0),
 		Reserved:  [7]byte{},
 	}
-	copy(column.FieldName[:], []byte(strings.ToUpper(name))[:11])
+	copy(column.FieldName[:], appendSpaces([]byte(strings.ToUpper(name)), 10)[:11])
 	debugf("Creating new column: %v - type: %v - length: %v - decimals: %v - nullable: %v - position: %v - flag: %v", name, dataType, length, decimals, nullable, column.Position, column.Flag)
 	// Set the appropriate flag for nullable fields
 	if nullable {
@@ -603,13 +605,13 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 		column.Flag |= byte(BinaryFlag)
 		fallthrough
 	case Varchar, Character:
-		if length == 0 || length > 254 {
-			return nil, newError("dbase-table-newcolumn-2", errors.New("character, varbinary and varchar values can only be between 1 to 254 characters long"))
+		if length == 0 || length > MaxCharacterLength {
+			return nil, NewErrorf("character, varbinary and varchar values can only be between 1 to 254 characters long")
 		}
 		column.Length = length
 	case Numeric, Float:
-		if length == 0 || length > 20 {
-			return nil, newError("dbase-table-newcolumn-3", errors.New("numeric and float values can only be between 1 to 20 characters long"))
+		if length == 0 || length > MaxNumericLength || length > MaxFloatLength {
+			return nil, NewErrorf("numeric and float values can only be between 1 to 20 characters long")
 		}
 		column.Length = length
 	case Logical:
@@ -619,7 +621,7 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 	case Currency, Date, DateTime, Double:
 		column.Length = 8
 	default:
-		return nil, newError("dbase-table-newcolumn-4", fmt.Errorf("invalid data type %v specified", dataType))
+		return nil, NewErrorf("invalid data type %v specified", dataType)
 	}
 	return column, nil
 }
@@ -642,7 +644,7 @@ func (row *Row) Increment() error {
 	}
 	err := row.handle.WriteColumns()
 	if err != nil {
-		return newError("dbase-table-row-increment-1", err)
+		return WrapError(err)
 	}
 	return nil
 }

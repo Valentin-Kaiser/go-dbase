@@ -51,7 +51,6 @@ func (file *File) Interpret(raw []byte, column *Column) (interface{}, error) {
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
-		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
 		DateTime: file.parseDateTime,
 		// L values are stored as strings T or F, we only check for T, the rest is false...
 		Logical: file.parseLogical,
@@ -67,12 +66,12 @@ func (file *File) Interpret(raw []byte, column *Column) (interface{}, error) {
 	}
 
 	if len(raw) != int(column.Length) {
-		return nil, newErrorf("dbase-interpreter-datatovalue-1", "invalid length %v Bytes != %v Bytes at column field: %v", len(raw), column.Length, column.Name())
+		return nil, NewErrorf("invalid length %v Bytes != %v Bytes at column field: %v", len(raw), column.Length, column.Name())
 	}
 
 	f, ok := funcs[DataType(column.DataType)]
 	if !ok {
-		return nil, newErrorf("dbase-interpreter-datatovalue-2", "unsupported column data type: %s at column field: %v", DataType(column.DataType), column.Name())
+		return nil, NewErrorf("unsupported column data type: %s at column field: %v", DataType(column.DataType), column.Name())
 	}
 
 	return f(raw, column)
@@ -99,7 +98,6 @@ func (file *File) Represent(field *Field, padding bool) ([]byte, error) {
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
-		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
 		DateTime: file.getDateTimeRepresentation,
 		// L (bool) values are stored as strings T or F, we only check for T, the rest is false...
 		Logical: file.getLogicalRepresentation,
@@ -120,7 +118,7 @@ func (file *File) Represent(field *Field, padding bool) ([]byte, error) {
 
 	f, ok := funcs[DataType(field.column.DataType)]
 	if !ok {
-		return nil, newErrorf("dbase-interpreter-valuetodata-1", "unsupported column data type: %s at column field: %v", DataType(field.column.DataType), field.Name())
+		return nil, NewErrorf("unsupported column data type: %s at column field: %v", DataType(field.column.DataType), field.Name())
 	}
 
 	return f(field, padding)
@@ -131,7 +129,7 @@ func (file *File) parseMemo(raw []byte, column *Column) (interface{}, error) {
 	// M values contain the address in the FPT file from where to read data
 	memo, isText, err := file.ReadMemo(raw)
 	if err != nil {
-		return nil, newError("dbase-interpreter-parsememo-1", fmt.Errorf("parsing memo failed at column field: %v failed with error: %w", column.Name(), err))
+		return nil, NewErrorf("parsing memo failed at column field: %v failed", column.Name()).Details(err)
 	}
 	if isText {
 		return string(memo), nil
@@ -154,21 +152,27 @@ func (file *File) getMemoRepresentation(field *Field, _ bool) ([]byte, error) {
 		txt = false
 	}
 	if !ok && !sok {
-		return nil, newError("dbase-interpreter-getmemorepresentation-1", fmt.Errorf("invalid type for memo field: %T", field.value))
+		return nil, NewErrorf("invalid type for memo field: %T", field.value)
 	}
 	address, err := file.WriteMemo(memo, txt, len(memo))
 	if err != nil {
-		return nil, newError("dbase-interpreter-getmrepresentation-2", fmt.Errorf("writing to memo file at column field: %v failed with error: %w", field.Name(), err))
+		return nil, WrapError(err)
 	}
 	return address, nil
 }
 
 // Returns the value as string
 func (file *File) parseCharacter(raw []byte, column *Column) (interface{}, error) {
+	if len(raw) == 0 {
+		return "", nil
+	}
+	if len(raw) > MaxCharacterLength {
+		return NewErrorf("invalid length %v bytes > %v bytes at column field: %v", len(raw), MaxCharacterLength, column.Name()), nil
+	}
 	// C values are stored as strings, the returned string is not trimmed
 	str, err := toUTF8String(raw, file.config.Converter)
 	if err != nil {
-		return str, newError("dbase-interpreter-parsecharacter-1", fmt.Errorf("parsing to utf8 string failed at column field: %v failed with error: %w", column.Name(), err))
+		return str, NewErrorf("parsing to utf8 string failed at column field: %v failed", column.Name()).Details(err)
 	}
 	return str, nil
 }
@@ -178,12 +182,15 @@ func (file *File) getCharacterRepresentation(field *Field, skipSpacing bool) ([]
 	// C values are stored as strings, the returned string is not trimmed
 	c, ok := field.value.(string)
 	if !ok {
-		return nil, newError("dbase-interpreter-getcharacterrepresentation-1", fmt.Errorf("invalid data type %T, expected string on column field: %v", field.value, field.Name()))
+		return nil, NewErrorf("invalid data type %T, expected string on column field: %v", field.value, field.Name())
+	}
+	if len(c) > MaxCharacterLength {
+		return nil, NewErrorf("invalid length %v bytes > %v bytes at column field: %v", len(c), MaxCharacterLength, field.Name())
 	}
 	raw := make([]byte, field.column.Length)
 	bin, err := fromUtf8String([]byte(c), file.config.Converter)
 	if err != nil {
-		return nil, newError("dbase-interpreter-getcharacterrepresentation-2", fmt.Errorf("parsing from utf8 string at column field: %v failed with error %w", field.Name(), err))
+		return nil, NewErrorf("parsing from utf8 string at column field: %v failed", field.Name()).Details(err)
 	}
 	if skipSpacing {
 		return bin, nil
@@ -191,7 +198,7 @@ func (file *File) getCharacterRepresentation(field *Field, skipSpacing bool) ([]
 	bin = appendSpaces(bin, int(field.column.Length))
 	copy(raw, bin)
 	if len(raw) > int(field.column.Length) {
-		return nil, newError("dbase-interpreter-getcharacterrepresentation-3", fmt.Errorf("invalid length %v bytes > %v bytes at column field: %v", len(raw), field.column.Length, field.Name()))
+		return nil, NewErrorf("invalid length %v bytes > %v bytes at column field: %v", len(raw), field.column.Length, field.Name())
 	}
 	return raw, nil
 }
@@ -208,7 +215,7 @@ func (file *File) getIntegerRepresentation(field *Field, _ bool) ([]byte, error)
 	if !ok {
 		f, ok := field.value.(float64)
 		if !ok {
-			return nil, newError("dbase-interpreter-getintegerrepresentation-1", fmt.Errorf("invalid data type %T, expected int32 at column field: %v", field.value, field.Name()))
+			return nil, NewErrorf("invalid data type %T, expected int32 at column field: %v", field.value, field.Name())
 		}
 		// check for lower and uppper bounds to prevent overflow
 		if f > 0 && f <= math.MaxInt32 {
@@ -218,11 +225,11 @@ func (file *File) getIntegerRepresentation(field *Field, _ bool) ([]byte, error)
 	raw := make([]byte, field.column.Length)
 	bin, err := toBinary(i)
 	if err != nil {
-		return nil, newError("dbase-interpreter-getintegerrepresentation-2", fmt.Errorf("converting to binary at column field: %v failed with error: %w", field.Name(), err))
+		return nil, NewErrorf("converting to binary at column field: %v failed", field.Name()).Details(err)
 	}
 	copy(raw, bin)
 	if len(raw) != int(field.column.Length) {
-		return nil, newError("dbase-interpreter-getintegerrepresentation-3", fmt.Errorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name()))
+		return nil, NewErrorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name())
 	}
 	return raw, nil
 }
@@ -236,18 +243,18 @@ func (file *File) parseCurrency(raw []byte, _ *Column) (interface{}, error) {
 func (file *File) getCurrencyRepresentation(field *Field, _ bool) ([]byte, error) {
 	f, ok := field.value.(float64)
 	if !ok {
-		return nil, newError("dbase-interpreter-getcurrencyrepresentation-1", fmt.Errorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name()))
+		return nil, NewErrorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
 	}
 	// Cast to int64 and multiply by 10000 to get the value as int64 with 4 decimals
-	i := int64(f * 10000)
+	i := int64(math.Round(f * 10000))
 	raw := make([]byte, field.column.Length)
 	bin, err := toBinary(i)
 	if err != nil {
-		return nil, newError("dbase-interpreter-getcurrencyrepresentation-2", fmt.Errorf("converting to binary at column field: %v failed with error: %w", field.Name(), err))
+		return nil, NewErrorf("converting to binary at column field: %v failed", field.Name()).Details(err)
 	}
 	copy(raw, bin)
 	if len(raw) != int(field.column.Length) {
-		return nil, newError("dbase-interpreter-getcurrencyrepresentation-3", fmt.Errorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name()))
+		return nil, NewErrorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name())
 	}
 	return raw, nil
 }
@@ -256,7 +263,7 @@ func (file *File) getCurrencyRepresentation(field *Field, _ bool) ([]byte, error
 func (file *File) parseFloat(raw []byte, column *Column) (interface{}, error) {
 	f, err := parseFloat(raw)
 	if err != nil {
-		return f, newError("dbase-interpreter-parsefloat-1", fmt.Errorf("parsing float at column field: %v failed with error: %w", column.Name(), err))
+		return f, NewErrorf("parsing float at column field: %v failed", column.Name()).Details(err)
 	}
 	return f, nil
 }
@@ -265,7 +272,7 @@ func (file *File) parseFloat(raw []byte, column *Column) (interface{}, error) {
 func (file *File) getFloatRepresentation(field *Field, skipSpacing bool) ([]byte, error) {
 	b, ok := field.value.(float64)
 	if !ok {
-		return nil, newError("dbase-interpreter-getfloatrepresentation-1", fmt.Errorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name()))
+		return nil, NewErrorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
 	}
 	var bin []byte
 	if b == float64(int64(b)) {
@@ -291,16 +298,16 @@ func (file *File) parseDouble(raw []byte, _ *Column) (interface{}, error) {
 func (file *File) getDoubleRepresentation(field *Field, _ bool) ([]byte, error) {
 	b, ok := field.value.(float64)
 	if !ok {
-		return nil, newError("dbase-interpreter-getdoublerepresentation-1", fmt.Errorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name()))
+		return nil, NewErrorf("invalid data type %T, expected float64 at column field: %v", field.value, field.Name())
 	}
 	raw := make([]byte, field.column.Length)
 	bin, err := toBinary(b)
 	if err != nil {
-		return nil, newError("dbase-interpreter-getdoublerepresentation-2", fmt.Errorf("converting to binary at column field: %v failed with error: %w", field.Name(), err))
+		return nil, NewErrorf("converting to binary at column field: %v failed", field.Name()).Details(err)
 	}
 	copy(raw, bin)
 	if len(raw) != int(field.column.Length) {
-		return nil, newError("dbase-interpreter-getdoublerepresentation-3", fmt.Errorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name()))
+		return nil, NewErrorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name())
 	}
 	return raw, nil
 }
@@ -310,7 +317,7 @@ func (file *File) parseDate(raw []byte, column *Column) (interface{}, error) {
 	// D values are stored as string in format YYYYMMDD, convert to time.Time
 	date, err := parseDate(raw)
 	if err != nil {
-		return date, newError("dbase-interpreter-parsedatevalue-1", fmt.Errorf("parsing to date at column field: %v failed with error: %w", column.Name(), err))
+		return date, NewErrorf("parsing to date at column field: %v failed", column.Name()).Details(err)
 	}
 	return date, nil
 }
@@ -321,11 +328,11 @@ func (file *File) getDateRepresentation(field *Field, _ bool) ([]byte, error) {
 	if !ok {
 		s, ok := field.value.(string)
 		if !ok {
-			return nil, newError("dbase-interpreter-getdaterepresentation-1", fmt.Errorf("invalid data type %T, expected time.Time at column field: %v", field.value, field.Name()))
+			return nil, NewErrorf("invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
 		}
 		t, err := time.Parse(time.RFC3339, s)
 		if err != nil {
-			return nil, newError("dbase-interpreter-getdaterepresentation-2", fmt.Errorf("parsing time failed at column field: %v failed with error: %w", field.Name(), err))
+			return nil, NewErrorf("parsing time failed at column field: %v failed", field.Name()).Details(err)
 		}
 		d = t
 	}
@@ -333,7 +340,7 @@ func (file *File) getDateRepresentation(field *Field, _ bool) ([]byte, error) {
 	bin := []byte(d.Format("20060102"))
 	copy(raw, bin)
 	if len(raw) != int(field.column.Length) {
-		return nil, newError("dbase-interpreter-getdaterepresentation-3", fmt.Errorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name()))
+		return nil, NewErrorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name())
 	}
 	return raw, nil
 }
@@ -349,11 +356,11 @@ func (file *File) getDateTimeRepresentation(field *Field, _ bool) ([]byte, error
 	if !ok {
 		s, ok := field.value.(string)
 		if !ok {
-			return nil, newError("dbase-interpreter-getdatetimerepresentation-1", fmt.Errorf("invalid data type %T, expected time.Time at column field: %v", field.value, field.Name()))
+			return nil, NewErrorf("invalid data type %T, expected time.Time at column field: %v", field.value, field.Name())
 		}
 		parsedTime, err := time.Parse(time.RFC3339, s)
 		if err != nil {
-			return nil, newError("dbase-interpreter-getdatetimerepresentation-2", fmt.Errorf("parsing time failed at column field: %v failed with error: %w", field.Name(), err))
+			return nil, NewErrorf("parsing time failed at column field: %v failed", field.Name()).Details(err)
 		}
 		t = parsedTime
 	}
@@ -361,17 +368,17 @@ func (file *File) getDateTimeRepresentation(field *Field, _ bool) ([]byte, error
 	i := julianDate(t.Year(), int(t.Month()), t.Day())
 	date, err := toBinary(uint64(i))
 	if err != nil {
-		return nil, newError("dbase-interpreter-getdatetimerepresentation-3", fmt.Errorf("time conversion at column field: %v failed with error: %w", field.Name(), err))
+		return nil, NewErrorf("time conversion at column field: %v failed", field.Name()).Details(err)
 	}
 	copy(raw[:4], date)
 	millis := t.Hour()*3600000 + t.Minute()*60000 + t.Second()*1000 + t.Nanosecond()/1000000
 	time, err := toBinary(uint64(millis))
 	if err != nil {
-		return nil, newError("dbase-interpreter-getdatetimerepresentation-4", fmt.Errorf("binary conversion at column field: %v failed with error: %w", field.Name(), err))
+		return nil, NewErrorf("binary conversion at column field: %v failed", field.Name()).Details(err)
 	}
 	copy(raw[4:], time)
 	if len(raw) != int(field.column.Length) {
-		return nil, newError("dbase-interpreter-getdatetimerepresentation-5", fmt.Errorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name()))
+		return nil, NewErrorf("invalid length %v bytes != %v bytes at column field: %v", len(raw), field.column.Length, field.Name())
 	}
 	return raw, nil
 }
@@ -385,7 +392,7 @@ func (file *File) parseLogical(raw []byte, _ *Column) (interface{}, error) {
 func (file *File) getLogicalRepresentation(field *Field, _ bool) ([]byte, error) {
 	l, ok := field.value.(bool)
 	if !ok {
-		return nil, newError("dbase-interpreter-getlogicalrepresentation-1", fmt.Errorf("invalid data type %T, expected bool at column field: %v", field.value, field.Name()))
+		return nil, NewErrorf("invalid data type %T, expected bool at column field: %v", field.value, field.Name())
 	}
 	raw := []byte("F")
 	if l {
@@ -407,7 +414,7 @@ func (file *File) getRawRepresentation(field *Field, _ bool) ([]byte, error) {
 	}
 	raw, ok := field.value.([]byte)
 	if !ok {
-		return nil, newError("dbase-interpreter-getrawrepresentation-1", fmt.Errorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name()))
+		return nil, NewErrorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name())
 	}
 	return raw, nil
 }
@@ -417,7 +424,7 @@ func (file *File) parseNumeric(raw []byte, column *Column) (interface{}, error) 
 	if column.Decimals == 0 {
 		i, err := parseNumericInt(raw)
 		if err != nil {
-			return i, newError("dbase-interpreter-parsenumeric-1", fmt.Errorf("parsing numeric int at column field: %v failed with error: %w", column.Name(), err))
+			return i, NewErrorf("parsing numeric int at column field: %v failed", column.Name()).Details(err)
 		}
 		return i, nil
 	}
@@ -445,7 +452,7 @@ func (file *File) getNumericRepresentation(field *Field, skipSpacing bool) ([]by
 		bin = []byte(fmt.Sprintf("%d", field.value))
 	}
 	if !iok && !fok {
-		return nil, newError("dbase-interpreter-getnumericrepresentation-1", fmt.Errorf("invalid data type %T, expected int64 or float64 at column field: %v", field.value, field.Name()))
+		return nil, NewErrorf("invalid data type %T, expected int64 or float64 at column field: %v", field.value, field.Name())
 	}
 	if skipSpacing {
 		return bin, nil
@@ -456,7 +463,7 @@ func (file *File) getNumericRepresentation(field *Field, skipSpacing bool) ([]by
 func (file *File) parseVarchar(raw []byte, column *Column) (interface{}, error) {
 	varlen, null, err := file.ReadNullFlag(uint64(file.table.rowPointer), column)
 	if err != nil {
-		return nil, newError("dbase-interpreter-parsevarchar-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
+		return nil, NewErrorf("reading null flag at column field: %v failed", column.Name()).Details(err)
 	}
 	if null {
 		return []byte{}, nil
@@ -477,13 +484,13 @@ func (file *File) getVarcharRepresentation(field *Field, _ bool) ([]byte, error)
 	if ok {
 		return m, nil
 	}
-	return nil, newError("dbase-interpreter-getvarcharrepresentation-1", fmt.Errorf("invalid data type %T, expected string at column field: %v", field.value, field.Name()))
+	return nil, NewErrorf("invalid data type %T, expected string at column field: %v", field.value, field.Name())
 }
 
 func (file *File) parseVarbinary(raw []byte, column *Column) (interface{}, error) {
 	varlen, null, err := file.ReadNullFlag(uint64(file.table.rowPointer), column)
 	if err != nil {
-		return nil, newError("dbase-interpreter-parsevarbinary-1", fmt.Errorf("reading null flag at column field: %v failed with error: %w", column.Name(), err))
+		return nil, NewErrorf("reading null flag at column field: %v failed", column.Name()).Details(err)
 	}
 	if null {
 		return []byte{}, nil
@@ -498,7 +505,7 @@ func (file *File) parseVarbinary(raw []byte, column *Column) (interface{}, error
 func (file *File) getVarbinaryRepresentation(field *Field, _ bool) ([]byte, error) {
 	raw, ok := field.value.([]byte)
 	if !ok {
-		return nil, newError("dbase-interpreter-getvarbinaryrepresentation-1", fmt.Errorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name()))
+		return nil, NewErrorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name())
 	}
 	return raw, nil
 }

@@ -1,9 +1,5 @@
 package dbase
 
-import (
-	"fmt"
-)
-
 // IO is the interface to work with the DBF file.
 // Three implementations are available:
 // - WindowsIO (for direct file access with Windows)
@@ -161,7 +157,7 @@ func ValidateFileVersion(version byte, untested bool) error {
 	debugf("Validating file version: %d", version)
 	switch version {
 	default:
-		return newError("dbase-io-validatefileversion-1", fmt.Errorf("untested DBF file version: %d (0x%x)", version, version))
+		return NewErrorf("untested DBF file version: %d (0x%x)", version, version)
 	case byte(FoxPro), byte(FoxProAutoincrement), byte(FoxProVar):
 		return nil
 	}
