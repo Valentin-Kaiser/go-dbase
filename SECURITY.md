@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-I am dedicated to ensure the security of go-dbase. To achieve this, I follow the Semantic Versioning (semver) scheme, where revisions are in the format "major.minor.patch".
+I am dedicated to ensure the security of go-dbase. To achieve this, I follow the Semantic Versioning (SemVer) scheme, where revisions are in the format "major.minor.patch".
 I will release patches for any security vulnerabilities that are discovered in the latest major or minor release. 
 
 | Version | Supported          |

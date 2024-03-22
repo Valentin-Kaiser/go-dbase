@@ -99,7 +99,7 @@ func main() {
 
 	output = append(output, "\n\n## Columns\n\n")
 	for _, info := range tableInfos {
-		output = append(output, fmt.Sprintf("### %v\n\n", info.Name))
+		output = append(output, fmt.Sprintf("\n### %v\n\n", info.Name))
 		output = append(output, "| Column | Type | Length | Comment |\n|---|---|---|---|\n")
 		for _, column := range info.ColumnsInfo {
 			output = append(output, column.String())

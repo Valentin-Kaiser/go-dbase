@@ -42,6 +42,10 @@ linters:
     - makezero
     - wrapcheck
     - interfacebloat
+    - dupl
+    - errorlint
+    - gosmopolitan
+    - ireturn
 
     # disabled because of generics
     - rowserrcheck

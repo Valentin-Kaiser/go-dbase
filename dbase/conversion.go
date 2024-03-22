@@ -22,6 +22,7 @@ func julianDate(y, m, d int) int {
 
 // Convert julian day number to year, month and day.
 // (Julian day number -> days since 01-01-4712 BC)
+// nolint: gocritic // assignment can not be simplified
 func julianToDate(jd int) (int, int, int) {
 	l := jd + 68569
 	n := (4 * l) / 146097
