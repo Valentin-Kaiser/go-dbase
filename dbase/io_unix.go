@@ -203,7 +203,7 @@ func (u UnixIO) ReadHeader(file *File) error {
 	return nil
 }
 
-func (u UnixIO) WriteHeader(file *File) (err error) {
+func (u UnixIO) WriteHeader(file *File) error {
 	debugf("Writing header - exclusive writing: %v", file.config.WriteLock)
 	handle, err := u.getHandle(file)
 	if err != nil {
@@ -280,7 +280,7 @@ func (u UnixIO) ReadColumns(file *File) ([]*Column, *Column, error) {
 	return columns, nullFlag, nil
 }
 
-func (u UnixIO) WriteColumns(file *File) (err error) {
+func (u UnixIO) WriteColumns(file *File) error {
 	debugf("Writing columns - exclusive writing: %v", file.config.WriteLock)
 	handle, err := u.getHandle(file)
 	if err != nil {
@@ -488,7 +488,7 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 	return address, nil
 }
 
-func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
+func (u UnixIO) WriteMemoHeader(file *File, size int) error {
 	relatedHandle, err := u.getRelatedHandle(file)
 	if err != nil {
 		return WrapError(err)
@@ -543,7 +543,7 @@ func (u UnixIO) ReadRow(file *File, position uint32) ([]byte, error) {
 	return buf, nil
 }
 
-func (u UnixIO) WriteRow(file *File, row *Row) (err error) {
+func (u UnixIO) WriteRow(file *File, row *Row) error {
 	debugf("Writing row: %d ...", row.Position)
 	row.handle.dbaseMutex.Lock()
 	defer row.handle.dbaseMutex.Unlock()
