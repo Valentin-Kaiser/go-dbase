@@ -46,6 +46,7 @@ linters:
     - errorlint
     - gosmopolitan
     - ireturn
+    - nolintlint
 
     # disabled because of generics
     - rowserrcheck

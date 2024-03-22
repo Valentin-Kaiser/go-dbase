@@ -488,7 +488,7 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 	return address, nil
 }
 
-func (u UnixIO) WriteMemoHeader(file *File, size int) (err error) {
+func (u UnixIO) WriteMemoHeader(file *File, size int) error {
 	relatedHandle, err := u.getRelatedHandle(file)
 	if err != nil {
 		return WrapError(err)
