@@ -3,7 +3,7 @@ module github.com/Valentin-Kaiser/go-dbase
 go 1.20
 
 retract (
-    v0.0.0-20220622120602-842944cf2977
+    v0.0.0-20220622120602-842944cf2977 // invalid version on sub-module
 )
 
 require (
