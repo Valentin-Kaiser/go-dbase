@@ -2,6 +2,11 @@ module github.com/Valentin-Kaiser/go-dbase
 
 go 1.20
 
-require golang.org/x/text v0.14.0
+retract (
+    v0.0.0-20220622120602-842944cf2977 // invalid version on sub-module
+)
 
-require golang.org/x/sys v0.19.0
+require (
+    golang.org/x/text v0.14.0
+    golang.org/x/sys v0.19.0
+)
