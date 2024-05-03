@@ -31,7 +31,7 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	debugf("Opening table: %s - Read-only: %v - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.ReadOnly, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
 	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
 	fileName := filepath.Clean(config.Filename)
-	fileName, err := _findFile(fileName)
+	fileName, err := findFile(fileName)
 	if err != nil {
 		return nil, WrapError(err)
 	}
@@ -99,7 +99,7 @@ func (u UnixIO) openMemo(file *File, filename string, mode int, container bool) 
 		if container {
 			ext = DCT
 		}
-		relatedFile, err := _findFile(strings.TrimSuffix(filename, path.Ext(filename)) + string(ext))
+		relatedFile, err := findFile(strings.TrimSuffix(filename, path.Ext(filename)) + string(ext))
 		if err != nil {
 			return WrapError(err)
 		}
@@ -678,22 +678,6 @@ func (u UnixIO) Deleted(file *File) (bool, error) {
 		return false, NewErrorf("read %d bytes, expected 1", read)
 	}
 	return buf[0] == byte(Deleted), nil
-}
-
-func _findFile(name string) (string, error) {
-	debugf("Searching for file: %s", name)
-	// Read all files in the directory
-	files, err := os.ReadDir(filepath.Dir(name))
-	if err != nil {
-		return "", NewError("failed to read directory").Details(err)
-	}
-	for _, file := range files {
-		if strings.EqualFold(file.Name(), filepath.Base(name)) {
-			debugf("Found file: %s", file.Name())
-			return filepath.Join(filepath.Dir(name), file.Name()), nil
-		}
-	}
-	return name, nil
 }
 
 func (u UnixIO) getHandle(file *File) (*os.File, error) {
