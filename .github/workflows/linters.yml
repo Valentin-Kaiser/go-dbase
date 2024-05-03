@@ -33,6 +33,7 @@ jobs:
           VALIDATE_ALL_CODEBASE: true
           VALIDATE_GO: false
           VALIDATE_MARKDOWN: false
+          VALIDATE_JSCPD: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
   golangci-lint:

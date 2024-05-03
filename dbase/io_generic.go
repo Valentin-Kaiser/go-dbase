@@ -641,7 +641,7 @@ func (g GenericIO) getRelatedHandle(file *File) (io.ReadWriteSeeker, error) {
 // Walk the dir and find the file case insensitive
 func findFile(f string) (string, error) {
 	var foundFile string
-	err := filepath.Walk(filepath.Dir(f), func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(filepath.Dir(f), func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
