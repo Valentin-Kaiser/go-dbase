@@ -28,7 +28,7 @@ func (w WindowsIO) OpenTable(config *Config) (*File, error) {
 	}
 	debugf("Opening table: %s - Read-only: %v - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.ReadOnly, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
 	var err error
-	config.Filename, err = _findFile(filepath.Clean(config.Filename))
+	config.Filename, err = findFile(filepath.Clean(config.Filename))
 	if err != nil {
 		return nil, WrapError(err)
 	}
@@ -99,7 +99,7 @@ func (w WindowsIO) initTable(config *Config, file *File) error {
 func (w WindowsIO) initRelated(config *Config, file *File) error {
 	if MemoFlag.Defined(file.header.TableFlags) {
 		ext := FPT
-		if FileExtension(filepath.Ext(config.Filename)) == DBC {
+		if strings.ToUpper(filepath.Ext(config.Filename)) == string(DBC) {
 			ext = DCT
 		}
 		relatedFile := strings.TrimSuffix(config.Filename, path.Ext(config.Filename)) + string(ext)
@@ -779,22 +779,6 @@ func (w WindowsIO) Deleted(file *File) (bool, error) {
 		return false, NewErrorf("read %d bytes, expected 1", read).Details(ErrIncomplete)
 	}
 	return Marker(buf[0]) == Deleted, nil
-}
-
-func _findFile(name string) (string, error) {
-	debugf("Searching for file: %s", name)
-	// Read all files in the directory
-	files, err := os.ReadDir(filepath.Dir(name))
-	if err != nil {
-		return "", NewErrorf("reading directory failed").Details(err)
-	}
-	for _, file := range files {
-		if strings.EqualFold(file.Name(), filepath.Base(name)) {
-			debugf("Found file: %s", file.Name())
-			return filepath.Join(filepath.Dir(name), file.Name()), nil
-		}
-	}
-	return name, nil
 }
 
 func (w WindowsIO) getHandle(file *File) (*windows.Handle, error) {

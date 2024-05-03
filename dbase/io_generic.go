@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -635,4 +636,26 @@ func (g GenericIO) getRelatedHandle(file *File) (io.ReadWriteSeeker, error) {
 		return nil, WrapError(ErrNoFPT)
 	}
 	return handle, nil
+}
+
+// Walk the dir and find the file case insensitive
+func findFile(path string) (string, error) {
+	var foundFile string
+	err := filepath.Walk(filepath.Dir(path), func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if strings.EqualFold(filepath.Base(path), filepath.Base(path)) {
+			foundFile = path
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return foundFile, nil
 }
