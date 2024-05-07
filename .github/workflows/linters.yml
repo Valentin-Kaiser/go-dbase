@@ -49,4 +49,4 @@ jobs:
       - name: Install dependencies
         run: go mod tidy
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v5
+        uses: golangci/golangci-lint-action@v6
