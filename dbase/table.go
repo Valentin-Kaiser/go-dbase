@@ -111,7 +111,7 @@ func (row *Row) StringValueByName(name string) (string, error) {
 		}
 		bslice, ok := val.([]byte)
 		if ok {
-			return string(sanitizeString(bslice)), nil
+			return string(sanitizeEmptyBytes(bslice)), nil
 		}
 		return "", NewErrorf("value of type %T is not a string", val)
 	}
@@ -367,7 +367,7 @@ func (row *Row) ToMap() (map[string]interface{}, error) {
 				}
 
 				if bslice, ok := val.([]byte); ok {
-					val = sanitizeString(bslice)
+					val = sanitizeEmptyBytes(bslice)
 				}
 			}
 			if mod.Convert != nil {

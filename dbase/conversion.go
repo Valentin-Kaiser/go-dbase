@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -39,7 +40,7 @@ func julianToDate(jd int) (int, int, int) {
 
 // parseDate parses a date string from a byte slice and returns a time.Time
 func parseDate(raw []byte) (time.Time, error) {
-	raw = sanitizeString(raw)
+	raw = sanitizeEmptyBytes(raw)
 	if len(raw) == 0 {
 		return time.Time{}, nil
 	}
@@ -71,7 +72,7 @@ func parseDateTime(raw []byte) time.Time {
 
 // parseNumericInt parses a string as byte array to int64
 func parseNumericInt(raw []byte) (int64, error) {
-	trimmed := string(sanitizeString(raw))
+	trimmed := string(sanitizeEmptyBytes(raw))
 	if len(trimmed) == 0 {
 		return int64(0), nil
 	}
@@ -84,7 +85,7 @@ func parseNumericInt(raw []byte) (int64, error) {
 
 // parseFloat parses a string as byte array to float64
 func parseFloat(raw []byte) (float64, error) {
-	trimmed := strings.TrimSpace(string(sanitizeString(raw)))
+	trimmed := strings.TrimSpace(string(sanitizeEmptyBytes(raw)))
 	if len(trimmed) == 0 {
 		return float64(0), nil
 	}
@@ -147,10 +148,15 @@ func prependSpaces(raw []byte, length int) []byte {
 	return raw
 }
 
-func sanitizeString(raw []byte) []byte {
+func sanitizeEmptyBytes(raw []byte) []byte {
 	raw = bytes.ReplaceAll(raw, []byte{0x00}, []byte{})
 	raw = []byte(strings.TrimSpace(string(raw)))
 	return raw
+}
+
+func sanitizeSpaces(str string) string {
+	re := regexp.MustCompile(`\s+`)
+	return re.ReplaceAllString(str, " ")
 }
 
 // nthBit returns the nth bit of a byte slice
