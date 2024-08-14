@@ -23,7 +23,8 @@ type Config struct {
 	Converter                         EncodingConverter // The encoding converter to use.
 	Exclusive                         bool              // If true the file is opened in exclusive mode.
 	Untested                          bool              // If true the file version is not checked.
-	TrimSpaces                        bool              // Trimspaces default value
+	TrimSpaces                        bool              // If true, spaces are trimmed from the start and end of string values.
+	CollapseSpaces                    bool              // If true, any length of spaces is replaced by a single space.
 	DisableConvertFilenameUnderscores bool              // If false underscores in the table filename are converted to spaces.
 	ReadOnly                          bool              // If true the file is opened in read-only mode.
 	WriteLock                         bool              // Whether or not the write operations should lock the record

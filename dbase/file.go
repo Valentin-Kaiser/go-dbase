@@ -253,7 +253,12 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 			}
 
 			if bslice, ok := val.([]byte); ok {
-				val = sanitizeString(bslice)
+				val = sanitizeEmptyBytes(bslice)
+			}
+		}
+		if file.config.CollapseSpaces {
+			if str, ok := val.(string); ok {
+				val = sanitizeSpaces(str)
 			}
 		}
 		rec.fields = append(rec.fields, &Field{
