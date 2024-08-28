@@ -6,7 +6,9 @@ import (
 
 	"io"
 
+	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
 
@@ -18,8 +20,10 @@ type EncodingConverter interface {
 }
 
 type DefaultConverter struct {
-	encoding *charmap.Charmap
+	encoding encoding.Encoding
 }
+
+var customEncoding = map[byte]encoding.Encoding{}
 
 // Decode decodes a specified encoding to byte slice to a UTF8 byte slice
 func (c DefaultConverter) Decode(in []byte) ([]byte, error) {
@@ -74,17 +78,28 @@ func (c DefaultConverter) CodePage() byte {
 		return 0x7D
 	case charmap.Windows1256: // Arabic Windows
 		return 0x7E
+	case simplifiedchinese.GBK: // Simplified Chinese GBK
+		return 0x7A
 	default:
+		for mark, encoding := range customEncoding {
+			if encoding == c.encoding {
+				return mark
+			}
+		}
 		return 0x00
 	}
 }
 
-func NewDefaultConverter(encoding *charmap.Charmap) DefaultConverter {
+func NewDefaultConverter(encoding encoding.Encoding) DefaultConverter {
 	return DefaultConverter{encoding: encoding}
 }
 
 // NewDefaultConverterFromCodePage returns a new EncodingConverter from a code page mark
 func ConverterFromCodePage(codePageMark byte) DefaultConverter {
+	if encoding, ok := customEncoding[codePageMark]; ok {
+		return NewDefaultConverter(encoding)
+	}
+
 	switch codePageMark {
 	case 0x01: // U.S. MS-DOS
 		return NewDefaultConverter(charmap.CodePage437)
@@ -112,7 +127,13 @@ func ConverterFromCodePage(codePageMark byte) DefaultConverter {
 		return NewDefaultConverter(charmap.Windows1255)
 	case 0x7E: // Arabic Windows
 		return NewDefaultConverter(charmap.Windows1256)
+	case 0x7A: // Simplified Chinese GBK
+		return NewDefaultConverter(simplifiedchinese.GBK)
 	default: // Default to Central European Windows
 		return NewDefaultConverter(charmap.Windows1250)
 	}
+}
+
+func RegisterCustomEncoding(codePageMark byte, encoding encoding.Encoding) {
+	customEncoding[codePageMark] = encoding
 }
