@@ -593,7 +593,7 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 		Step:      uint16(0),
 		Reserved:  [7]byte{},
 	}
-	copy(column.FieldName[:], appendSpaces([]byte(strings.ToUpper(name)), 10)[:11])
+	copy(column.FieldName[:], []byte(strings.ToUpper(name)))
 	debugf("Creating new column: %v - type: %v - length: %v - decimals: %v - nullable: %v - position: %v - flag: %v", name, dataType, length, decimals, nullable, column.Position, column.Flag)
 	// Set the appropriate flag for nullable fields
 	if nullable {
