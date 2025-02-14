@@ -29,12 +29,6 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 		return nil, NewError("missing filename")
 	}
 	debugf("Opening table: %s - Read-only: %v - Exclusive: %v - Untested: %v - Trim spaces: %v - Write lock: %v - ValidateCodepage: %v - InterpretCodepage: %v", config.Filename, config.ReadOnly, config.Exclusive, config.Untested, config.TrimSpaces, config.WriteLock, config.ValidateCodePage, config.InterpretCodePage)
-	fileExtension := FileExtension(strings.ToUpper(filepath.Ext(config.Filename)))
-	fileName := filepath.Clean(config.Filename)
-	fileName, err := findFile(fileName)
-	if err != nil {
-		return nil, WrapError(err)
-	}
 	mode := os.O_RDWR
 	if config.ReadOnly {
 		mode = os.O_RDONLY
@@ -42,7 +36,7 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	if config.Exclusive {
 		mode |= os.O_EXCL
 	}
-	handle, err := os.OpenFile(fileName, mode, 0600)
+	handle, err := os.OpenFile(config.Filename, mode, 0600)
 	if err != nil {
 		return nil, NewError("opening file failed").Details(err)
 	}
@@ -67,7 +61,7 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 	}
 	file.nullFlagColumn = nullFlag
 	file.table = &Table{
-		name:    strings.TrimSuffix(strings.ToUpper(filepath.Base(fileName)), string(fileExtension)),
+		name:    config.Filename,
 		columns: columns,
 		mods:    make([]*Modification, len(columns)),
 	}
@@ -82,7 +76,7 @@ func (u UnixIO) OpenTable(config *Config) (*File, error) {
 		return nil, NewErrorf("code page mark mismatch: %d != %d", file.header.CodePage, file.config.Converter.CodePage())
 	}
 
-	err = u.openMemo(file, fileName, mode, fileExtension == DBC)
+	err = u.openMemo(file, config.Filename, mode, FileExtension(filepath.Ext(config.Filename)) == DBC)
 	if err != nil {
 		return nil, WrapError(err)
 	}
