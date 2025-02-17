@@ -3,6 +3,7 @@ package dbase
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -638,24 +639,21 @@ func (g GenericIO) getRelatedHandle(file *File) (io.ReadWriteSeeker, error) {
 	return handle, nil
 }
 
-// Walk the dir and find the file case insensitive
+// findFile searches for the file case-insensitive in the same directory
 func findFile(f string) (string, error) {
-	var foundFile string
-	err := filepath.Walk(filepath.Dir(f), func(path string, _ os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	dir := filepath.Dir(f)
+	filename := filepath.Base(f)
 
-		if strings.EqualFold(filepath.Base(path), filepath.Base(f)) {
-			foundFile = path
-		}
-
-		return nil
-	})
-
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return "", err
 	}
 
-	return foundFile, nil
+	for _, file := range files {
+		if strings.EqualFold(file.Name(), filename) {
+			return filepath.Join(dir, file.Name()), nil
+		}
+	}
+
+	return "", fmt.Errorf("file not found: %s", filename)
 }
