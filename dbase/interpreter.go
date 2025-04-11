@@ -143,12 +143,20 @@ func (file *File) getMemoRepresentation(field *Field, _ bool) ([]byte, error) {
 	txt := false
 	s, sok := field.value.(string)
 	if sok {
-		memo = []byte(s)
+		var err error
+		memo, err = fromUtf8String([]byte(s), file.config.Converter)
+		if err != nil {
+			return nil, NewErrorf("parsing from utf8 string at column field: %v failed", field.Name()).Details(err)
+		}
 		txt = true
 	}
 	m, ok := field.value.([]byte)
 	if ok {
-		memo = m
+		var err error
+		memo, err = fromUtf8String(m, file.config.Converter)
+		if err != nil {
+			return nil, NewErrorf("parsing from utf8 string at column field: %v failed", field.Name()).Details(err)
+		}
 		txt = false
 	}
 	if !ok && !sok {
