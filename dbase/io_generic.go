@@ -393,7 +393,7 @@ func (g GenericIO) WriteMemo(address []byte, file *File, raw []byte, text bool, 
 			blocks++
 		}
 	}
-	if address != nil && len(address) > 0 {
+	if !isEmptyBytes(address) {
 		blockPosition = binary.LittleEndian.Uint32(address)
 		blocks = 0
 	}

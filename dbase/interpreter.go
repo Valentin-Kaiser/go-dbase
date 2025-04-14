@@ -517,3 +517,16 @@ func (file *File) getVarbinaryRepresentation(field *Field, _ bool) ([]byte, erro
 	}
 	return raw, nil
 }
+
+func isEmptyBytes(b []byte) bool {
+	if b == nil || len(b) == 0 {
+		return true
+	}
+
+	for _, v := range b {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
