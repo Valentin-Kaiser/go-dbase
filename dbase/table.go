@@ -42,8 +42,9 @@ type Column struct {
 
 // Field is a row data field
 type Field struct {
-	column *Column     // Pointer to the column this field belongs to
-	value  interface{} // Value of the field
+	column  *Column     // Pointer to the column this field belongs to
+	value   interface{} // Value of the field
+	memoPos []byte      // Position of the memo field in the memo file
 }
 
 // nullFlagPosition calculates position of this column in the null flag

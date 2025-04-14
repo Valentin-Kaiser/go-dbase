@@ -162,7 +162,7 @@ func (file *File) getMemoRepresentation(field *Field, _ bool) ([]byte, error) {
 	if !ok && !sok {
 		return nil, NewErrorf("invalid type for memo field: %T", field.value)
 	}
-	address, err := file.WriteMemo(memo, txt, len(memo))
+	address, err := file.WriteMemo(field.memoPos, memo, txt, len(memo))
 	if err != nil {
 		return nil, WrapError(err)
 	}

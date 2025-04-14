@@ -243,7 +243,8 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 	offset := uint16(1)
 	for i := 0; i < int(file.ColumnsCount()); i++ {
 		column := file.table.columns[i]
-		val, err := file.Interpret(data[offset:offset+uint16(column.Length)], file.table.columns[i])
+		raw := data[offset : offset+uint16(column.Length)]
+		val, err := file.Interpret(raw, file.table.columns[i])
 		if err != nil {
 			return nil, WrapError(err)
 		}
@@ -261,10 +262,17 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 				val = sanitizeSpaces(str)
 			}
 		}
-		rec.fields = append(rec.fields, &Field{
-			column: column,
-			value:  val,
-		})
+		field := &Field{
+			column:  column,
+			value:   val,
+			memoPos: make([]byte, 0),
+		}
+
+		if DataType(column.DataType) == Memo {
+			field.memoPos = raw
+		}
+
+		rec.fields = append(rec.fields, field)
 		offset += uint16(column.Length)
 	}
 	return rec, nil
