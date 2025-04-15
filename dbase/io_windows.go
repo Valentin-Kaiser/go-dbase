@@ -489,7 +489,11 @@ func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
-func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte, error) {
+func (w WindowsIO) WriteMemo(address []byte, file *File, raw []byte, text bool, length int) ([]byte, error) {
+	if isEmptyBytes(raw) {
+		debugf("no memo data to write")
+		return nil, nil
+	}
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()
 	relatedHandle, err := w.getRelatedHandle(file)
@@ -503,6 +507,11 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 		if length%int(file.memoHeader.BlockSize) > 0 {
 			blocks++
 		}
+	}
+	if !isEmptyBytes(address) {
+		debugf("memo address is not empty, writing to block %d", binary.LittleEndian.Uint32(address))
+		blockPosition = binary.LittleEndian.Uint32(address)
+		blocks = 0
 	}
 	// Write the memo header
 	err = file.WriteMemoHeader(blocks)
@@ -520,7 +529,7 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 	// The next 4 bytes are the length of the data
 	binary.BigEndian.PutUint32(data[4:8], uint32(length))
 	// The rest is the data
-	data = append(data, raw...)
+	data = appendBytes(append(data, raw...), int(file.memoHeader.BlockSize), 0)
 	// Lock the block we are writing to
 	if file.config.WriteLock {
 		o := &windows.Overlapped{
@@ -551,7 +560,7 @@ func (w WindowsIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]b
 		return nil, NewErrorf("writing memo data failed").Details(err)
 	}
 	// Convert the block number to []byte
-	address, err := toBinary(blockPosition)
+	address, err = toBinary(blockPosition)
 	if err != nil {
 		return nil, WrapError(err)
 	}

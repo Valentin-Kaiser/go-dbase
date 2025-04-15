@@ -127,6 +127,9 @@ func (file *File) Represent(field *Field, padding bool) ([]byte, error) {
 // Returns the value from the memo file as string or []byte
 func (file *File) parseMemo(raw []byte, column *Column) (interface{}, error) {
 	// M values contain the address in the FPT file from where to read data
+	if isEmptyBytes(raw) {
+		return nil, nil
+	}
 	memo, isText, err := file.ReadMemo(raw)
 	if err != nil {
 		return nil, NewErrorf("parsing memo failed at column field: %v failed", column.Name()).Details(err)
@@ -162,7 +165,7 @@ func (file *File) getMemoRepresentation(field *Field, _ bool) ([]byte, error) {
 	if !ok && !sok {
 		return nil, NewErrorf("invalid type for memo field: %T", field.value)
 	}
-	address, err := file.WriteMemo(memo, txt, len(memo))
+	address, err := file.WriteMemo(field.memoPos, memo, txt, len(memo))
 	if err != nil {
 		return nil, WrapError(err)
 	}
@@ -516,4 +519,17 @@ func (file *File) getVarbinaryRepresentation(field *Field, _ bool) ([]byte, erro
 		return nil, NewErrorf("invalid data type %T, expected []byte at column field: %v", field.value, field.Name())
 	}
 	return raw, nil
+}
+
+func isEmptyBytes(b []byte) bool {
+	if b == nil || len(b) == 0 {
+		return true
+	}
+
+	for _, v := range b {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
 }

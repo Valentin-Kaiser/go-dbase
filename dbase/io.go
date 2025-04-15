@@ -16,7 +16,7 @@ type IO interface {
 	ReadMemoHeader(file *File) error
 	WriteMemoHeader(file *File, size int) error
 	ReadMemo(file *File, address []byte) ([]byte, bool, error)
-	WriteMemo(file *File, raw []byte, text bool, length int) ([]byte, error)
+	WriteMemo(address []byte, file *File, raw []byte, text bool, length int) ([]byte, error)
 	ReadNullFlag(file *File, position uint64, column *Column) (bool, bool, error)
 	ReadRow(file *File, position uint32) ([]byte, error)
 	WriteRow(file *File, row *Row) error
@@ -94,8 +94,8 @@ func (file *File) ReadMemo(address []byte) ([]byte, bool, error) {
 }
 
 // WriteMemo writes a memo to the memo file and returns the address of the memo.
-func (file *File) WriteMemo(data []byte, text bool, length int) ([]byte, error) {
-	return file.defaults().io.WriteMemo(file, data, text, length)
+func (file *File) WriteMemo(address []byte, data []byte, text bool, length int) ([]byte, error) {
+	return file.defaults().io.WriteMemo(address, file, data, text, length)
 }
 
 // Read the nullFlag field at the end of the row

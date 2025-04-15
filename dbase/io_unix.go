@@ -435,7 +435,11 @@ func (u UnixIO) ReadMemo(file *File, blockdata []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
-func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte, error) {
+func (u UnixIO) WriteMemo(address []byte, file *File, raw []byte, text bool, length int) ([]byte, error) {
+	if isEmptyBytes(raw) {
+		debugf("no memo data to write")
+		return nil, nil
+	}
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()
 	relatedHandle, err := u.getRelatedHandle(file)
@@ -443,10 +447,17 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 		return nil, WrapError(err)
 	}
 	// Get the block position
+	blocks := 1
 	blockPosition := file.memoHeader.NextFree
-	blocks := length / int(file.memoHeader.BlockSize)
-	if length%int(file.memoHeader.BlockSize) > 0 {
-		blocks++
+	if length > 0 && file.memoHeader.BlockSize > 0 {
+		blocks = length / int(file.memoHeader.BlockSize)
+		if length%int(file.memoHeader.BlockSize) > 0 {
+			blocks++
+		}
+	}
+	if !isEmptyBytes(address) {
+		blockPosition = binary.LittleEndian.Uint32(address)
+		blocks = 0
 	}
 	// Write the memo header
 	err = file.WriteMemoHeader(blocks)
@@ -464,7 +475,7 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 	// The next 4 bytes are the length of the data
 	binary.BigEndian.PutUint32(data[4:8], uint32(length))
 	// The rest is the data
-	data = append(data, raw...)
+	data = appendBytes(append(data, raw...), int(file.memoHeader.BlockSize), 0)
 	position := int64(blockPosition) * int64(file.memoHeader.BlockSize)
 	debugf("Writing memo block %d at position %d", blockPosition, position)
 	// Seek to new the next free block
@@ -481,7 +492,7 @@ func (u UnixIO) WriteMemo(file *File, raw []byte, text bool, length int) ([]byte
 		return nil, NewErrorf("wrote %d bytes, expected %d", wrote, len(data))
 	}
 	// Convert the block number to []byte
-	address, err := toBinary(blockPosition)
+	address, err = toBinary(blockPosition)
 	if err != nil {
 		return nil, WrapError(err)
 	}

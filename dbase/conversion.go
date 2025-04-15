@@ -126,10 +126,15 @@ func toBinary(data interface{}) ([]byte, error) {
 
 // appendSpaces appends spaces to a byte slice until it reaches the given length
 func appendSpaces(raw []byte, length int) []byte {
+	return appendBytes(raw, length, ' ')
+}
+
+// appendBytes appends bytes to a byte slice until it reaches the given length
+func appendBytes(raw []byte, length int, value byte) []byte {
 	if len(raw) < length {
 		a := make([]byte, length-len(raw))
 		for i := range a {
-			a[i] = ' '
+			a[i] = value
 		}
 		return append(raw, a...)
 	}
@@ -138,10 +143,15 @@ func appendSpaces(raw []byte, length int) []byte {
 
 // prependSpaces prepends spaces to a byte slice until it reaches the given length
 func prependSpaces(raw []byte, length int) []byte {
+	return prependBytes(raw, length, ' ')
+}
+
+// prependBytes prepends bytes to a byte slice until it reaches the given length
+func prependBytes(raw []byte, length int, value byte) []byte {
 	if len(raw) < length {
 		result := make([]byte, 0)
 		for i := 0; i < length-len(raw); i++ {
-			result = append(result, ' ')
+			result = append(result, value)
 		}
 		return append(result, raw...)
 	}
