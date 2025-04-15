@@ -263,9 +263,8 @@ func (file *File) BytesToRow(data []byte) (*Row, error) {
 			}
 		}
 		field := &Field{
-			column:  column,
-			value:   val,
-			memoPos: make([]byte, 0),
+			column: column,
+			value:  val,
 		}
 
 		if DataType(column.DataType) == Memo {
