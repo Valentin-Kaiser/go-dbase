@@ -127,6 +127,9 @@ func (file *File) Represent(field *Field, padding bool) ([]byte, error) {
 // Returns the value from the memo file as string or []byte
 func (file *File) parseMemo(raw []byte, column *Column) (interface{}, error) {
 	// M values contain the address in the FPT file from where to read data
+	if isEmptyBytes(raw) {
+		return nil, nil
+	}
 	memo, isText, err := file.ReadMemo(raw)
 	if err != nil {
 		return nil, NewErrorf("parsing memo failed at column field: %v failed", column.Name()).Details(err)

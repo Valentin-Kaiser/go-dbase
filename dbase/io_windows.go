@@ -491,7 +491,7 @@ func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 
 func (w WindowsIO) WriteMemo(address []byte, file *File, raw []byte, text bool, length int) ([]byte, error) {
 	if isEmptyBytes(raw) {
-		debugf("Writing memo has no data")
+		debugf("no memo data to write")
 		return nil, nil
 	}
 	file.memoMutex.Lock()
@@ -509,6 +509,7 @@ func (w WindowsIO) WriteMemo(address []byte, file *File, raw []byte, text bool, 
 		}
 	}
 	if !isEmptyBytes(address) {
+		debugf("memo address is not empty, writing to block %d", binary.LittleEndian.Uint32(address))
 		blockPosition = binary.LittleEndian.Uint32(address)
 		blocks = 0
 	}
