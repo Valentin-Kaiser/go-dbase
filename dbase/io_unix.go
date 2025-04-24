@@ -438,7 +438,7 @@ func (u UnixIO) ReadMemo(file *File, blockdata []byte) ([]byte, bool, error) {
 func (u UnixIO) WriteMemo(address []byte, file *File, raw []byte, text bool, length int) ([]byte, error) {
 	if isEmptyBytes(raw) {
 		debugf("no memo data to write")
-		return nil, nil
+		return []byte{}, nil
 	}
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()

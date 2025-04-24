@@ -492,7 +492,7 @@ func (w WindowsIO) ReadMemo(file *File, address []byte) ([]byte, bool, error) {
 func (w WindowsIO) WriteMemo(address []byte, file *File, raw []byte, text bool, length int) ([]byte, error) {
 	if isEmptyBytes(raw) {
 		debugf("no memo data to write")
-		return nil, nil
+		return []byte{}, nil
 	}
 	file.memoMutex.Lock()
 	defer file.memoMutex.Unlock()
