@@ -128,7 +128,7 @@ func (file *File) Represent(field *Field, padding bool) ([]byte, error) {
 func (file *File) parseMemo(raw []byte, column *Column) (interface{}, error) {
 	// M values contain the address in the FPT file from where to read data
 	if isEmptyBytes(raw) {
-		return nil, nil
+		return []byte{}, nil
 	}
 	memo, isText, err := file.ReadMemo(raw)
 	if err != nil {
