@@ -9,7 +9,7 @@ import (
 func TestOpenTable(t *testing.T) {
 	// Use test data from examples
 	testFile := "../examples/test_data/table/TEST.DBF"
-	
+
 	// Check if test file exists
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
@@ -46,7 +46,7 @@ func TestOpenTable(t *testing.T) {
 
 func TestTableColumns(t *testing.T) {
 	testFile := "../examples/test_data/table/TEST.DBF"
-	
+
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -83,7 +83,7 @@ func TestTableColumns(t *testing.T) {
 
 func TestTableNavigation(t *testing.T) {
 	testFile := "../examples/test_data/table/TEST.DBF"
-	
+
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -113,7 +113,7 @@ func TestTableNavigation(t *testing.T) {
 	if err != nil {
 		t.Errorf("Should be able to go to first row: %v", err)
 	}
-	
+
 	if table.Pointer() != 1 {
 		t.Error("Pointer should be 1 after going to first row")
 	}
@@ -121,7 +121,7 @@ func TestTableNavigation(t *testing.T) {
 
 func TestTableReadRow(t *testing.T) {
 	testFile := "../examples/test_data/table/TEST.DBF"
-	
+
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -137,7 +137,7 @@ func TestTableReadRow(t *testing.T) {
 
 	// Move to first row and read
 	table.Skip(1)
-	
+
 	row, err := table.Row()
 	if err != nil {
 		t.Fatalf("Failed to read row: %v", err)
@@ -166,7 +166,7 @@ func TestTableReadRow(t *testing.T) {
 
 func TestTableRowAsMap(t *testing.T) {
 	testFile := "../examples/test_data/table/TEST.DBF"
-	
+
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -215,7 +215,7 @@ func TestTableRowAsMap(t *testing.T) {
 
 func TestTableHeader(t *testing.T) {
 	testFile := "../examples/test_data/table/TEST.DBF"
-	
+
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -271,7 +271,371 @@ func TestTableConfigValidation(t *testing.T) {
 	if err == nil {
 		t.Error("Should fail with non-existent file")
 	}
-	
+
 	// Skip nil config test as it causes panic in the current implementation
 	// This would be a good candidate for a production fix
+}
+
+func TestRow_Values(t *testing.T) {
+	// Create a row with some fields
+	row := &Row{
+		fields: []*Field{
+			{value: "hello"},
+			{value: 123},
+			{value: true},
+			nil, // Test with nil field
+		},
+	}
+
+	values := row.Values()
+	expected := []interface{}{"hello", 123, true}
+
+	if len(values) != len(expected) {
+		t.Errorf("Expected %d values, got %d", len(expected), len(values))
+		return
+	}
+
+	for i, expected := range expected {
+		if values[i] != expected {
+			t.Errorf("Expected value %v at index %d, got %v", expected, i, values[i])
+		}
+	}
+}
+
+// Helper function to create a test file with columns
+func createTestFile(columnNames ...string) *File {
+	columns := make([]*Column, len(columnNames))
+	for i, name := range columnNames {
+		column := &Column{}
+		copy(column.FieldName[:], name)
+		columns[i] = column
+	}
+
+	return &File{
+		table: &Table{
+			columns: columns,
+		},
+	}
+}
+
+func TestRow_MustValueByName(t *testing.T) {
+	// Create a file with columns
+	file := createTestFile("test")
+
+	// Create a row with a field
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: "test_value"},
+		},
+	}
+
+	// Test successful case
+	result := row.MustValueByName("test")
+	if result != "test_value" {
+		t.Errorf("Expected 'test_value', got %v", result)
+	}
+
+	// Test panic case
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for non-existent field")
+		}
+	}()
+	row.MustValueByName("nonexistent")
+}
+
+func TestRow_StringValueByName(t *testing.T) {
+	// Create a file with columns
+	file := createTestFile("str", "bytes")
+
+	// Create a row with fields
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: "hello"},
+			{value: []byte("world")},
+		},
+	}
+
+	// Test string field
+	result, err := row.StringValueByName("str")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if result != "hello" {
+		t.Errorf("Expected 'hello', got '%s'", result)
+	}
+
+	// Test bytes field (should convert to string)
+	result, err = row.StringValueByName("bytes")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if result != "world" {
+		t.Errorf("Expected 'world', got '%s'", result)
+	}
+
+	// Test non-existent field
+	_, err = row.StringValueByName("nonexistent")
+	if err == nil {
+		t.Error("Expected error for non-existent field")
+	}
+}
+
+func TestRow_MustStringValueByName(t *testing.T) {
+	// Create a file with columns
+	file := createTestFile("test")
+
+	// Create a row with a field
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: "test_value"},
+		},
+	}
+
+	// Test successful case
+	result := row.MustStringValueByName("test")
+	if result != "test_value" {
+		t.Errorf("Expected 'test_value', got %s", result)
+	}
+
+	// Test panic case
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for non-existent field")
+		}
+	}()
+	row.MustStringValueByName("nonexistent")
+}
+
+func TestRow_IntValueByName(t *testing.T) {
+	file := createTestFile("int_field")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: int64(123)},
+		},
+	}
+
+	value, err := row.IntValueByName("int_field")
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+	if value != int64(123) {
+		t.Errorf("Expected int64(123), got %v", value)
+	}
+
+	// Test with non-existent field
+	_, err = row.IntValueByName("nonexistent")
+	if err == nil {
+		t.Error("Expected error for non-existent field")
+	}
+}
+
+func TestRow_MustIntValueByName(t *testing.T) {
+	file := createTestFile("int_field")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: int64(456)},
+		},
+	}
+
+	value := row.MustIntValueByName("int_field")
+	if value != int64(456) {
+		t.Errorf("Expected int64(456), got %v", value)
+	}
+
+	// Test panic with non-existent field
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for non-existent field")
+		}
+	}()
+	row.MustIntValueByName("nonexistent")
+}
+
+func TestRow_FloatValueByName(t *testing.T) {
+	file := createTestFile("float_field")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: 123.45},
+		},
+	}
+
+	value, err := row.FloatValueByName("float_field")
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+	if value != 123.45 {
+		t.Errorf("Expected 123.45, got %v", value)
+	}
+
+	// Test with non-existent field
+	_, err = row.FloatValueByName("nonexistent")
+	if err == nil {
+		t.Error("Expected error for non-existent field")
+	}
+}
+
+func TestRow_MustFloatValueByName(t *testing.T) {
+	file := createTestFile("float_field")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: 678.90},
+		},
+	}
+
+	value := row.MustFloatValueByName("float_field")
+	if value != 678.90 {
+		t.Errorf("Expected 678.90, got %v", value)
+	}
+
+	// Test panic with non-existent field
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for non-existent field")
+		}
+	}()
+	row.MustFloatValueByName("nonexistent")
+}
+
+func TestRow_BoolValueByName(t *testing.T) {
+	file := createTestFile("bool_field")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: true},
+		},
+	}
+
+	value, err := row.BoolValueByName("bool_field")
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+	if value != true {
+		t.Errorf("Expected true, got %v", value)
+	}
+
+	// Test with non-existent field
+	_, err = row.BoolValueByName("nonexistent")
+	if err == nil {
+		t.Error("Expected error for non-existent field")
+	}
+}
+
+func TestRow_MustBoolValueByName(t *testing.T) {
+	file := createTestFile("bool_field")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: false},
+		},
+	}
+
+	value := row.MustBoolValueByName("bool_field")
+	if value != false {
+		t.Errorf("Expected false, got %v", value)
+	}
+
+	// Test panic with non-existent field
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for non-existent field")
+		}
+	}()
+	row.MustBoolValueByName("nonexistent")
+}
+
+func TestRow_BytesValueByName(t *testing.T) {
+	file := createTestFile("bytes_field")
+	testBytes := []byte("test bytes")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: testBytes},
+		},
+	}
+
+	value, err := row.BytesValueByName("bytes_field")
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+	if string(value) != string(testBytes) {
+		t.Errorf("Expected %v, got %v", testBytes, value)
+	}
+
+	// Test with non-existent field
+	_, err = row.BytesValueByName("nonexistent")
+	if err == nil {
+		t.Error("Expected error for non-existent field")
+	}
+}
+
+func TestRow_MustBytesValueByName(t *testing.T) {
+	file := createTestFile("bytes_field")
+	testBytes := []byte("must bytes")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: testBytes},
+		},
+	}
+
+	value := row.MustBytesValueByName("bytes_field")
+	if string(value) != string(testBytes) {
+		t.Errorf("Expected %v, got %v", testBytes, value)
+	}
+
+	// Test panic with non-existent field
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for non-existent field")
+		}
+	}()
+	row.MustBytesValueByName("nonexistent")
+}
+
+func TestRow_Field(t *testing.T) {
+	file := createTestFile("field1")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: "test"},
+		},
+	}
+
+	field := row.Field(0)
+	if field.GetValue() != "test" {
+		t.Errorf("Expected 'test', got %v", field.GetValue())
+	}
+}
+
+func TestRow_FieldByName(t *testing.T) {
+	file := createTestFile("named_field")
+
+	row := &Row{
+		handle: file,
+		fields: []*Field{
+			{value: "test"},
+		},
+	}
+
+	field := row.FieldByName("named_field")
+	if field.GetValue() != "test" {
+		t.Errorf("Expected 'test', got %v", field.GetValue())
+	}
 }

@@ -119,3 +119,39 @@ func TestMemoHeaderStructure(t *testing.T) {
 		t.Errorf("Expected BlockSize 512, got %d", memoHeader.BlockSize)
 	}
 }
+
+func TestHeader_ColumnsCount(t *testing.T) {
+	header := &Header{
+		FirstRow: 296 + 32*5, // 5 columns * 32 bytes each + base offset
+	}
+
+	count := header.ColumnsCount()
+	if count != uint16(5) {
+		t.Errorf("Expected columns count 5, got %d", count)
+	}
+}
+
+func TestHeader_RecordsCount(t *testing.T) {
+	header := &Header{
+		RowsCount: 100,
+	}
+
+	count := header.RecordsCount()
+	if count != uint32(100) {
+		t.Errorf("Expected records count 100, got %d", count)
+	}
+}
+
+func TestHeader_FileSize(t *testing.T) {
+	header := &Header{
+		RowsCount: 100,
+		RowLength: 50,
+		FirstRow:  296 + 32*3, // 3 columns
+	}
+
+	size := header.FileSize()
+	expected := int64(296 + 3*32 + 100*50) // 296 + (columns * 32) + (rows * rowLength)
+	if size != expected {
+		t.Errorf("Expected file size %d, got %d", expected, size)
+	}
+}
