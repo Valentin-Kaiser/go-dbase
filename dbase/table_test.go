@@ -7,15 +7,12 @@ import (
 )
 
 func TestOpenTable(t *testing.T) {
-	// Use test data from examples
 	testFile := "../examples/test_data/table/TEST.DBF"
 
-	// Check if test file exists
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
 
-	// Test opening a table
 	table, err := OpenTable(&Config{
 		Filename:   testFile,
 		TrimSpaces: true,
@@ -25,7 +22,6 @@ func TestOpenTable(t *testing.T) {
 	}
 	defer table.Close()
 
-	// Verify table properties
 	if table.TableName() == "" {
 		t.Error("Table name should not be empty")
 	}
@@ -34,7 +30,6 @@ func TestOpenTable(t *testing.T) {
 		t.Error("Table should have rows")
 	}
 
-	// Test BOF/EOF
 	if !table.BOF() {
 		t.Error("Table should be at beginning of file initially")
 	}
@@ -60,18 +55,15 @@ func TestTableColumns(t *testing.T) {
 	}
 	defer table.Close()
 
-	// Test columns
 	columns := table.Columns()
 	if len(columns) == 0 {
 		t.Error("Table should have columns")
 	}
 
-	// Check that we have a reasonable number of columns
 	if len(columns) < 10 {
 		t.Errorf("Expected at least 10 columns, got %d", len(columns))
 	}
 
-	// Check column names
 	columnNames := make([]string, len(columns))
 	for i, col := range columns {
 		columnNames[i] = col.Name()
@@ -97,18 +89,15 @@ func TestTableNavigation(t *testing.T) {
 	}
 	defer table.Close()
 
-	// Test navigation
 	if table.Pointer() != 0 {
 		t.Error("Initial pointer should be 0")
 	}
 
-	// Move to first row
 	table.Skip(1)
 	if table.Pointer() != 1 {
 		t.Error("Pointer should be 1 after skipping to first row")
 	}
 
-	// Test GoTo
 	err = table.GoTo(1)
 	if err != nil {
 		t.Errorf("Should be able to go to first row: %v", err)
@@ -135,7 +124,6 @@ func TestTableReadRow(t *testing.T) {
 	}
 	defer table.Close()
 
-	// Move to first row and read
 	table.Skip(1)
 
 	row, err := table.Row()
@@ -143,24 +131,19 @@ func TestTableReadRow(t *testing.T) {
 		t.Fatalf("Failed to read row: %v", err)
 	}
 
-	// Check if row has fields
 	if len(row.Fields()) == 0 {
 		t.Error("Row should have fields")
 	}
 
-	// Test row position
 	if row.Position == 0 {
 		t.Error("Row position should not be 0")
 	}
 
-	// Test field values
 	fields := row.Fields()
 	for _, field := range fields {
-		// Just check that fields have names and values
 		if field.Name() == "" {
 			t.Error("Field name should not be empty")
 		}
-		// Value can be nil for some fields, so we don't check it
 	}
 }
 
@@ -180,16 +163,13 @@ func TestTableRowAsMap(t *testing.T) {
 	}
 	defer table.Close()
 
-	// Move to first row
 	table.Skip(1)
 
-	// Get row first
 	row, err := table.Row()
 	if err != nil {
 		t.Fatalf("Failed to get row: %v", err)
 	}
 
-	// Get row as map
 	rowMap, err := row.ToMap()
 	if err != nil {
 		t.Fatalf("Failed to get row as map: %v", err)
@@ -199,7 +179,6 @@ func TestTableRowAsMap(t *testing.T) {
 		t.Error("Row map should not be empty")
 	}
 
-	// Check for some expected keys
 	expectedKeys := []string{"PRODUCTID", "PRODNAME", "PRICE", "ACTIVE"}
 	found := 0
 	for _, key := range expectedKeys {
@@ -229,7 +208,6 @@ func TestTableHeader(t *testing.T) {
 	}
 	defer table.Close()
 
-	// Test header
 	header := table.Header()
 	if header == nil {
 		t.Error("Header should not be nil")
@@ -247,37 +225,29 @@ func TestTableHeader(t *testing.T) {
 		t.Error("Header should show row length > 0")
 	}
 
-	// Test modified date
 	modifiedDate := header.Modified(2000)
 	if modifiedDate.IsZero() {
 		t.Error("Modified date should not be zero")
 	}
 
-	// Check if modified date is reasonable (not too far in the future)
 	if modifiedDate.After(time.Now().AddDate(1, 0, 0)) {
 		t.Error("Modified date should not be too far in the future")
 	}
 }
 
 func TestTableConfigValidation(t *testing.T) {
-	// Test empty filename
 	_, err := OpenTable(&Config{Filename: ""})
 	if err == nil {
 		t.Error("Should fail with empty filename")
 	}
 
-	// Test non-existent file
 	_, err = OpenTable(&Config{Filename: "/non/existent/file.dbf"})
 	if err == nil {
 		t.Error("Should fail with non-existent file")
 	}
-
-	// Skip nil config test as it causes panic in the current implementation
-	// This would be a good candidate for a production fix
 }
 
 func TestRow_Values(t *testing.T) {
-	// Create a row with some fields
 	row := &Row{
 		fields: []*Field{
 			{value: "hello"},
@@ -319,10 +289,8 @@ func createTestFile(columnNames ...string) *File {
 }
 
 func TestRow_MustValueByName(t *testing.T) {
-	// Create a file with columns
 	file := createTestFile("test")
 
-	// Create a row with a field
 	row := &Row{
 		handle: file,
 		fields: []*Field{
@@ -330,13 +298,11 @@ func TestRow_MustValueByName(t *testing.T) {
 		},
 	}
 
-	// Test successful case
 	result := row.MustValueByName("test")
 	if result != "test_value" {
 		t.Errorf("Expected 'test_value', got %v", result)
 	}
 
-	// Test panic case
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic for non-existent field")
@@ -346,10 +312,8 @@ func TestRow_MustValueByName(t *testing.T) {
 }
 
 func TestRow_StringValueByName(t *testing.T) {
-	// Create a file with columns
 	file := createTestFile("str", "bytes")
 
-	// Create a row with fields
 	row := &Row{
 		handle: file,
 		fields: []*Field{
@@ -358,7 +322,6 @@ func TestRow_StringValueByName(t *testing.T) {
 		},
 	}
 
-	// Test string field
 	result, err := row.StringValueByName("str")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -367,7 +330,6 @@ func TestRow_StringValueByName(t *testing.T) {
 		t.Errorf("Expected 'hello', got '%s'", result)
 	}
 
-	// Test bytes field (should convert to string)
 	result, err = row.StringValueByName("bytes")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -376,7 +338,6 @@ func TestRow_StringValueByName(t *testing.T) {
 		t.Errorf("Expected 'world', got '%s'", result)
 	}
 
-	// Test non-existent field
 	_, err = row.StringValueByName("nonexistent")
 	if err == nil {
 		t.Error("Expected error for non-existent field")
@@ -384,10 +345,8 @@ func TestRow_StringValueByName(t *testing.T) {
 }
 
 func TestRow_MustStringValueByName(t *testing.T) {
-	// Create a file with columns
 	file := createTestFile("test")
 
-	// Create a row with a field
 	row := &Row{
 		handle: file,
 		fields: []*Field{
@@ -395,13 +354,11 @@ func TestRow_MustStringValueByName(t *testing.T) {
 		},
 	}
 
-	// Test successful case
 	result := row.MustStringValueByName("test")
 	if result != "test_value" {
 		t.Errorf("Expected 'test_value', got %s", result)
 	}
 
-	// Test panic case
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic for non-existent field")
@@ -428,7 +385,6 @@ func TestRow_IntValueByName(t *testing.T) {
 		t.Errorf("Expected int64(123), got %v", value)
 	}
 
-	// Test with non-existent field
 	_, err = row.IntValueByName("nonexistent")
 	if err == nil {
 		t.Error("Expected error for non-existent field")
@@ -450,7 +406,6 @@ func TestRow_MustIntValueByName(t *testing.T) {
 		t.Errorf("Expected int64(456), got %v", value)
 	}
 
-	// Test panic with non-existent field
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic for non-existent field")
@@ -477,7 +432,6 @@ func TestRow_FloatValueByName(t *testing.T) {
 		t.Errorf("Expected 123.45, got %v", value)
 	}
 
-	// Test with non-existent field
 	_, err = row.FloatValueByName("nonexistent")
 	if err == nil {
 		t.Error("Expected error for non-existent field")
@@ -499,7 +453,6 @@ func TestRow_MustFloatValueByName(t *testing.T) {
 		t.Errorf("Expected 678.90, got %v", value)
 	}
 
-	// Test panic with non-existent field
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic for non-existent field")
@@ -526,7 +479,6 @@ func TestRow_BoolValueByName(t *testing.T) {
 		t.Errorf("Expected true, got %v", value)
 	}
 
-	// Test with non-existent field
 	_, err = row.BoolValueByName("nonexistent")
 	if err == nil {
 		t.Error("Expected error for non-existent field")
@@ -548,7 +500,6 @@ func TestRow_MustBoolValueByName(t *testing.T) {
 		t.Errorf("Expected false, got %v", value)
 	}
 
-	// Test panic with non-existent field
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic for non-existent field")
@@ -576,7 +527,6 @@ func TestRow_BytesValueByName(t *testing.T) {
 		t.Errorf("Expected %v, got %v", testBytes, value)
 	}
 
-	// Test with non-existent field
 	_, err = row.BytesValueByName("nonexistent")
 	if err == nil {
 		t.Error("Expected error for non-existent field")
@@ -599,7 +549,6 @@ func TestRow_MustBytesValueByName(t *testing.T) {
 		t.Errorf("Expected %v, got %v", testBytes, value)
 	}
 
-	// Test panic with non-existent field
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic for non-existent field")

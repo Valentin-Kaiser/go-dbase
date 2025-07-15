@@ -6,14 +6,12 @@ import (
 )
 
 func TestHeaderModified(t *testing.T) {
-	// Test with known values
 	header := &Header{
 		Year:  23, // 2023
 		Month: 12,
 		Day:   25,
 	}
 
-	// Test with base year 2000
 	modifiedDate := header.Modified(2000)
 	expected := time.Date(2023, 12, 25, 0, 0, 0, 0, time.UTC)
 
@@ -31,7 +29,6 @@ func TestHeaderModified(t *testing.T) {
 }
 
 func TestHeaderModifiedWithDifferentBase(t *testing.T) {
-	// Test with different base year
 	header := &Header{
 		Year:  50, // Should be 1950 with base 1900
 		Month: 6,
@@ -55,14 +52,12 @@ func TestHeaderModifiedWithDifferentBase(t *testing.T) {
 }
 
 func TestHeaderModifiedEdgeCases(t *testing.T) {
-	// Test with invalid values
 	header := &Header{
 		Year:  99,
 		Month: 0,  // Invalid month
 		Day:   32, // Invalid day
 	}
 
-	// Should not panic, but may return invalid date
 	modifiedDate := header.Modified(2000)
 	if modifiedDate.IsZero() {
 		t.Error("Modified date should not be zero even with invalid input")
@@ -70,7 +65,6 @@ func TestHeaderModifiedEdgeCases(t *testing.T) {
 }
 
 func TestHeaderStructure(t *testing.T) {
-	// Test header struct has expected fields
 	header := &Header{
 		FileType:   0x30,
 		Year:       23,
@@ -105,7 +99,6 @@ func TestHeaderStructure(t *testing.T) {
 }
 
 func TestMemoHeaderStructure(t *testing.T) {
-	// Test memo header struct has expected fields
 	memoHeader := &MemoHeader{
 		NextFree:  1024,
 		BlockSize: 512,

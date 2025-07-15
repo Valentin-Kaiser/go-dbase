@@ -9,7 +9,6 @@ import (
 )
 
 func TestJulianDate(t *testing.T) {
-	// Test the julian date conversion functions
 	testCases := []struct {
 		year, month, day int
 		expected         int
@@ -26,7 +25,6 @@ func TestJulianDate(t *testing.T) {
 				tc.year, tc.month, tc.day, result, tc.expected)
 		}
 
-		// Test round-trip conversion
 		y, m, d := julianToDate(result)
 		if y != tc.year || m != tc.month || d != tc.day {
 			t.Errorf("julianToDate(%d) = (%d, %d, %d), expected (%d, %d, %d)",
@@ -250,7 +248,6 @@ func TestParseFloat(t *testing.T) {
 }
 
 func TestToUTF8String(t *testing.T) {
-	// Test with valid converter
 	input := []byte("test")
 	converter := NewDefaultConverter(charmap.Windows1252)
 	result, err := toUTF8String(input, converter)
@@ -261,20 +258,17 @@ func TestToUTF8String(t *testing.T) {
 		t.Errorf("Expected 'test', got '%s'", result)
 	}
 
-	// Test with special characters
 	input = []byte{0xE4} // 'ä' in Windows1252
 	result, err = toUTF8String(input, converter)
 	if err != nil {
 		t.Errorf("Unexpected error with special character: %v", err)
 	}
-	// Should convert to proper UTF-8
 	if len(result) == 0 {
 		t.Errorf("Expected non-empty result for special character")
 	}
 }
 
 func TestFromUtf8String(t *testing.T) {
-	// Test with valid converter
 	input := []byte("test")
 	converter := NewDefaultConverter(charmap.Windows1252)
 	result, err := fromUtf8String(input, converter)
@@ -285,13 +279,11 @@ func TestFromUtf8String(t *testing.T) {
 		t.Errorf("Expected 'test', got '%s'", string(result))
 	}
 
-	// Test with UTF-8 characters
 	input = []byte("café") // Contains UTF-8 encoded characters
 	result, err = fromUtf8String(input, converter)
 	if err != nil {
 		t.Errorf("Unexpected error with UTF-8 input: %v", err)
 	}
-	// Result should be encoded according to converter
 	if len(result) == 0 {
 		t.Errorf("Expected non-empty result for UTF-8 input")
 	}
@@ -445,25 +437,21 @@ func TestExtractTags(t *testing.T) {
 }
 
 func TestCast(t *testing.T) {
-	// Test same type - should return as is
 	result := cast(42, reflect.TypeOf(42))
 	if result != 42 {
 		t.Errorf("Expected 42, got %v", result)
 	}
 
-	// Test convertible type
 	result = cast(int32(42), reflect.TypeOf(int64(0)))
 	if result != int64(42) {
 		t.Errorf("Expected int64(42), got %v", result)
 	}
 
-	// Test nil
 	result = cast(nil, reflect.TypeOf(42))
 	if result != nil {
 		t.Errorf("Expected nil, got %v", result)
 	}
 
-	// Test non-convertible - should return original
 	result = cast("string", reflect.TypeOf(42))
 	if result != "string" {
 		t.Errorf("Expected 'string', got %v", result)

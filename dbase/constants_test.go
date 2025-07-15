@@ -7,7 +7,6 @@ import (
 )
 
 func TestFileVersion_Constants(t *testing.T) {
-	// Test that file version constants have expected values
 	expectedValues := map[FileVersion]byte{
 		FoxPro:              0x30,
 		FoxProAutoincrement: 0x31,
@@ -30,7 +29,6 @@ func TestFileVersion_Constants(t *testing.T) {
 }
 
 func TestFileExtension_Constants(t *testing.T) {
-	// Test that file extension constants have expected values
 	expectedValues := map[FileExtension]string{
 		DBC: ".DBC",
 		DCT: ".DCT",
