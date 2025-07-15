@@ -13,7 +13,7 @@ func TestJulianDate(t *testing.T) {
 		year, month, day int
 		expected         int
 	}{
-		{2023, 12, 25, 2460304}, // Christmas 2023 (corrected)
+		{2023, 12, 25, 2460304}, // Christmas 2023
 		{2000, 1, 1, 2451545},   // Y2K
 		{1900, 1, 1, 2415021},   // Start of 20th century
 	}
