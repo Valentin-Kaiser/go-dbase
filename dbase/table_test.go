@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-func TestOpenTable(t *testing.T) {
-	testFile := "../examples/test_data/table/TEST.DBF"
+const testFile = "../examples/test_data/table/TEST.DBF"
 
+func TestOpenTable(t *testing.T) {
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -40,8 +40,6 @@ func TestOpenTable(t *testing.T) {
 }
 
 func TestTableColumns(t *testing.T) {
-	testFile := "../examples/test_data/table/TEST.DBF"
-
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -74,8 +72,6 @@ func TestTableColumns(t *testing.T) {
 }
 
 func TestTableNavigation(t *testing.T) {
-	testFile := "../examples/test_data/table/TEST.DBF"
-
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -109,8 +105,6 @@ func TestTableNavigation(t *testing.T) {
 }
 
 func TestTableReadRow(t *testing.T) {
-	testFile := "../examples/test_data/table/TEST.DBF"
-
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -148,8 +142,6 @@ func TestTableReadRow(t *testing.T) {
 }
 
 func TestTableRowAsMap(t *testing.T) {
-	testFile := "../examples/test_data/table/TEST.DBF"
-
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}
@@ -193,8 +185,6 @@ func TestTableRowAsMap(t *testing.T) {
 }
 
 func TestTableHeader(t *testing.T) {
-	testFile := "../examples/test_data/table/TEST.DBF"
-
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("Test data file not found, skipping test")
 	}

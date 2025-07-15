@@ -1,6 +1,7 @@
 package dbase
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -90,26 +91,9 @@ func TestValidateFileVersion(t *testing.T) {
 	}
 
 	// Check error message contains version info
-	if err != nil && !containsSubstr(err.Error(), "0xff") {
+	if err != nil && !strings.Contains(err.Error(), "0xff") {
 		t.Errorf("Expected error message to contain version info, got: %s", err.Error())
 	}
-}
-
-// Helper function to check if string contains substring (case insensitive)
-func containsSubstr(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr ||
-		len(s) > len(substr) &&
-			(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-				hasSubstring(s, substr)))
-}
-
-func hasSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 func TestOpenTableIO_InvalidFile(t *testing.T) {
