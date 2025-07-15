@@ -656,8 +656,17 @@ func (w WindowsIO) WriteRow(file *File, row *Row) (err error) {
 	// Update the header
 	position := int64(row.handle.header.FirstRow) + (int64(row.Position) * int64(row.handle.header.RowLength))
 	if row.Position >= row.handle.header.RowsCount {
+		// Check if we're exceeding the maximum records per table
+		if row.handle.header.RowsCount >= MaxRecordsPerTable {
+			return NewErrorf("maximum records per table exceeded: %d >= %d", row.handle.header.RowsCount, MaxRecordsPerTable)
+		}
 		position = int64(row.handle.header.FirstRow) + (int64(row.Position-1) * int64(row.handle.header.RowLength))
 		row.handle.header.RowsCount++
+		// Check if the new file size would exceed the maximum
+		if err := row.handle.header.ValidateFileSize(); err != nil {
+			row.handle.header.RowsCount-- // Rollback the increment
+			return WrapError(err)
+		}
 	}
 	err = row.handle.WriteHeader()
 	if err != nil {

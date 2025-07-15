@@ -36,8 +36,8 @@ type Column struct {
 	Decimals  uint8    // Number of decimal places
 	Flag      byte     // Column flag
 	Next      uint32   // Value of autoincrement Next value
-	Step      uint16   // Value of autoincrement Step value
-	Reserved  [7]byte  // Reserved
+	Step      uint8    // Value of autoincrement Step value
+	Reserved  [8]byte  // Reserved
 }
 
 // Field is a row data field
@@ -494,6 +494,9 @@ func NewTable(version FileVersion, config *Config, columns []*Column, memoBlockS
 	if len(columns) == 0 {
 		return nil, errors.New("no columns specified")
 	}
+	if len(columns) > MaxFieldsPerRecord {
+		return nil, NewErrorf("too many fields: %d > %d", len(columns), MaxFieldsPerRecord)
+	}
 	if config.Converter == nil {
 		return nil, errors.New("no converter specified")
 	}
@@ -535,6 +538,10 @@ func NewTable(version FileVersion, config *Config, columns []*Column, memoBlockS
 		column.Position = uint32(file.header.RowLength)
 		// Add the column length to the row length
 		file.header.RowLength += uint16(column.Length)
+		// Check if we're exceeding the maximum characters per record
+		if file.header.RowLength > MaxCharactersPerRecord {
+			return nil, NewErrorf("maximum characters per record exceeded: %d > %d", file.header.RowLength, MaxCharactersPerRecord)
+		}
 		// Add columns to the table
 		file.table.columns = append(file.table.columns, column)
 	}
@@ -562,10 +569,14 @@ func NewTable(version FileVersion, config *Config, columns []*Column, memoBlockS
 			Flag:      byte(HiddenFlag + NullableFlag),
 			Next:      0x00,
 			Step:      0x00,
-			Reserved:  [7]byte{},
+			Reserved:  [8]byte{},
 		}
 		file.header.FirstRow += 32
 		file.header.RowLength += uint16(length)
+		// Check if we're exceeding the maximum characters per record with null flag
+		if file.header.RowLength > MaxCharactersPerRecord {
+			return nil, NewErrorf("maximum characters per record exceeded: %d > %d", file.header.RowLength, MaxCharactersPerRecord)
+		}
 		debugf("Initializing null flag column - length: %v", length)
 	}
 
@@ -591,8 +602,8 @@ func NewColumn(name string, dataType DataType, length uint8, decimals uint8, nul
 		Length:    uint8(0),
 		Flag:      0x00,
 		Next:      uint32(0),
-		Step:      uint16(0),
-		Reserved:  [7]byte{},
+		Step:      uint8(0),
+		Reserved:  [8]byte{},
 	}
 	copy(column.FieldName[:], []byte(strings.ToUpper(name)))
 	debugf("Creating new column: %v - type: %v - length: %v - decimals: %v - nullable: %v - position: %v - flag: %v", name, dataType, length, decimals, nullable, column.Position, column.Flag)

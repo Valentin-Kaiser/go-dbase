@@ -133,11 +133,19 @@ func (t DataType) Reflect() (reflect.Type, error) {
 // wether the column has a variable length.
 var nullFlagColumn = [11]byte{0x5F, 0x4E, 0x75, 0x6C, 0x6C, 0x46, 0x6C, 0x61, 0x67, 0x73}
 
+// https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/3kfd3hw9(v=vs.71)
 const (
-	MaxColumnNameLength = 10
-	MaxCharacterLength  = 254
-	MaxNumericLength    = 20
-	MaxFloatLength      = 20
-	MaxIntegerValue     = math.MaxInt32
-	MinIntegerValue     = math.MinInt32
+	MaxColumnNameLength      = 10
+	MaxCharacterLength       = 254
+	MaxNumericLength         = 20
+	MaxFloatLength           = 20
+	MaxIntegerValue          = math.MaxInt32
+	MinIntegerValue          = math.MinInt32
+	MaxFieldsPerRecord       = 255
+	MaxCharactersPerRecord   = 65500
+	MaxTableFileSize         = 2 << 30
+	MaxRecordsPerTable       = 1000000000
+	MaxIndexKeyLength        = 100
+	MaxCompactIndexKeyLength = 240
+	NumericPrecisionDigits   = 16
 )
