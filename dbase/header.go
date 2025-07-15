@@ -49,3 +49,12 @@ func (h *Header) RecordsCount() uint32 {
 func (h *Header) FileSize() int64 {
 	return 296 + int64(h.ColumnsCount()*32) + int64(h.RowsCount*uint32(h.RowLength))
 }
+
+// ValidateFileSize checks if the calculated file size exceeds the maximum allowed size
+func (h *Header) ValidateFileSize() error {
+	fileSize := h.FileSize()
+	if fileSize > MaxTableFileSize {
+		return NewErrorf("calculated file size exceeds maximum: %d > %d bytes", fileSize, MaxTableFileSize)
+	}
+	return nil
+}
